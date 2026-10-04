@@ -23,7 +23,7 @@
 // 准备就绪 is refused while the temp overflow row (临时整备区) holds pieces: the reason shows under the button
 // (user playtest #3 item 3; the row's own label is ui/underframe.js TempRowNotice).
 
-import { useRef } from '../../vendor/hooks.module.js';
+import { useRef, useState, useEffect } from '../../vendor/hooks.module.js';
 import { PHASE } from '../../../shared/constants.js';
 import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, useTicker } from './components.js';
 import { Sprite, LpTower, GIcon, LocalSprite } from './gameComponents.js';
@@ -297,18 +297,80 @@ export function PauseButton({ paused, busy = false, onToggle }) {
 }
 
 /**
+ * Battle playback speed control (client-side combat): cycles 1× → 2× → 4×. Highlighted whenever it is off the
+ * default 2× so the player notices the battle is in slow-motion or fast-forward.
+ * @param {{ value: number, onCycle: () => void }} props
+ */
+export function SpeedButton({ value, onCycle }) {
+  const v = Number(value) > 0 ? Number(value) : 2;
+  return html`<${Tooltip} text=${`战斗倍速 ${v}×（点击切换 1× / 2× / 4×）`} placement="bottom">
+    <button type="button" class=${cx('speedbtn', 'tapx', v !== 2 && 'is-on')} aria-label=${`战斗倍速 ${v} 倍，点击切换`}
+      data-testid="speed" onClick=${() => onCycle?.()}>
+      <span class="speedbtn__txt num">${v}×</span>
+    </button>
+  <//>`;
+};
+
+/** Fast-forward-to-end glyph (double chevrons into a bar = skip the rest of this battle). */
+function SkipGlyph() {
+  return html`<svg class="skipbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M3.5 5.2 9.6 12l-6.1 6.8z" /><path d="M11.5 5.2 17.6 12l-6.1 6.8z" /><path d="M19.2 4.6h1.8v14.8h-1.8z" />
+  </svg>`;
+}
+
+/**
+ * "Skip this battle" control for the own normal field (solo, or each player's own field in multiplayer 各自行动): it
+ * is ENABLED only after every enemy has spawned (ready); before that it stays dimmed and disabled so a skip can never
+ * silently drop unspawned enemies. Once enabled, the first tap ARMS it (turns red, shows 确认跳过) against mis-taps and
+ * the second tap within 3 s force-ends the battle as a timeout — every enemy still on the field rushes the gate and
+ * costs LP — straight to the next prep / shop. It auto-resets if the confirmation does not come.
+ * @param {{ onSkip: () => (boolean|void), ready?: boolean }} props
+ */
+export function SkipButton({ onSkip, ready = true }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return undefined;
+    const id = setTimeout(() => setArmed(false), 3000);
+    return () => clearTimeout(id);
+  }, [armed]);
+  // safety: leave the armed state if the button becomes disabled (it cannot normally happen — arming requires ready)
+  useEffect(() => { if (!ready && armed) setArmed(false); }, [ready, armed]);
+  const onClick = () => {
+    if (!ready) return; // gated until every enemy has entered the field
+    if (!armed) { setArmed(true); return; }
+    setArmed(false);
+    try { onSkip?.(); } catch { /* the runner ignores a non-skippable battle */ }
+  };
+  const tip = armed
+    ? '再次点击确认：场上剩余敌人立刻冲家、扣除生命值，并直接进入下一轮整备'
+    : ready
+      ? '跳过本场：剩余敌人冲家扣血，直接进入下一轮买卖（联防 / Boss 关不可用）'
+      : '敌人尚未全部出场：等所有敌人进场后才可跳过，届时剩余敌人冲家扣血并进入下一轮';
+  return html`<${Tooltip} text=${tip} placement="bottom">
+    <button type="button" class=${cx('skipbtn', 'tapx', armed && 'is-armed', !ready && 'is-disabled')}
+      aria-label=${armed ? '确认跳过本场' : ready ? '跳过本场' : '等待敌人全部出场后跳过本场'}
+      aria-pressed=${armed ? 'true' : 'false'} aria-disabled=${ready ? 'false' : 'true'}
+      disabled=${!ready} data-testid="skip" onClick=${onClick}>
+      ${armed ? html`<span class="skipbtn__txt">确认跳过</span>` : html`<${SkipGlyph} />`}
+    </button>
+  <//>`;
+};
+
+/**
  * Top bar.
  * @param {{ pub:any, priv:any, conn:any, hud:any, total:number|null, drawer:string|null, onExit:Function, onDrawer:(tab:string)=>void,
  *   onReady:(r:boolean)=>void, readyBusy?:boolean, readyCount?:number, playerCount?:number,
  *   pen?:boolean, penAvail?:boolean, onPen?:(on:boolean)=>void, config?: any, frozenAt?: number|null,
  *   pause?: { show: boolean, paused: boolean, busy?: boolean, onToggle: () => void } | null,
+ *   speed?: { show: boolean, value: number, onCycle: () => void } | null,
+ *   skip?: { show: boolean, ready?: boolean, onSkip: () => void } | null,
  *   live?: { pending: number, unite: boolean, left?: number|null } | null }} props
  *   frozenAt: the server time every clock shows while the solo match is paused (null = live)
  *   live: the own battle's pending LP loss (liveLp): the tower shows lp − pending in red with a −N tick, 联防中 during 联防;
  *     `left` (a leaker in 联防): its enemies still standing — the capsule's ×N tag
  */
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
-  config = null, frozenAt = null, pause = null, live = null }) {
+  config = null, frozenAt = null, pause = null, speed = null, skip = null, live = null }) {
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
@@ -361,6 +423,8 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
         ${frozenSecs != null
           ? html`<${Countdown} seconds=${frozenSecs} total=${total ?? undefined} size="md" label="PAUSED" />`
           : html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />`}
+        ${speed?.show ? html`<${SpeedButton} value=${speed.value} onCycle=${speed.onCycle} />` : null}
+        ${skip?.show ? html`<${SkipButton} onSkip=${skip.onSkip} ready=${skip.ready !== false} />` : null}
         ${pause && (pause.show || pause.paused) ? html`<${PauseButton} paused=${!!pause.paused} busy=${pause.busy} onToggle=${pause.onToggle} />` : null}
       </div>
       <${OvertimeWarning} ot=${ot} />

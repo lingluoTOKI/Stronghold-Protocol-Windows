@@ -442,6 +442,9 @@ export async function createFieldView(host, options = {}) {
   const gone = new Set();
   const woundUp = new WeakSet(); // atk event tuples whose attack wind-up already started
   const interp = new SnapshotBuffer({ delay: 0.1, rate: 2 });
+  // Local deterministic feed state (client-side combat): when on, every snapshot carries the battle speed and the
+  // interpolation rate is synced from it on the same frame (no React-effect lag at a 1x/2x/4x switch).
+  let localFeedOn = false;
   const sample = new Map();
   const meleePending = new Map(); // target id → { src, t }
   const consumedIds = new Set();  // battle ids used up by their own effect (fx `consumed`): no death particles
@@ -1317,7 +1320,10 @@ export async function createFieldView(host, options = {}) {
   function pushSnapshot(snap) {
     if (destroyed || mode !== 'battle') return false;
     if (battleMeta?.fieldId && snap && snap.fieldId && snap.fieldId !== battleMeta.fieldId) return false;
-    return interp.push(snap, performance.now() / 1000);
+    const ok = interp.push(snap, performance.now() / 1000);
+    // local deterministic feed: apply the known battle speed on the same frame a snapshot arrives (zero switch lag)
+    if (ok && localFeedOn && snap && Number(snap.speed) > 0) interp.setLocalRate(Number(snap.speed));
+    return ok;
   }
 
   function pushEvents(ev) {
@@ -1679,9 +1685,12 @@ export async function createFieldView(host, options = {}) {
     setLocalFeed(o) {
       const on = !!(o && o.on);
       const speed = Number(o && o.speed) > 0 ? Number(o.speed) : 2;
+      localFeedOn = on;
       interp.delay = on ? 0.034 : 0.1;
       interp.defaultRate = on ? Math.min(20, speed) : 2;
       interp.maxRate = on ? Math.max(8, speed * 1.5) : 8;
+      // apply the rate at once (local feed knows it) instead of waiting for the arrival EMA to converge
+      if (on) interp.setLocalRate(speed); else interp.clearLocalRate();
       return true;
     },
     highlightTiles(tilesList, style) {

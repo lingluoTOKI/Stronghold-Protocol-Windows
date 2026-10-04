@@ -412,6 +412,15 @@ function MatchScreen() {
     }
   }, [view, showPrep, priv, editable, field, combat, mode, watchingOther, watching, holdSeq]);
 
+  // Playback speed button (client-side combat): keep the render interpolation rate in sync with the on-screen local
+  // battle's user-selected speed (1× / 2× / 4×) without re-entering the battle or resetting the camera — the enter
+  // effect above runs once per field, while this follows battle/runner.js state().speed live.
+  useEffect(() => {
+    if (view?.raw && field?.local && battleState && battleState.fieldId === field.fieldId && Number(battleState.speed) > 0) {
+      view.raw.setLocalFeed?.({ on: true, speed: battleState.speed });
+    }
+  }, [view, field?.local, field?.fieldId, battleState?.fieldId, battleState?.speed]);
+
   // battle frames straight from the socket (server-run combat, 20 Hz) or from the local simulation (client-side combat,
   // battle/runner.js, every animation frame) — never through the store. Frames go to the view as received: the game
   // time travels as `gt` and the render engine reads it (render/interp.js frameTime).
@@ -826,6 +835,10 @@ function MatchScreen() {
   const togglePauseRef = useRef(togglePause);
   togglePauseRef.current = togglePause;
 
+  // ---- battle playback speed (1× / 2× / 4×, client-side own field only) -------------------------------------------
+  const cycleSpeed = useCallback(() => { try { battleRunner?.cycleSpeed?.(); } catch { /* no runner */ } }, []);
+  const skipBattleCb = useCallback(() => { try { battleRunner?.skipBattle?.(); } catch { /* no runner */ } }, []);
+
   // a press on the field deselects (a tap on a piece selects it again at release — see pieceClick)
   useEffect(() => {
     const host = hostRef.current;
@@ -1044,6 +1057,15 @@ function MatchScreen() {
   // the solo pause button: only while the own battle still runs (the server refuses it afterwards)
   const canPause = pauseAvailable(pub, { solo, alive, done: meP?.status === 'done' || localDone });
   live.current.canPause = canPause;
+  // the speed button shows only for the own client-side battle while it runs: the runner flags the controllable field
+  // (own + authoritative + not a watch replica); scouting a teammate or a 联防 / boss-partner replica stays on the
+  // server clock and offers no button.
+  const canSpeed = cc && combat && !watchingOther && !!battleState && !!battleState.speedControl && !battleState.done;
+  const speedValue = battleState?.speedControl ? Number(battleState.speed) || 2 : (battleRunner?.getUserSpeed?.() ?? 2);  // skip the own controllable NORMAL battle: solo, or each player's own field in multiplayer free-for-all. The runner
+  // already gates own + authoritative + normal + not-boss + not-unite, so unite / boss / watched replicas never show it.
+  const canSkip = cc && combat && !watchingOther && !!battleState && !!battleState.canSkip && !battleState.done;
+  // the button is shown all combat but only ENABLED once every enemy has spawned (runner.state().skipReady)
+  const skipReady = canSkip && !!battleState.skipReady;
   // client-side combat: observing a teammate's battle (research 09 §3.1) and the 联防 / 最终攻势 camera halves
   // (an eliminated player auto-observes a teammate's normal field — research 09 "keep-watching" — without asking)
   const watchedFid = watchingOther ? watching : (cc && combat && !alive && battleState && battleState.watch && battleState.kind === 'normal' ? battleState.fieldId : null);
@@ -1151,6 +1173,8 @@ function MatchScreen() {
         readyBusy=${readyBusy} readyCount=${readyCount} playerCount=${solo ? 1 : aliveCount}
         pen=${pen} penAvail=${penAvail} onPen=${togglePen} config=${gd.config} frozenAt=${frozenAt}
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
+        speed=${canSpeed ? { show: true, value: speedValue, onCycle: cycleSpeed } : null}
+        skip=${canSkip ? { show: true, ready: skipReady, onSkip: skipBattleCb } : null}
         live=${liveLpNow} />
 
       <div class="gm__bonds">

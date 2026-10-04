@@ -68,6 +68,30 @@
 .pausebtn.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(23, 249, 183, .45); }
 .pausebtn.is-busy { opacity: .6; }
 
+/* battle playback speed (ui/hud.js SpeedButton, 1× / 2× / 4×; same dark square as the pause button) */
+.speedbtn {
+  display: grid; place-items: center; min-width: .6rem; height: .6rem; padding: 0 .08rem; flex: none;
+  background: rgba(10, 14, 12, .88); border: 2px solid rgba(242, 242, 242, .75); color: #fff;
+  box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .55);
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.speedbtn__txt { font-size: .22rem; font-weight: 700; line-height: 1; letter-spacing: .02em; }
+.speedbtn:hover:not(:disabled) { background: rgba(255, 255, 255, .14); border-color: #fff; }
+.speedbtn.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(23, 249, 183, .45); }
+/* solo skip-battle (ui/hud.js SkipButton): dark square like the speed button; the armed (confirm) state turns red */
+.skipbtn {
+  display: grid; place-items: center; min-width: .6rem; height: .6rem; padding: 0 .1rem; flex: none;
+  background: rgba(10, 14, 12, .88); border: 2px solid rgba(242, 242, 242, .75); color: #fff;
+  box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .55);
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.skipbtn__glyph { width: .32rem; height: .32rem; fill: currentColor; }
+.skipbtn__txt { font-size: .18rem; font-weight: 700; line-height: 1; letter-spacing: .02em; white-space: nowrap; }
+.skipbtn:hover:not(:disabled) { background: rgba(255, 255, 255, .14); border-color: #fff; }
+.skipbtn.is-armed { background: #e2262a; border-color: #ff8a8a; color: #fff; box-shadow: 0 0 .22rem rgba(255, 60, 60, .55); animation: blink 1s steps(2, end) infinite; }
+.skipbtn.is-disabled, .skipbtn:disabled { opacity: .45; border-color: rgba(242, 242, 242, .3); color: rgba(255, 255, 255, .55); cursor: not-allowed; }
+.skipbtn.is-disabled:hover, .skipbtn:disabled:hover { background: rgba(10, 14, 12, .88); border-color: rgba(242, 242, 242, .3); }
+
 /* boss-round overtime warning (ui/hud.js OvertimeWarning; red DOT look: official icon_warn / blood_icon + bg_lose_hp) */
 .otwarn {
   position: relative; display: flex; align-items: center; gap: .08rem; height: .38rem; padding: 0 .14rem 0 .1rem;
