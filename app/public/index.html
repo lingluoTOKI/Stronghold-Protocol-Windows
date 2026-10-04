@@ -6,6 +6,9 @@
        notches (viewport-fit=cover; css/devices.css keeps the HUD inside the safe area). -->
   <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#0c0f0e" />
+  <!-- PWA：安卓 Chrome 可“安装应用 / 添加到主屏幕”，配合下列 apple meta，iOS 从主屏幕图标启动也全屏无浏览器栏 -->
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon.svg" />
   <meta name="color-scheme" content="dark" />
   <meta name="format-detection" content="telephone=no" />
   <!-- "Add to Home Screen" (iOS / Android) opens full screen without browser bars -->
