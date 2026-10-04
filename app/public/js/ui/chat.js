@@ -45,9 +45,9 @@ export function ensureChatCss(doc = globalThis.document) {
     '/* 用户拖拽过尺寸后：消息区填满面板剩余高度（不再受 34vh 限制） */',
     '.chat-dock__panel.is-sized .chat-dock__body{max-height:none;min-height:0;}',
     /* 右下角拖拽手柄（落在消息区右下，避开输入行）：翡翠绿小三角，触摸可拖，双击复位 */
-    '.chat-dock__resize{position:absolute;right:0;bottom:.74rem;width:.26rem;min-width:20px;height:.26rem;min-height:20px;z-index:5;cursor:nwse-resize;touch-action:none;}',
-    '.chat-dock__resize::after{content:"";position:absolute;right:.05rem;bottom:.05rem;width:0;height:0;border-style:solid;border-width:0 0 .13rem .13rem;border-color:transparent var(--mint-500,#4ed8af) transparent transparent;opacity:.45;transition:opacity .15s;}',
-    '.chat-dock__resize:hover::after{opacity:1;}',
+    '.chat-dock__resize{position:absolute;right:0;bottom:.74rem;width:.32rem;min-width:26px;height:.32rem;min-height:26px;z-index:5;cursor:nwse-resize;touch-action:none;}',
+    '.chat-dock__resize::before{content:"";position:absolute;right:.04rem;bottom:.04rem;width:.17rem;min-width:14px;height:.17rem;min-height:14px;border-right:2px solid var(--mint-500,#4ed8af);border-bottom:2px solid var(--mint-500,#4ed8af);opacity:.55;transition:opacity .15s,border-color .15s;}',
+    '.chat-dock__resize:hover::before{opacity:1;border-color:var(--mint-400,#59f4ca);}',
     '.chat-dock__empty{color:var(--text-dim,#5d6863);text-align:center;padding:.16rem 0;font-size:max(.12rem,10px);letter-spacing:.08em;}',
     '.chat-item{display:flex;align-items:baseline;gap:.06rem;line-height:1.45;padding:.03rem .08rem;border-left:2px solid var(--line,rgba(78,216,175,.13));word-break:break-word;}',
     '.chat-item:hover{background:rgba(78,216,175,.06);}',

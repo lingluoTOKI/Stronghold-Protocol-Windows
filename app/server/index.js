@@ -597,6 +597,15 @@ export async function startServer(opts = {}) {
       });
       return;
     }
+    if (parts.rawPath === '/api/online') {
+      sendJson(req, res, 200, { online: Math.max(network.connectionCount, 0) });
+      return;
+    }
+    if (parts.rawPath === '/api/status') {
+      const st = lobby.stats();
+      sendJson(req, res, 200, { online: Math.max(network.connectionCount, 0), activeRooms: st.matches });
+      return;
+    }
     await serveStatic(req, res, parts.rawPath, parts.query);
   }
 
