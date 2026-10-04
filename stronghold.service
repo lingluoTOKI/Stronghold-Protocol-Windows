@@ -1,0 +1,14 @@
+[Unit]
+Description=Stronghold Protocol game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/root/stronghold
+ExecStart=/usr/local/bin/node server/index.js
+Environment=PORT=3000 HOST=0.0.0.0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

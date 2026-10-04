@@ -1,0 +1,28 @@
+# 仓库根目录行尾规范（app\ 子目录另有一份 app\.gitattributes）
+* text=auto
+
+# Windows 批处理必须是 CRLF，否则 cmd.exe 的标签/goto 会失效
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.sh  text eol=lf
+
+# 跨平台一致的文本
+*.mjs  text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+
+# 二进制
+*.png binary
+*.jpg binary
+*.webp binary
+*.skel binary
+*.woff2 binary
+*.otf binary
+*.ttf binary
+*.mp3 binary
+*.ogg binary
+*.exe binary
+*.tgz binary
