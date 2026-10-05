@@ -340,12 +340,16 @@ const boardCol = (u) => (u.player && u.player.mirror ? -u.tileC : u.tileC);
 const egirOrder = (a, b) => boardCol(a) - boardCol(b) || b.tileR - a.tileR || a.id - b.id;
 
 /**
- * 联防: an operator forced out at the deployment (carry.down, Battle.start, before battleStart) still stands on its
- * deploy position. The devour and the 5-tier revive slots both count it there (PRTS 盟约记录 前3名 / 最先部署).
+ * 联防: an operator down at battle start — forced out at the deployment (carry.down, Battle.start, before
+ * battleStart) OR already knocked out waiting to redeploy (上一场被击倒, removeReason 'killed' — owner's playtest
+ * 2026-10-05: such a member used to be excluded and took no part in the devour) — still stands on its deploy
+ * position. The devour and the 5-tier revive slots both count it there (PRTS 盟约记录 前3名 / 最先部署).
  */
 function egirDownAtStart(battle, u) {
-  return S.isOp(u) && !u.alive && u.removeReason === FORCED_EXIT && !!u.carry && u.carry.down === true
-    && battle.isDown(u);
+  // 联防开局时处于退场状态的成员都参与：被强制退场 (FORCED_EXIT) 或上一场被击倒等待再部署 (carry.down, removeReason
+  // 'killed') — owner's playtest 2026-10-05: 后者原先被排除、不参与吞噬。战斗中被打倒的干员 carry 为 null，不会误入。
+  return S.isOp(u) && !u.alive && !u.removed && battle.isDown(u)
+    && (u.removeReason === FORCED_EXIT || (!!u.carry && u.carry.down === true));
 }
 
 /**
