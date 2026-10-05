@@ -12,22 +12,30 @@
 //   * sample(): per unit, lerps x/y/hp/sp between the two snapshots bracketing renderT; flags/anim come from
 //     the older one. A unit missing from the newer snapshot (died/left mid-buffer) holds its last position
 //     until renderT reaches the newer snapshot; a unit that only exists in the newer one (spawned mid-buffer)
-//     appears when renderT reaches it. Moves longer than `teleport` tiles between two snapshots snap.
+//     appears when renderT reaches it. Moves longer than `teleport` tiles between two snapshots snap, and so does a
+//     unit whose deploy animation starts in between (a redeploy while it stays listed: 乌尔比安's 【移动】, a 突袭 jump).
 //   * event queue: a `b.ev` batch is stamped with its game time (`gt`, the snapshot it was drained with); a batch
 //     without one is placed inside the latest snapshot interval (newest snapshot time minus half an interval),
 //     and handed out by `takeEvents()` once renderT passes the stamp. Stale cosmetic events (> `eventMaxLag`
-//     game s behind) are dropped by the caller's choice (`isCosmeticEvent`); state events are always delivered.
+//     game s behind) are dropped by the caller's choice (`isCosmeticEvent`); state events — an enemy's form fx
+//     included — are always delivered, and a full queue sheds only cosmetic ones.
 //
 // Snapshot tuple layout (DESIGN §8.2): [id, x, y, hp, maxHp, sp, spMax, flags, anim]. Two optional lists ride along
 // (server/sim/Battle.js snapshot, user playtest #4 items 8 / 9):
 //   * `elem` [[id, element, fill, cooldownEnd, cooldown]] — the element gauge a unit shows: appended to that unit's
 //     normalised tuple (EL…EL_DUR) and handed out by sample() as `el`, `elFill`, `elUntil`, `elDur` (from the older
 //     snapshot, like flags);
-//   * `down` [[id, respawnAt, respawnTime, state]] — knocked-out operators waiting to redeploy (they are no longer in
-//     `units`): downAt(time) returns the list of the snapshot at `time`.
+//   * `down` [[id, respawnAt, respawnTime, state, row?, col?]] — knocked-out operators waiting to redeploy (they are no
+//     longer in `units`) and the tile they lie on (where they fell, or their home — sim Battle._layBody; kept only when
+//     both are integers): downAt(time) returns the list of the snapshot at `time`.
 // Game times in both (`cooldownEnd`, `respawnAt`) are on the snapshots' clock, so a view compares them with renderT.
 
+import { fxForm } from '../../../shared/protocol.js';
+import { ANIM } from '../../../shared/constants.js';
+
 export const TUPLE = Object.freeze({ ID: 0, X: 1, Y: 2, HP: 3, MAXHP: 4, SP: 5, SPMAX: 6, FLAGS: 7, ANIM: 8, EL: 9, EL_FILL: 10, EL_UNTIL: 11, EL_DUR: 12 });
+/** The unit was (re)deployed between tuples `a` and the newer `b`: `b` plays the deploy animation, `a` did not (sim snapshot animOf). */
+const redeployed = (a, b) => b[8] === ANIM.DEPLOY && a[8] !== ANIM.DEPLOY;
 /** Element keys a snapshot `elem` entry may carry (server/sim/constants.js ELEMENT_ORDER). */
 const ELEMENT_KEYS = new Set(['neural', 'erosion', 'burn', 'apoptosis', 'necrosis']);
 
@@ -37,7 +45,13 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
 /** Cosmetic event kinds that may be dropped when far behind (never state-changing). */
 export const COSMETIC_EVENTS = new Set(['atk', 'dmg', 'heal', 'fx', 'layer', 'bounty']);
-export const isCosmeticEvent = (ev) => Array.isArray(ev) && COSMETIC_EVENTS.has(ev[0]);
+/**
+ * Whether an event may be dropped when stale or shed from a full queue. An 'fx' that carries an enemy's model `form`
+ * (shared/protocol.js fxForm) is state: dropping it left the view on the old model after a long main-thread stall, on a
+ * watched field after a hidden tab and on a field entered late (user report #5 after 0.1.0) — the fourth place the client
+ * keeps it, with battle/runner.js keepsState and screens/game.js keepEarly.
+ */
+export const isCosmeticEvent = (ev) => Array.isArray(ev) && COSMETIC_EVENTS.has(ev[0]) && fxForm(ev) === undefined;
 
 /**
  * Game time (s) of a b.snap / b.ev payload, or NaN. On the wire every frame is `{ t: '<type>', … }`, so the server
@@ -52,7 +66,7 @@ export function frameTime(msg) {
 
 /**
  * Validate & normalise a b.snap payload. Returns `{ t, units: Map<id, tuple>, down: [[id, respawnAt, respawnTime,
- * state]] | null, raw }` or null when unusable. Tuples with a non-finite id/x/y are skipped; other numbers default
+ * state, row?, col?]] | null, raw }` or null when unusable. Tuples with a non-finite id/x/y are skipped; other numbers default
  * to 0; a unit's `elem` entry (see header) is appended to its tuple; malformed `elem` / `down` entries are dropped.
  */
 export function normalizeSnapshot(snap) {
@@ -80,7 +94,9 @@ export function normalizeSnapshot(snap) {
   if (Array.isArray(snap.down)) {
     for (const d of snap.down) {
       if (!Array.isArray(d) || !(typeof d[0] === 'number' || typeof d[0] === 'string')) continue;
-      (down || (down = [])).push([d[0], finite(d[1]), Math.max(0, finite(d[2])), finite(d[3]) | 0]);
+      const e = [d[0], finite(d[1]), Math.max(0, finite(d[2])), finite(d[3]) | 0];
+      if (Number.isInteger(d[4]) && Number.isInteger(d[5])) e.push(d[4], d[5]);
+      (down || (down = [])).push(e);
     }
   }
   return { t, units, down, raw: snap };
@@ -299,7 +315,8 @@ export class SnapshotBuffer {
       const b = B ? B.units.get(id) : null;
       if (b) {
         const dx = b[1] - a[1], dy = b[2] - a[2];
-        const tele = dx * dx + dy * dy > this.teleport * this.teleport;
+        // (a deployment in between — the newer snapshot starts its deploy animation — lands on its tile, no slide)
+        const tele = dx * dx + dy * dy > this.teleport * this.teleport || redeployed(a, b);
         o.x = tele ? (alpha < 1 ? a[1] : b[1]) : a[1] + dx * alpha;
         o.y = tele ? (alpha < 1 ? a[2] : b[2]) : a[2] + dy * alpha;
         o.vx = !tele && span > 0 ? dx / span : 0;
@@ -315,7 +332,7 @@ export class SnapshotBuffer {
           const dtp = A.t - P.t;
           if (p && dtp > 0) {
             vx = (a[1] - p[1]) / dtp; vy = (a[2] - p[2]) / dtp;
-            if (vx * vx + vy * vy > (this.teleport / dtp) ** 2) { vx = 0; vy = 0; }
+            if (vx * vx + vy * vy > (this.teleport / dtp) ** 2 || redeployed(p, a)) { vx = 0; vy = 0; }
           }
         }
         o.x = a[1] + vx * ext;
@@ -337,9 +354,12 @@ export class SnapshotBuffer {
 
   /**
    * Remove and return (in order) the queued events due at `time` (default renderT). When `dropCosmeticBefore`
-   * is a number, cosmetic events stamped earlier than it are discarded instead of returned.
+   * is a number, cosmetic events stamped earlier than it are discarded instead of returned; a state event stamped
+   * earlier is returned, and when `late` (a Map) is given it records that event → how far (game s) its stamp lies
+   * before `time`, so the caller can skip its stale cosmetics (render/app.js: a late form fx switches the model without
+   * replaying its telegraph and with its closing clip shortened).
    */
-  takeEvents(time = this.renderT, out = [], dropCosmeticBefore = null) {
+  takeEvents(time = this.renderT, out = [], dropCosmeticBefore = null, late = null) {
     if (!this.events.length || !Number.isFinite(time)) return out;
     let n = 0;
     while (n < this.events.length && this.events[n].t <= time) n++;
@@ -347,7 +367,10 @@ export class SnapshotBuffer {
     const list = this.events;
     for (let i = 0; i < n; i++) {
       const e = list[i];
-      if (typeof dropCosmeticBefore === 'number' && e.t < dropCosmeticBefore && isCosmeticEvent(e.ev)) continue;
+      if (typeof dropCosmeticBefore === 'number' && e.t < dropCosmeticBefore) {
+        if (isCosmeticEvent(e.ev)) continue;
+        if (late) late.set(e.ev, time - e.t);
+      }
       out.push(e.ev);
     }
     const rest = list.length - n;

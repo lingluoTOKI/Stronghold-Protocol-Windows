@@ -28,11 +28,20 @@ export const MUL_KEYS = Object.freeze([
   'trueTakenMul', 'elemTakenMul', 'elementalTakenMul', 'healingDealtMul', 'healingTakenMul', 'spRecoveryMul', 'redeployMul',
   'atkScaleMul', 'physDealtMul', 'artsDealtMul',
 ]);
-/** Boolean flag keys (OR). `taunt` is also accepted as a numeric mod. */
+/**
+ * Boolean flag keys (OR). `taunt` is also accepted as a numeric mod. `liftoff` = 起飞 of an ally (蒂比's skills): blocks
+ * no ground enemy (Battle._blockerFor), 对地规避 against ground enemies (targeting.js evadesGround); it stays a ground
+ * unit on its tile (`unit.ground` unchanged). `noHeal` = no heal from another unit (and no heal pick of one); `healFree`
+ * = 禁疗 that also stops the unit's own heals (damage.js heal: only an HP-regen attribute and a heal that "无视禁疗" pass —
+ * 史尔特尔's 余烬, which sets both). `stealthOff` = an enemy 隐匿 source switched off after a block (Battle._stealthSwitch).
+ */
 export const FLAG_KEYS = Object.freeze([
   'stun', 'freeze', 'sleep', 'silence', 'disarm', 'stealth', 'invulnerable', 'unblockable', 'levitate', 'fear',
   'cold', 'reveal', 'bind', 'noHeal', 'untargetable', 'blockFly', 'noMove', 'noSp', 'burstLock', 'hidden',
-  'noBlock', 'tremble', 'hitCount', 'hitCountArts', 'attract', 'float', 'noDisplace', 'isolated', 'camou',
+  'noBlock', 'tremble', 'hitCount', 'hitCountArts', 'attract', 'float', 'noDisplace', 'isolated', 'camou', 'liftoff',
+  // 自缚 (the unit's own immobility: 守墓石像's 转换模式, the 自缚 leaders) beside its `noMove` — 束缚 sets noMove too, and
+  // only 自缚 makes a unit "不视为可达目标" for 余 S2's teleport (PRTS 余 S2 备注)
+  'selfBound', 'healFree', 'stealthOff',
 ]);
 
 /**
@@ -46,6 +55,8 @@ export const STATUS = Object.freeze({
   stun: { flags: { stun: true, noBlock: true }, immune: 'stun' },
   // 冻结: 无法移动、攻击及使用技能; 敌方被冻结时，法术抗性-15 (the RES cut applies to enemies only)
   freeze: { flags: { freeze: true, stun: true }, mods: { resFlat: -FREEZE_RES_DOWN }, enemyOnlyMods: true, immune: 'frozen' },
+  // 寒冷: ASPD −30. A second cold while this one remains applies 冻结 for max(remaining, incoming)
+  // (Battle.applyStatus; PRTS 术语释义 寒冷 「持续时间取双方之中最高」).
   cold: { flags: { cold: true }, mods: { aspd: COLD_ASPD } },
   // 沉睡: 无敌且无法行动 (untargetable, takes no damage — except from `hitSleep` attackers — and blocks nothing)
   sleep: { flags: { sleep: true, noBlock: true }, immune: 'sleep' },

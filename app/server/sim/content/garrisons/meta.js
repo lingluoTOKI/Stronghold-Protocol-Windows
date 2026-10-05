@@ -16,10 +16,16 @@
 //   * 瑰盐 "优先…更靠上的和更靠右的": highest row first (DESIGN §3.1: row 0 is the bottom), then highest column.
 //   * 购买价格为N (SERVER_CHESS_PRICE): bb.price is a discount off the tier price — 至简 (Ⅲ, 3) has 2 → 1, 红豆 (Ⅰ, 2)
 //     has 1 → 1, exactly the N both official texts give (user playtest #5: 至简 costs 1). The dispatcher runs it before
-//     every other onPrice modifier, so 远见's discount (never below 1) and strategy caps act on the lowered price.
+//     every other onPrice modifier, so 远见's discount (to 0 at 150 layers since 0.1.3) and strategy caps act on the
+//     lowered price.
 //   * [ASSUMED] 余 SERVER_MOST_BOND: ties between most-member bonds are shuffled; the chess is a copy-weighted pool roll
 //     of any tier (the text gives no tier cap); a bond without an available chess falls through to the next tied one.
 //   * [ASSUMED] 松果: the "免费特殊招募" is a free pick-one offer of `rewardOffer.count` (3) chess of the pool's tier.
+//   * 拉普兰德 SERVER_GAIN_BOND_LAYER_BY_REFRESH_CNT "若为本回合首次主动刷新": per copy — the first manual refresh this
+//     operator witnesses in the round (players' report after 0.1.0); [ASSUMED] an elite merged this round keeps its
+//     copies' count, and a copy bought after selling one this round is a new copy (fires on its own first refresh).
+//     "本回合每刷新过1次" (SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER, 阿罗玛 / 安洁莉娜 / 售出时)
+//     fires on another event and reads the player's refreshes of the round (roundStats), like 本回合每获得过 / 每花费.
 
 import { metaBonds, frontPiece, behindPiece, distinctTiers } from '../support/meta.js';
 
@@ -188,18 +194,29 @@ H.SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER = {
   },
 };
 
+// 拉普兰德 "<刷新时>若为本回合首次主动刷新…，此干员在整备区时也有效": the refresh count is the operator's own — the manual
+// refreshes this copy witnessed this round (board or hand), so a 拉普兰德 bought after the round's first refresh still
+// fires on the next one (players' report after 0.1.0: "获得该干员后该回合的首次刷新" also stacks — the official behaviour;
+// read as each trait instance counting its own SERVER_REFRESH_SHOP triggers against bb.refresh_cnt). A re-triggered trait
+// (ev.trigger) is no manual refresh: it neither fires nor counts. A new copy (bought, granted) starts at 0. [ASSUMED]:
+// the copies of an elite merged this round pass on their highest count (PlayerState.pieceRoundCount — no second trigger
+// that round, conservative); a copy bought after selling one this round is a new copy — "获得该干员后" — and fires on its
+// own first refresh (the server cannot tell it from any other copy; each such +4 costs her price + a refresh − the
+// 1-fund refund, and needs her in the shop again).
+const REFRESH_CNT_KEY = 'garrison:SERVER_GAIN_BOND_LAYER_BY_REFRESH_CNT:refreshes'; // per-piece counter (module-prefixed)
 H.SERVER_GAIN_BOND_LAYER_BY_REFRESH_CNT = {
   onRefresh(ctx, ev) {
     if (ev && ev.trigger) return;
-    const { bb, bbStr, garrison } = ctx.source;
-    if ((ctx.roundStats().refreshes | 0) !== num(bb.refresh_cnt, 1)) return;
+    const { bb, bbStr, garrison, piece } = ctx.source;
+    if (!piece || !Number.isInteger(piece.uid) || piece.uid <= 0) return;
+    if (ctx.incPieceCounter(piece.uid, REFRESH_CNT_KEY) !== num(bb.refresh_cnt, 1)) return;
     addAll(ctx, ids(bbStr.bond), num(bb.layer), requireActiveOf(garrison));
   },
 };
 
 // "购买价格为N": bb.price is the discount off the chess's tier price — 至简 (Ⅲ, 3 资金) carries 2 and 红豆 (Ⅰ, 2 资金)
 // carries 1, and both texts say 购买价格为1 (read as the new price, 至简 cost 2; user playtest #5). The dispatcher runs
-// this first on onPrice (effectsMeta.js), so bonds (远见 −1, never below 1) and strategies see the lowered price.
+// this first on onPrice (effectsMeta.js), so bonds (远见 −1: 1 → 0) and strategies see the lowered price.
 H.SERVER_CHESS_PRICE = {
   onPrice(ctx, ev) {
     const p = ctx.source.bb.price;

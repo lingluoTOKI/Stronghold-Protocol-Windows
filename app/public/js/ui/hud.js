@@ -25,7 +25,7 @@
 
 import { useRef, useState, useEffect } from '../../vendor/hooks.module.js';
 import { PHASE } from '../../../shared/constants.js';
-import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, useTicker } from './components.js';
+import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, useTicker, hasDeadline } from './components.js';
 import { Sprite, LpTower, GIcon, LocalSprite } from './gameComponents.js';
 import { localAsset } from '../data.js';
 import { serverNow } from '../store.js';
@@ -33,6 +33,8 @@ import { isCombatPhase, isBossPhase, prepCapsuleLabel, bossFrac, bossPctText, fm
 import { overtimeState, overtimeDrainPerSec, remainAt } from './matchStatus.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
+// 战斗基准速度（游戏秒 / 真实秒）：服务器下发的战斗 deadline 按此真实时钟设定，默认 2×。
+const BATTLE_BASE_SPEED = 2;
 
 /**
  * Phase capsule: prep label, kills n/m (combat/unite), kills + boss HP bar (boss rounds).
@@ -357,6 +359,24 @@ export function SkipButton({ onSkip, ready = true }) {
 };
 
 /**
+ * 自己可控普通战斗场的对局倒计时：直接读本地确定性模拟的游戏时钟（Battle.time / timeLimit）。
+ * 显示以基准 2× 为刻度的对局剩余秒 = (游戏总时长 − 已进行游戏时间) / 2，进场初始即满程 total。
+ * 因为读的是模拟游戏时间而非真实时钟：进场时无论已经是几倍速、中途如何切换，数字都连续不跳变，
+ * 且 2× 每秒减 1、4× 每秒减 2、1× 每两秒减 1，与战斗进程严格同步、零漂移。
+ * speed 为 null（Boss 关 / 联防 / 观战 / 休整商店 / 暂停 PAUSED 覆盖）时返回 null，交回服务器实时 deadline。
+ * @param {{ show:boolean, clock?: () => ({time:number, timeLimit:number}|null) }|null} speed
+ * @returns {number|null} 剩余整数秒（ceil）；null 表示不接管、沿用服务器 deadline
+ */
+function useBattleCountdown(speed) {
+  const active = !!speed?.show && typeof speed.clock === 'function';
+  useTicker(active ? 200 : 0);
+  if (!active) return null;
+  let c = null;
+  try { c = speed.clock(); } catch { c = null; }
+  if (!c || !(Number(c.timeLimit) > 0)) return null;
+  return Math.max(0, Math.ceil((Number(c.timeLimit) - Number(c.time)) / BATTLE_BASE_SPEED));
+}
+/**
  * Top bar.
  * @param {{ pub:any, priv:any, conn:any, hud:any, total:number|null, drawer:string|null, onExit:Function, onDrawer:(tab:string)=>void,
  *   onReady:(r:boolean)=>void, readyBusy?:boolean, readyCount?:number, playerCount?:number,
@@ -370,7 +390,7 @@ export function SkipButton({ onSkip, ready = true }) {
  *     `left` (a leaker in 联防): its enemies still standing — the capsule's ×N tag
  */
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
-  config = null, frozenAt = null, pause = null, speed = null, skip = null, live = null }) {
+  config = null, frozenAt = null, pause = null, speed = null, skip = null, live = null, spectator = false }) {
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
@@ -378,16 +398,20 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   const pending = !boss && Number.isFinite(lp) && live && live.pending > 0 ? Math.min(lp, live.pending) : 0;
   const hidden = phase === PHASE.HIDDEN_CORE || (Number.isFinite(pub?.lastRound) && pub.round > pub.lastRound);
   const roundText = hidden ? '??' : pub?.round > 0 ? String(pub.round) : '--';
-  const showReady = phase === PHASE.PREP && priv?.alive !== false;
+  // a spectator seat (no m.private, community report #26) never readies
+  const showReady = phase === PHASE.PREP && !spectator && priv?.alive !== false;
   // boss rounds: the overtime warning follows the clock (4 Hz while live; frozen while paused)
   const otLive = boss && Number(pub?.overtimeAt) > 0;
   useTicker(otLive && frozenAt == null ? 250 : 0);
+  // 自己可控的普通战斗场：顶部是一条连续对局时钟，切倍速只改流逝速率、数字不跳变（见 useBattleCountdown）。
+  const battleSecs = useBattleCountdown(speed);
   const now = Number.isFinite(frozenAt) ? frozenAt : serverNow();
   const ot = otLive ? overtimeState(pub, now, { perSec: overtimeDrainPerSec(config) }) : null;
   const draining = ot?.state === 'drain';
   const lowLp = (Number.isFinite(lp) && lp - pending <= 5) || draining;
   const cap = Number(config?.lpCapPerRound) > 0 ? Number(config.lpCapPerRound) : 10;
   const frozenSecs = Number.isFinite(frozenAt) ? remainAt(pub?.deadline, frozenAt) : null;
+  // （可控普通战斗场的连续倒计时由上方 useBattleCountdown 给出；其余场仍用服务器实时 deadline）
   const btn = checkButtons({ pen, penAvail, infoOpen: !!drawer });
   const onLeft = () => (pen ? onPen(false) : onDrawer('info'));
   const onRight = () => (pen ? onPen(false) : penAvail ? onPen(true) : null);
@@ -422,8 +446,14 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
       <div class="gtop__clock">
         ${frozenSecs != null
           ? html`<${Countdown} seconds=${frozenSecs} total=${total ?? undefined} size="md" label="PAUSED" />`
-          : html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />`}
-        ${speed?.show ? html`<${SpeedButton} value=${speed.value} onCycle=${speed.onCycle} />` : null}
+          : battleSecs != null
+            ? html`<${Countdown} seconds=${battleSecs} total=${total ?? undefined} size="md" />`
+            : html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />`}
+        ${speed?.show
+          ? html`<${SpeedButton} value=${speed.value} onCycle=${speed.onCycle} />`
+          : isCombatPhase(pub?.phase) && !spectator
+            ? html`<span class="gtop__nospeed" title="本阶段无法调整战斗倍速">本阶段不可调倍速</span>`
+            : null}
         ${skip?.show ? html`<${SkipButton} onSkip=${skip.onSkip} ready=${skip.ready !== false} />` : null}
         ${pause && (pause.show || pause.paused) ? html`<${PauseButton} paused=${!!pause.paused} busy=${pause.busy} onToggle=${pause.onToggle} />` : null}
       </div>

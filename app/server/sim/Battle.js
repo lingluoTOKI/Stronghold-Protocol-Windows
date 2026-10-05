@@ -5,11 +5,15 @@
 //   b.step(); b.finished; b.forceEnd(reason); b.time; b.result(); b.snapshot(); b.drainEvents(); b.on/off(...)
 //
 // Construction creates every ally unit (undeployed) and installs content (kits + domain modules). The first
-// step() (or an explicit start()) deploys everything (operators top→bottom, left→right — mirrored for the right boss
-// side —, then the summon pieces the same way — except a piece content flags `deferDeploy`, which waits on its tile;
-// the players of a shared field side by side), fires `deploy` (initial) for each unit, forces out the operators that
-// enter already knocked out (`carryState.down`, 联防: constants.js FORCED_EXIT — down on their tile, redeploy timer
-// running) and then fires `battleStart`.
+// step() (or an explicit start()) deploys everything (operators by column from the left, top to bottom within a
+// column — mirrored for the right boss side —, then the summon pieces the same way — except a piece content flags
+// `deferDeploy`, which waits on its tile; the players of a shared field side by side), fires `deploy` (initial) for
+// each unit, forces out the operators that enter already knocked out (`carryState.down`, 联防: constants.js
+// FORCED_EXIT — down on their tile, redeploy timer running) and then fires `battleStart`.
+// An operator that left the field — knocked out, or forced out by its own effects (史尔特尔's 余烬 …, GitHub #60) — lies
+// on its `body` tile — where it fell, or its own home when it fell on another board piece's home — and redeploys there;
+// no ally deploys or moves onto that tile meanwhile (PRTS 卫戍协议/帮助 §作战阶段 单位部署; `isDown`, `_layBody`, `downOn`,
+// `restTile`, `isReservedTile`; docs/SIM.md §1).
 // Tick order: scheduled callbacks → spawns → DP → buffs → enemies (attack, move, block) → enemy index →
 //   allies (skill tick, attack) → projectiles → redeploys → boss sync → `tick` hook → release hooks of removed units →
 //   time += TICK → end checks. A forceEnd() requested mid-step ends the step after the current phase (docs/SIM.md §1.4).
@@ -21,14 +25,14 @@
 // Robustness: every content callback and every step phase is wrapped; errors are logged once per key and the
 // battle continues. After MAX_INTERNAL_ERRORS the battle force-ends as a timeout.
 
-import { TICK, ROWS, COLS, BLOCK_RADIUS_SQ, DP_DEFAULTS, DOWN_STATE, FORCED_EXIT, MAX_BATTLE_TIME, MAX_INTERNAL_ERRORS, COLD_FREEZE_DURATION, OBSTACLE_DEVICES, EVENT_BUFFER_CAP, BOSS_ROW_OFFSET, MAX_HOOK_DEPTH, MAX_ALIVE_ENEMIES, LEVITATE_HALF_WEIGHT, RESIST_DEFAULT, RESIST_PALSY_DECAY, PUSH_TILES, PUSH_TILES_EFFECT, PULL_WEAK_SHARE, PULL_CRAWL, PULL_ORIGIN, PULL_STOP_RADIUS, PUSH_DIRECTIONAL_MIN_DIST, AUTO_OP_COOLDOWN } from './constants.js';
+import { TICK, ROWS, COLS, BLOCK_RADIUS_SQ, DP_DEFAULTS, DOWN_STATE, FORCED_EXIT, MAX_BATTLE_TIME, MAX_INTERNAL_ERRORS, COLD_FREEZE_DURATION, OBSTACLE_DEVICES, EVENT_BUFFER_CAP, BOSS_ROW_OFFSET, MAX_HOOK_DEPTH, MAX_ALIVE_ENEMIES, LEVITATE_HALF_WEIGHT, RESIST_DEFAULT, RESIST_PALSY_DECAY, PUSH_TILES, PUSH_TILES_EFFECT, PULL_WEAK_SHARE, PULL_CRAWL, PULL_ORIGIN, PULL_STOP_RADIUS, PUSH_DIRECTIONAL_MIN_DIST, AUTO_OP_COOLDOWN, STEALTH_RESTORE } from './constants.js';
 import { GEO, layerGainRoom } from '../../shared/constants.js';
 import { createRng } from './rng.js';
 import { Grid } from './grid.js';
 import { Unit } from './units.js';
 import { makeBuff, STATUS, RESIST_STATUSES } from './buffs.js';
 import { dealDamage as pipeDamage, heal as pipeHeal, applyHpLoss, makeDamageInfo, reduceElement, palsyBuff, elementView, leaderHitCancelled } from './damage.js';
-import { absoluteRangeKeys, canTargetEnemy } from './targeting.js';
+import { absoluteRangeKeys, canTargetEnemy, extendedGrid, evadesGround, enemyStealthed, stealthOffKey } from './targeting.js';
 import { bodyKeys, bodyInKeys, bodyInRadius } from './body.js';
 import { normDir, mirrorDir, localOrder, localBefore } from './dir.js';
 import { ProjectileSystem } from './projectiles.js';
@@ -120,6 +124,7 @@ export class Battle {
     this.finished = false;
     this.reason = null;
     this.started = false;
+    this._startDeploying = false;
     /** @type {Unit[]} every unit ever created */
     this.units = [];
     /** @type {Unit[]} alive enemies (compacted each tick) */
@@ -345,22 +350,30 @@ export class Battle {
     if (this.started) return;
     this.started = true;
     this._safe(() => this._spawnStageDevices(), 'stageDevices');
-    // PRTS 卫戍协议/帮助: "按从上到下>从左到右的顺序部署。优先部署干员，随后为召唤物（如果有）" — per player the operators
-    // top row first, left to right within a row (the mirrored right boss side: right to left in field columns,
-    // research 01 §4.3 "嘲諷優先鏡射"), then the summon pieces in the same order. [ASSUMED] On a shared field (联防, boss)
-    // the players' fields deploy at the same time (PRTS: one unit after another with a fixed delay, from the battle
+    // PRTS 卫戍协议/帮助 §作战阶段: "按从上到下>从左到右的顺序部署。优先部署干员，随后为召唤物（如果有）", noted "自卫戍协议：
+    // 盟约 下半（2026/3/14）起，部署顺序由“从左到右>从下到上”更改为“从上到下>从左到右”" — a scanning order: down each column
+    // (top first), the columns from left to right; act 1's along each row, the rows from the bottom. It is the order PRTS
+    // gives the 阿戈尔 devour ("从最先部署（更靠左和靠上的）的【阿戈尔】干员开始", content/bonds/core.js egirOrder) and the one
+    // act-2 videos show. Per player the operators, left column first, top to bottom within a column (the mirrored right
+    // boss side from its own left, i.e. the highest field column — PRTS "部署顺序…左右镜像", research 01 §4.3), then the
+    // summon pieces in the same order. Until 0.1.3 the top row came first (row-major). [ASSUMED] On a shared field (联防,
+    // boss) the players' fields deploy at the same time (PRTS: one unit after another with a fixed delay, from the battle
     // start), so the i-th operators of all players come in together (in `players` order), then the summons likewise
     const seq0 = this._deploySeq;
     const lists = this.players.map((ps) => ps.units.filter((u) => u.kind === 'op' || u.kind === 'token').slice().sort((a, b) =>
-      b.homeR - a.homeR || (ps.mirror ? b.homeC - a.homeC : a.homeC - b.homeC) || a.id - b.id));
+      (ps.mirror ? b.homeC - a.homeC : a.homeC - b.homeC) || b.homeR - a.homeR || a.id - b.id));
     // a summon piece flagged `deferDeploy` by content (one its owner's loadout does not make — 赫默 on S1 with a drone
     // piece —, or a skill's summon when shared/constants.js SKILL_SUMMON_START_DEPLOY is off: content/tokens.js
     // dockSkillSummons) stays off the field, its tile reserved (isReservedTile), until content deploys it
+    // (_startDeploying: a board piece content brings in during this deployment — a tactician's 流形 / 狼群 comes with
+    // its owner's deploy — takes its 联防 carry on that first deployment too)
+    this._startDeploying = true;
     for (const kind of ['op', 'token']) {
       const per = lists.map((l) => l.filter((u) => u.kind === kind && !u.deferDeploy));
       const n = Math.max(0, ...per.map((l) => l.length));
       for (let i = 0; i < n; i++) for (const l of per) if (l[i]) this._safe(() => this._deploy(l[i], { initial: true }), 'initialDeploy', l[i]);
     }
+    this._startDeploying = false;
     // 仇恨 (targeting.js sortAllyTargets: the later deployed is attacked first): every summon that came in during the
     // initial deployment — also one an operator's deploy brought along (a tactician's 援军, a start-of-battle summon)
     // — ranks after all the operators (of every player on the field [ASSUMED]), in the order it came
@@ -484,9 +497,11 @@ export class Battle {
 
   _timeout() {
     // Remaining non-boss enemies on the field count as leaked (DESIGN §5.5). Spawns that never happened before the
-    // limit are dropped: they are removed from `total` and reported in `result().unspawned` (not leaks).
+    // limit are dropped: they are removed from `total` and reported in `result().unspawned` (not leaks). A content-made
+    // neutral (`mem.noLeak`: 隐德来希's 心烛, which follows its original) is never a leak — it is in no spawn schedule, so
+    // a client result listing it would be rejected (fields.js validateClientResult 'leak key').
     for (const e of this.enemies) {
-      if (!e.alive || e.isBoss) continue;
+      if (!e.alive || e.isBoss || e.mem.noLeak) continue;
       this._recordLeak(e, true);
     }
     this.unspawned = [];
@@ -533,10 +548,14 @@ export class Battle {
     for (const ps of this.players) {
       const pp = this._perPlayer[ps.playerId];
       pp.perfect = !pp.leaked.some((l) => l.counted !== false);
-      pp.unitsEnd = ps.units.filter((u) => u.kind === 'op').map((u) => ({
+      // the operators and the board's summon pieces (a board uid): 联防 carries an operator's HP ratio and SP, a summon's
+      // SP only (match/unite.js). `sp` is the official 技力 — stored charges included (PRTS 技能 "可充能X次…当前技力上限等于该
+      // 技能技力需求的X倍"); a running skill spent its SP at activation, so it reports what was left (0 for one charge).
+      // `skillActive` is reported, never carried.
+      pp.unitsEnd = ps.units.filter((u) => u.kind === 'op' || (u.kind === 'token' && u.uid != null)).map((u) => ({
         uid: u.uid, id: u.id, defId: u.defId,
         hpPct: u.alive ? Math.max(0, Math.min(1, u.hp / u.s.maxHp)) : 0,
-        sp: u.skill && !u.skill.noSkill ? Math.round(u.skill.sp * 100) / 100 : 0,
+        sp: u.skill && !u.skill.noSkill ? Math.round(u.skill.spTotal * 100) / 100 : 0,
         skillActive: !!(u.skill && u.skill.active && u.skill.kind !== 'passive'),
         alive: !!u.alive,
       }));
@@ -810,8 +829,11 @@ export class Battle {
     e.deploySeq = ++this._deploySeq;
     e.deployedAt = this.time;
     e.atkCd = 0;
-    e.pauseUntil = -Infinity;
-    e.profile = { noAttack: def.dmgType === 'none', maxTargets: 1, atkScale: 1 };
+    e.pauseUntil = -Infinity;      // content holds (暴鸰's drop)
+    e.atkStandUntil = -Infinity;   // standing for its attack clip (ai.js attackStand)
+    // every enemy profile starts with the same fields (stable object shapes keep the hot loop's property reads fast);
+    // `dmgType` null = the data's (content may arm a data-unarmed enemy: ai.js enemyAttack)
+    e.profile = { noAttack: def.dmgType === 'none', maxTargets: 1, atkScale: 1, dmgType: null };
     e.route = { legs: route ? compileRoute(route, this.rect) : [], legIdx: 0, pts: null, ptIdx: 0, suffix: null, version: -1, waitLeft: null };
     if (!e.route.legs.length) {
       const end = this.grid.specialTiles('end')[0];
@@ -840,8 +862,9 @@ export class Battle {
   // deployment / death / redeploy
 
   /**
-   * Deploy `u` on its home tile, or on `tile` ([r, c]: a one-off landing tile — the home stays the tile of later
-   * redeploys). `keepSp` = { sp, charges } restored right after the skill reset, before the `deploy` hook fires.
+   * Deploy `u` on its home tile, or on `tile` ([r, c]: a one-off landing tile — the home stays the board tile; an
+   * operator that left the field comes back on its body tile, restTile). `keepSp` = { sp, charges }
+   * restored right after the skill reset, before the `deploy` hook fires.
    */
   _deploy(u, { initial = false, carry = null, tile = null, keepSp = null } = {}) {
     if ((u.alive && u.deployed) || u._removing) return false;
@@ -854,11 +877,14 @@ export class Battle {
     const k = R0 * COLS + C0;
     const occ = this._occ[k];
     if (occ && occ !== u && occ.alive && occ.deployed) { this.log(`tile ${R0},${C0} occupied; ${u} not deployed`); return false; }
+    // "倒地干员所在地块视为可部署，但所有我方单位在此处的部署行为将被阻止" (PRTS 卫戍协议/帮助 §作战阶段 单位部署)
+    if (this.downOn(R0, C0, u)) { this.log(`a knocked-out operator lies on ${R0},${C0}; ${u} not deployed`); return false; }
     const first = u.deploySeq === 0;
     u.alive = true;
     u.deployed = true;
     u.removed = false;
     u.hidden = false;
+    u.body = null;
     u.x = C0; u.y = R0; u.tileR = R0; u.tileC = C0;
     u.blocking = [];
     u.deploySeq = ++this._deploySeq;
@@ -870,8 +896,10 @@ export class Battle {
     u.ground = this.grid.isLow(R0, C0) && !this._elevated?.has(k);
     u.markDirty();
     u.hp = u.s.maxHp;
-    const cs = initial ? (carry ?? u.carry) : null;
-    if (cs && Number.isFinite(cs.hpPct)) u.hp = Math.max(1, u.s.maxHp * Math.max(0.01, Math.min(1, cs.hpPct)));
+    // 联防 carry (PRTS 卫戍协议/帮助 §联防阶段 "将对应单位的生命比例、技力修改至与上一阶段结束时相同（召唤物仅修改技力…）"):
+    // an operator's HP ratio here, the SP in skill.reset and again after the `deploy` hook (below) — a summon's SP only
+    const cs = initial || (first && this._startDeploying) ? (carry ?? u.carry) : null;
+    if (cs && u.kind === 'op' && Number.isFinite(cs.hpPct)) u.hp = Math.max(1, u.s.maxHp * Math.max(0.01, Math.min(1, cs.hpPct)));
     this._occ[k] = u;
     this._refreshRange(u); // also rebuilds baseRangeKeys (initial range incl. permanent rangeExtend)
     if (!u.skill) this._setupUnit(u);
@@ -887,6 +915,9 @@ export class Battle {
     if (first) this._ev(['spawn', unitInfo(u)]);
     this._ev(['deploy', u.id]);
     if (this._hooks.deploy) this.emit('deploy', { unit: u, initial });
+    // 联防: "部署完成后，将对应单位的…技力修改至与上一阶段结束时相同" — the carried SP is set again once the deployment is
+    // done, so a deploy-time SP gift (独行, 黄沙罗盘 …) does not come on top of it; later redeploys keep those gifts
+    if (cs && Number.isFinite(cs.sp) && u.alive && u.skill) u.skill.setSpTotal(cs.sp);
     return true;
   }
 
@@ -905,7 +936,10 @@ export class Battle {
     this._remove(unit, 'killed', killer);
   }
 
-  /** Withdraw an ally without a kill (it may redeploy after its respawn time). */
+  /**
+   * Withdraw an ally without a kill (it may redeploy after its respawn time): an operator lies down where it stood and
+   * comes back there (isDown, GitHub #60) — unless `permanent`, or the 突袭 retreat ('raid') that redeploys it at once.
+   */
   retreat(unit, { reason = 'retreat', permanent = false } = {}) {
     if (!unit || !unit.alive || unit.side !== 'ally') return;
     this._remove(unit, reason, null, permanent);
@@ -940,6 +974,7 @@ export class Battle {
         if (reason === 'killed') { const pp = this._pp(unit.ownerId); if (pp) pp.deaths++; }
         const mul = unit.persist.redeployMul * unit.s.redeployMul;
         unit.respawnAt = this.time + Math.max(0, unit.base.respawnTime * mul);
+        if (this.isDown(unit)) this._layBody(unit); // before `die` / `death`: the body's tile is final for them
       } else {
         unit.removed = true;
       }
@@ -993,10 +1028,11 @@ export class Battle {
   }
 
   /**
-   * Immediately redeploy a dead (or retreated) ally. opts:
+   * Immediately redeploy a dead (or retreated) ally on its rest tile (restTile: where an operator that left the field
+   * lies, else its home tile). opts:
    *   free=true   no DP cost (false: pays `base.cost`, refused when the player lacks the DP)
-   *   tile=[r,c]  land on this in-rect tile instead of the home tile (the home stays the tile of later redeploys);
-   *               refused (false) when the tile is outside the rect or a living unit stands there — no fallback
+   *   tile=[r,c]  land on this in-rect tile instead (the home stays the board tile); refused (false) when the tile is
+   *               outside the rect, a living unit stands there or another knocked-out operator lies there — no fallback
    *   keepSp      keep the SP / charges the unit had (保留技力): restored before the `deploy` hook fires
    * Returns true when the unit was deployed (full HP, `deploy {initial:false}` fires).
    */
@@ -1006,10 +1042,14 @@ export class Battle {
     if (tile != null) {
       if (!Array.isArray(tile) || !Number.isInteger(tile[0]) || !Number.isInteger(tile[1]) || !this.grid.inRect(tile[0], tile[1])) return false;
       at = [tile[0], tile[1]];
+    } else {
+      const rest = this.restTile(unit);
+      if (rest[0] !== unit.homeR || rest[1] !== unit.homeC) at = rest;
     }
     const k = at ? at[0] * COLS + at[1] : unit.homeR * COLS + unit.homeC;
     const occ = this._occ[k];
     if (occ && occ.alive && occ !== unit) return false;
+    if (at && this.downOn(at[0], at[1], unit)) return false;
     const ps = this.getPlayer(unit.ownerId);
     const cost = unit.base.cost;
     let paid = 0;
@@ -1025,18 +1065,25 @@ export class Battle {
     return false;
   }
 
+  /**
+   * Automatic redeploys (DESIGN §5.5): an operator that left the field and whose timer is done comes back on its rest
+   * tile — where it lies ("满足再部署条件时，移除场上的该倒地干员并自动部署至该位置", PRTS 卫戍协议/帮助) — when that tile
+   * is free and its player has the DP.
+   */
   _checkRedeploys() {
     for (const u of this.allyUnits) {
       if (u.alive || u.removed || u.kind !== 'op') continue;
       if (this.time + 1e-9 < u.respawnAt) continue;
-      const k = u.homeR * COLS + u.homeC;
-      const occ = this._occ[k];
-      if (occ && occ.alive && occ !== u) continue;
+      // the DP first: an operator past its timer mostly waits for DP, and the tile checks scan every ally
       const ps = this.getPlayer(u.ownerId);
       const cost = u.base.cost;
       if (!ps || ps.dp + 1e-9 < cost) continue;
+      const [r, c] = this.restTile(u);
+      const occ = this._occ[r * COLS + c];
+      if (occ && occ.alive && occ !== u) continue;
+      if (this.downOn(r, c, u)) continue;
       ps.dp = Math.max(0, ps.dp - cost);
-      this._deploy(u, { initial: false });
+      this._deploy(u, { initial: false, tile: r === u.homeR && c === u.homeC ? null : [r, c] });
     }
   }
 
@@ -1066,7 +1113,8 @@ export class Battle {
    * Try to block enemy `e` where it stands. Returns true if it is (now) blocked. Official contact rule (constants.js
    * BLOCK_RADIUS, PRTS 游戏数据基础 §阻挡半径): the enemy's position within the blocker's block radius of the blocker's
    * centre (ground 0.7071 — the tile's circumscribed circle, reaching 0.21 tile into the side neighbours; air 0.8944;
-   * devices 0.4472), and the blocker has free capacity for the enemy's block weight. Checked every tick for every
+   * devices 0.4472), and the blocker has free capacity for the enemy's block weight (and may block it at all: a unit on
+   * a fenced tile blocks no ground enemy, _blockerFor). Checked every tick for every
    * unblocked enemy, moving or not, so an enemy overlapping an operator is taken over as soon as its blocker is gone or
    * the operator's capacity frees up (user playtest #5 item 4). Several blockers in contact → the nearest [ASSUMED],
    * ties → the first in row-then-column scan order.
@@ -1104,7 +1152,9 @@ export class Battle {
    * or not, whatever its facing ("可以选择且优先选择阻挡单位", PRTS 选择器; ai.js acquireTargets, the skills' DEFAULT
    * trigger). That holds for a ranged operator on a melee tile too: the user's rule after playtest #6, "阻挡了就一定要能
    * 打到" — officially the collision pushes a blocked enemy to its blocker's front, so whatever blocks an enemy can hit
-   * it (DESIGN §20; it replaces the playtest #5 QA's melee-only restriction).
+   * it (DESIGN §20; it replaces the playtest #5 QA's melee-only restriction). Only for attacks that hit enemies: a heal
+   * attack never asks — it keeps selecting injured allies while its unit blocks (PRTS 卫戍协议/帮助 "对于医疗干员
+   * （咒愈师分支除外），攻击目标为需要治疗的单位"; PRTS 选择器 adds only the blocked units its side can pick).
    */
   blockedTargets(u, profile) {
     const out = [];
@@ -1113,11 +1163,22 @@ export class Battle {
     return out;
   }
 
-  /** Can ally/device `u` block enemy `e` (block weight `w`) right now — everything but the contact distance. */
+  /**
+   * Can ally/device `u` block enemy `e` (block weight `w`) right now — everything but the contact distance. A unit on a
+   * tile ground units cannot pass blocks no ground enemy: the fenced tiles (围墙 tile_fence_bound / 围栏 tile_fence —
+   * low ground, deployable, passable to flyers only) — PRTS 围墙 / 围栏 地形机制 "部署在其中的单位，若当前阻挡类型为'地面
+   * 阻挡'则无法阻挡敌人". The gate reads the tile's ground passability; on the stages the fenced tiles are the only low
+   * tiles ground units cannot pass. Air blocking (blockFly against flyers) stays [ASSUMED: PRTS restricts the rule to
+   * 地面阻挡]. Nothing walks onto such a tile, so it matters for an enemy pushed or pulled against the fence
+   * (Battle.displace stops it at the tile edge, 0.5 from the fenced unit — inside the ground block radius). An airborne
+   * unit (起飞, flag `liftoff`: "不阻挡地面敌人…可以阻挡飞行敌人") blocks flyers only.
+   */
   _blockerFor(u, e, w) {
     if (!u.alive || !u.deployed || u.hidden || u.s.flags.noBlock || u.s.flags.sleep) return false;
     if (e.isFlying && !(u.s.flags.blockFly || (u.profile && u.profile.blockFly))) return false;
-    if (!e.isFlying && !u.ground) return false;
+    // ground enemies: only a ground unit that has not taken off (起飞 "不阻挡地面敌人": flag `liftoff`), standing on a tile
+    // ground units can pass (not a fenced 围墙 / 围栏 tile)
+    if (!e.isFlying && (!u.ground || u.s.flags.liftoff || this.grid.tile(u.tileR, u.tileC).pass !== 'ALL')) return false;
     const cap = u.s.blockCnt;
     if (cap <= 0) return false;
     let used = 0;
@@ -1131,13 +1192,33 @@ export class Battle {
     const i = bl.blocking.indexOf(e);
     if (i >= 0) bl.blocking.splice(i, 1);
     e.blockedBy = null;
+    this._stealthSwitch(e);
   }
 
   /** Release every enemy blocked by ally `u` (death, retreat, block count drop, substitution…). */
   releaseBlocked(u) {
     if (!u || !u.blocking || !u.blocking.length) return;
-    for (const e of u.blocking) if (e.blockedBy === u) e.blockedBy = null;
+    const was = u.blocking;
     u.blocking = [];
+    for (const e of was) if (e.blockedBy === u) { e.blockedBy = null; this._stealthSwitch(e); }
+  }
+
+  /**
+   * A block on enemy `e` just ended (every release goes through here: `_unblock`, `releaseBlocked`, ai.js
+   * enforceBlockCapacity). Each 隐匿 source it holds stays switched off for its restore time — PRTS 作战机制 §隐匿 "对于
+   * 绝大部分可隐匿的敌人而言，在被我方单位阻挡后会解除隐匿，不被阻挡的3秒后重新进入隐匿" (STEALTH_RESTORE), or the source's
+   * own "（解除阻挡N秒后恢复）" (buff `data.stealthRestore`, content/enemies.js: 0 s / 1 s on some enemy pages) — as a
+   * `stealthOff` buff per source; meanwhile it is targetable, operator splash reaches it and it is drawn solid
+   * (targeting.js enemyStealthed). A new block inside the window lifts it again and its end restarts the window. Our
+   * operators' 隐匿 / 迷彩 are never lifted by blocking (only enemies get here).
+   */
+  _stealthSwitch(e) {
+    if (!e || e.side !== 'enemy' || !e.alive || !e.s.flags.stealth) return;
+    for (const b of e.buffs.slice()) {
+      if (!b.flags || !b.flags.stealth) continue;
+      const t = Number.isFinite(b.data?.stealthRestore) ? b.data.stealthRestore : STEALTH_RESTORE;
+      if (t > 0) this.addBuff(e, { key: stealthOffKey(b.key), duration: t, flags: { stealthOff: true } });
+    }
   }
 
   // =============================================================================================================
@@ -1263,10 +1344,12 @@ export class Battle {
   }
 
   /**
-   * Apply a catalogue status. opts: { duration, source, value, force, refresh, point } — returns true when applied.
-   * Honours enemy immunities (stun/silence/sleep/frozen/levitate/feared) unless `force`. `beforeStatus` handlers may
-   * cancel it or change `duration` / `value`. Official rules (buffs.js STATUS): 抵抗 (the `resist` status) shortens the
-   * RESIST_STATUSES by its value (default half; applied after `beforeStatus`); 浮空 lasts half as long on units heavier
+   * Apply a catalogue status. opts: { duration, source, value, force, refresh, point, resistApplied } — returns true
+   * when applied. Honours enemy immunities (stun/silence/sleep/frozen/levitate/feared) unless `force`. `beforeStatus`
+   * handlers may cancel it or change `duration` / `value`. Official rules (buffs.js STATUS): 抵抗 (the `resist` status)
+   * shortens the RESIST_STATUSES by its value (default half; applied after `beforeStatus`; `resistApplied` skips that
+   * pass — the cold-on-cold 冻结 below already used post-抵抗 lengths). A second 寒冷 while 寒冷 remains applies 冻结 for
+   * max(remaining, this cold after 抵抗) (PRTS 术语释义 寒冷 「持续时间取双方之中最高」). 浮空 lasts half as long on units heavier
    * than LEVITATE_HALF_WEIGHT (current massLevel); 冻结's RES cut hits enemies only; 麻痹 adds stacks; "同名效果取最高"
    * statuses (`valued`) keep the strongest value — a weaker application only extends past the stronger one's end (it
    * then resumes); other statuses refresh to the longer duration. 诱导 (`attract`) walks the enemy to `point`
@@ -1274,9 +1357,16 @@ export class Battle {
    * was applied and from where (fear.js stampFear: the fan of 恐惧可达地块 its movement uses). A stunned/sleeping operator
    * releases the enemies it blocks; a feared/levitated/unblockable/attracted enemy is released by its blocker.
    * `statusApplied` reports the final duration and `entered` (the target did not carry the status before).
+   * A unit that is 无敌 and 无法选中 at once (a 重生 in progress, a hovering or 永久无敌 leader part) takes no status from
+   * the other side, `force` included — PRTS 无敌 "无法被不同阵营选中": so a status carried by the very hit that knocked an
+   * enemy out does not land after its 重生's cleanse (DESIGN §21.4). A ground enemy's status never lands on an airborne
+   * 起飞 ally (对地规避: targeting.js evadesGround) unless `opts.ignoreSelect`.
    */
   applyStatus(target, key, opts = {}) {
     if (!target || !target.alive) return false;
+    const src = opts.source;
+    if (src && src.side && src.side !== target.side && target.s.flags.invulnerable && target.s.flags.untargetable) return false;
+    if (!opts.ignoreSelect && target.s.flags.liftoff && evadesGround(src, target)) return false;
     const tpl = STATUS[key] || { flags: { [key]: true } };
     let duration = opts.duration == null ? Infinity : Number(opts.duration);
     let value = opts.value;
@@ -1295,14 +1385,26 @@ export class Battle {
       else if (Number.isFinite(d) && d <= 0) return false;
       value = c.value;
     }
-    if (RESIST_STATUSES.has(key)) {
+    if (RESIST_STATUSES.has(key) && !opts.resistApplied) {
       const rv = this.resistOf(target);
       if (rv > 0) duration *= 1 - rv;
     }
     if (key === 'levitate' && target.s.massLevel > LEVITATE_HALF_WEIGHT) duration /= 2;
     if (!(duration > 0)) return false;
     if (key === 'cold' && target.findBuff('cold') && !(immune && immune.has('frozen'))) {
-      this.applyStatus(target, 'freeze', { duration: COLD_FREEZE_DURATION, source: opts.source, force: opts.force });
+      // PRTS 术语释义 寒冷: 友方寒冷 pairs into 冻结, 「持续时间取双方之中最高」. `duration` is this cold after 抵抗;
+      // the cold already on the target keeps timeLeft. addBuff refresh 'extend' below sets that cold to the same max.
+      // COLD_FREEZE_DURATION is only the fallback when neither side has a duration. resistApplied: that max is already
+      // post-抵抗, so the freeze must not be halved again.
+      // [ASSUMED] one catalogue cold, so an enemy-applied second cold uses this max too. PRTS states it on the 友方
+      // line only (敌方 cold becomes 冻结 when the target already has 敌方 cold or 敌方 冻结).
+      const prev = target.findBuff('cold');
+      const spans = [prev.timeLeft, duration].filter((t) => t === Infinity || (Number.isFinite(t) && t > 0));
+      const freezeFor = spans.length ? Math.max(...spans) : COLD_FREEZE_DURATION;
+      this.applyStatus(target, 'freeze', {
+        duration: freezeFor, source: opts.source, force: opts.force,
+        ...(spans.length ? { resistApplied: true } : {}),
+      });
       if (!target.alive) return false;
     }
     const source = opts.source ?? null;
@@ -1561,6 +1663,31 @@ export class Battle {
     return out;
   }
 
+  /**
+   * The enemies within `r` (as enemiesInRadius) an ally-side area effect can select — PRTS 作战机制 §AOE伤害判定 "AOE的判定是
+   * 对攻击范围内的每个可以被选中的敌人进行判定", 隐匿 "隐匿状态下的单位一般无法被敌方的索敌机制和Buff选择器选中为目标": no
+   * untargetable enemy and no 隐匿 one unless revealed, blocked or not hidden again yet after a block (targeting.js
+   * enemyStealthed; tile selectors — enemiesInKeys / canTargetEnemy — already skip them). Flying and asleep enemies stay
+   * the caller's choice. Enemy-side effects on other enemies (auras, heals) and physical collisions keep enemiesInRadius.
+   * Player report #8 after 0.1.0 (the 逐火 余烬): until 0.1.1 profession splash and skill circles still reached an
+   * unblocked 隐匿 enemy.
+   */
+  foesInRadius(x, y, r, centre = false) {
+    const out = this.enemiesInRadius(x, y, r, centre);
+    let n = 0;
+    for (const e of out) {
+      const f = e.s.flags;
+      if (f.untargetable || (f.stealth && enemyStealthed(e))) continue;
+      out[n++] = e;
+    }
+    out.length = n;
+    return out;
+  }
+
+  /**
+   * Every deployed ally within `r` of (x, y) — no selection rule: an enemy's area effect selects among them with
+   * targeting.js areaSelectable (content/enemies.js areaAllies: no 隐匿 ally, the blocker included, GitHub #97; DESIGN §22.12).
+   */
   alliesInRadius(x, y, r, ownerId = null, { includeDevices = false } = {}) {
     const out = [];
     const r2 = r * r + 1e-9;
@@ -1590,15 +1717,21 @@ export class Battle {
 
   /**
    * Recompute a unit's absolute range tile keys: `rangeKeys` / `rangeKeySet` = current range (skill range override +
-   * rangeExtend) ∪ `unit.extraRangeKeys` (content extra targets — setExtraRange); `baseRangeKeys` = the INITIAL range
-   * of the DEFAULT skill trigger: the unit's own grid + its permanent rangeExtend (`s.baseRangeExtend`: persistent,
-   * never-expiring buffs — talents, modules, bonds), no skill range, no temporary extend, no extra keys. Rebuilt on
-   * deploy / relocate / skill range switches and whenever either extend changes (rangeChanged).
+   * rangeExtend — the unit's own 攻击距离 unless the running skill's range ignores it, `targeting.noRangeExtend`: 信仰搅拌机
+   * S3, PRTS 备注 "此技能的攻击范围不受'攻击距离'属性影响" — plus the skill's own `targeting.rangeExtend`) ∪
+   * `unit.extraRangeKeys` (content extra targets — setExtraRange); `baseRangeKeys` = the INITIAL range of the DEFAULT
+   * skill trigger: the unit's own grid + its permanent rangeExtend (`s.baseRangeExtend`: persistent, never-expiring
+   * buffs — talents, modules, bonds), no skill range, no temporary extend, no extra keys; `liveRangeGrid` = the
+   * relative grid (facing RIGHT) of the 攻击范围 the detail card shows (shared/protocol.js unitStatsEntry `range`;
+   * community report E1 after 0.1.0: the card kept the base grid while 烛煌 S3 attacked with 4-11): the grid behind
+   * `rangeKeys` without the extra keys (targeting.js extendedGrid; the grid itself when nothing extends it), or the
+   * unit's own range while a skill's grid only selects targets (`targeting.showOwnRange`: 荒芜拉普兰德 S1, no official
+   * range change). Rebuilt on deploy / relocate / skill range switches and whenever either extend changes (rangeChanged).
    */
   _refreshRange(u) {
     const tg = u.skill && u.skill.active ? u.skill.spec.targeting : null;
     const grid = (tg && tg.rangeGrid) || u.rangeGrid || [[0, 0]];
-    const ext = u.s.rangeExtend + ((tg && tg.rangeExtend) || 0);
+    const ext = (tg && tg.noRangeExtend ? 0 : u.s.rangeExtend) + ((tg && tg.rangeExtend) || 0);
     u._rangeExtend = u.s.rangeExtend;
     u._baseExtend = u.s.baseRangeExtend;
     const keys = absoluteRangeKeys(grid, u.tileR, u.tileC, u.dir, ext);
@@ -1607,6 +1740,9 @@ export class Battle {
     if (extra) for (const k of extra) if (!set.has(k)) { set.add(k); keys.push(k); }
     u.rangeKeys = keys;
     u.rangeKeySet = set;
+    const own = !!(tg && tg.showOwnRange);
+    const lg = own ? u.rangeGrid || [[0, 0]] : grid, le = own ? u.s.rangeExtend : ext;
+    u.liveRangeGrid = le > 0 ? extendedGrid(lg, le) : lg;
     if (u.kind !== 'device') u.baseRangeKeys = absoluteRangeKeys(u.rangeGrid || [[0, 0]], u.tileR, u.tileC, u.dir, u.s.baseRangeExtend);
     if (u.skill) u.skill._trigKeys = null; // CUSTOM_RANGE trigger grid is relative to the tile
   }
@@ -1709,10 +1845,12 @@ export class Battle {
    * the tile impassable.
    */
   spawnDevice(key, row, col, opts = {}) {
-    // Devices are ally-side units on a field tile: never outside the rect, never on top of a living unit.
+    // Devices are ally-side units on a field tile: never outside the rect, never on top of a living unit or of a
+    // knocked-out operator (downOn).
     if (!Number.isInteger(row) || !Number.isInteger(col) || !this.grid.inRect(row, col)) return null;
     const occ = this._occ[row * COLS + col];
     if (occ && occ.alive) return null;
+    if (this.downOn(row, col)) return null;
     const hp = fin(opts.hp, 100);
     const bat = fin(opts.bat, 1), aspd = fin(opts.aspd, 100);
     const def = {
@@ -1771,7 +1909,7 @@ export class Battle {
 
   addProjectile(p) { return this.projectiles.add(p); }
 
-  /** Move an ally to another tile (keeps state). */
+  /** Move an ally to another tile (keeps state); never onto a living unit or a knocked-out operator (downOn). */
   relocate(unit, r, c) {
     // only a living, deployed ally moves, and only onto an integer tile of this field (a dead unit left in _occ
     // would later "block" from a tile it no longer stands on once it redeploys at home)
@@ -1779,6 +1917,7 @@ export class Battle {
     if (!Number.isInteger(r) || !Number.isInteger(c) || !this.grid.inRect(r, c)) return false;
     const k = r * COLS + c;
     if (this._occ[k] && this._occ[k] !== unit && this._occ[k].alive) return false;
+    if (this.downOn(r, c)) return false;
     const ok = unit.tileR * COLS + unit.tileC;
     if (this._occ[ok] === unit) this._occ[ok] = null;
     this.releaseBlocked(unit);
@@ -1788,6 +1927,32 @@ export class Battle {
     this._occ[k] = unit;
     if (unit.obstacle) this.grid.setObstacle(r, c, true, unit.obstacleKind);
     this._refreshRange(unit); // current + base range, CUSTOM_RANGE trigger keys
+    return true;
+  }
+
+  /**
+   * 【移动】 (PRTS 术语释义 移动: "不退场，以当前血量在目标位置部署 … 本质上为一次特殊的撤退-再部署行为"): `unit` leaves its
+   * tile (relocate: same checks, false = refused, nothing changed) and is deployed on (r, c) at once. A new deployment —
+   * deploySeq / aggroSeq / deployedAt (the deploy animation; once-per-deployment effects re-arm) — announced by
+   * `deploy` { initial: false, move: true }: deploy effects fire again ("可以通过移动行为多次触发部署时触发的效果"). Not an
+   * exit: no `die` / `death`, so no knock-out, no redeploy timer or cost ("因移动撤退时不会积累再部署惩罚") — 不屈 and
+   * 阿戈尔's revive, which act on exits "因移动之外的原因" (PRTS 阿戈尔 备注), never see it. HP, buffs and a running skill
+   * stay: officially nothing carries over but what the mover's skill names (乌尔比安 S3: 技能进度 and the second talent's
+   * stacks); the remake keeps the rest too (owner's deviation, DESIGN §22.3). `clearSp`: the 技力 is emptied before the
+   * deploy handlers run ("部署时将清空技力"; 乌尔比安's 【返回】 "将清空技力，但仍可以享受后续由其他效果提供的技力").
+   */
+  moveRedeploy(unit, r, c, { clearSp = false } = {}) {
+    if (!this.relocate(unit, r, c)) return false;
+    unit.deploySeq = ++this._deploySeq;
+    unit.aggroSeq = unit.deploySeq;
+    unit.deployedAt = this.time;
+    const sk = unit.skill;
+    if (clearSp && sk && !sk.noSkill && sk.kind !== 'passive' && !(sk.active && sk.isTimed)) {
+      sk.sp = 0;
+      sk.charges = sk.spCost <= 0 ? sk.maxCharges : 0; // (a free skill is available once per deployment: skills.js reset)
+    }
+    this._ev(['deploy', unit.id]);
+    if (this._hooks.deploy) this.emit('deploy', { unit, initial: false, move: true });
     return true;
   }
 
@@ -1802,10 +1967,12 @@ export class Battle {
   /**
    * Push enemy `e` with 力度 `force` (PRTS 推与拉 §推力): the official distance of its 受力等级 (constants.js PUSH_TILES:
    * a 中力 push moves a weight-1 enemy 1.7 tiles, a weight-2 one 0.44, weight 3 0.12, weight ≥ 4 not at all). Radial
-   * (the default: away from `from`, the pusher's centre — "沿着干员向自身中心点的射线方向") or directional (`dir` = the
-   * pusher's direction {x, y}: 推击手, "朝部署方向" / "向前推开"); a directional push on a target more than 45° off `dir`
-   * or nearer than 0.25 tile becomes radial with 受力等级 −2 ("特殊修正"). `fixed` waives both corrections (PRTS 圣聆初雪 S1
-   * 备注 "不会因角度过大或距离过近而变化方向与力度"); `fixedAngle` only the angle one (PRTS 见行者 S2 备注 "不会因为角度过大
+   * (the default: away from `from`, the pusher's centre — "沿着干员向自身中心点的射线方向"; the client's buff template
+   * knockback[relative]: 琳琅诗怀雅 S3, 山 S3, 莫斯提马 S3) or directional (`dir` = the pusher's direction {x, y}; template
+   * knockback[dir], Knockback {_useSourceDirection: true, _decreaseForceLevelWhenNotInDirection: 2}: 推击手, 野鬃 S2
+   * "往攻击方向"); a directional push on a target more than 45° off `dir` or nearer than 0.25 tile becomes radial with
+   * 受力等级 −2 ("特殊修正"). `fixed` waives both corrections (圣聆初雪 S1 "朝部署方向": KnockBackWithCharacterDirection,
+   * PRTS 备注 "不会因角度过大或距离过近而变化方向与力度"); `fixedAngle` only the angle one (PRTS 见行者 S2 备注 "不会因为角度过大
    * 而改变推动的方向或削减力度" — the < 0.25 tile rule still applies). `inward` = a radial push towards `from` (薄绿 S2's "拖拽", PRTS 备注 "实际为
    * 反方向（指向薄绿方向）的推开"), never nearer than PULL_STOP_RADIUS to its centre [ASSUMED: "至面前"]. `effect` = a 特效
    * push (PRTS 推与拉: one frame less of travel than a 弹道 push — constants.js PUSH_TILES_EFFECT / PUSH_EFFECT_SKILLS).
@@ -1873,16 +2040,24 @@ export class Battle {
     return this.pull(e, force, { to: { x: unit.x + f[1] * PULL_ORIGIN, y: unit.y + f[0] * PULL_ORIGIN }, center: unit, stop: PULL_STOP_RADIUS });
   }
 
-  /** Can `e` be displaced at all: a living enemy, not a leader part of the boss pool, not 失衡免疫 (近地悬浮, 浮空). */
+  /**
+   * Can `e` be displaced at all: a living enemy, not a leader part of the boss pool, not 失衡免疫 (flag `noDisplace`:
+   * 近地悬浮, 浮空, the 胄 parts …) and not a 静态刚体 (data `staticBody`). PRTS 特殊机制 静态刚体: such a unit "可以进入
+   * 失衡状态 … 但物理层面上无法产生任何速度或移动" — every air unit of the mode except “炎佑”, plus the boss 昆图斯 (build-data
+   * STATIC_BODIES; player report after 0.1.0, "飞机可以被薄绿的技能拉走"). A skill that reaches it still hits it (its targeting
+   * is the skill's own: 锏 S3, 薄绿, the 钩索师 …); only the movement is 0, so distance-based effects (drag damage, 见行者 S2's
+   * wall stun) come to nothing. [ASSUMED] the 0.1 s 失衡硬直 a 静态刚体 still gets is not modelled (no displacement models it).
+   */
   _displaceable(e) {
-    return !!(e && e.alive && e.side === 'enemy' && !e.isBoss && !e.s.flags.noDisplace);
+    return !!(e && e.alive && e.side === 'enemy' && !e.isBoss && !e.s.flags.noDisplace && !(e.def && e.def.staticBody));
   }
 
   /**
    * Move an enemy `distance` tiles along `dir` = {x, y} (normalised internally) over passable tiles — the raw mover of
    * push() / pull(), which apply the official 力度 − 重量 rules (content uses those; the old `force` option is gone).
-   * 失衡免疫 (flag `noDisplace`: 近地悬浮, 浮空 — PRTS 异常效果 "不会被位移影响") and leaders ⇒ no movement. The tiles it may
-   * cross follow its movement (`motion`): a hovering enemy walks the ground, so it stays on ground-passable tiles.
+   * 失衡免疫 (flag `noDisplace`: 近地悬浮, 浮空 — PRTS 异常效果 "不会被位移影响"), 静态刚体 (data `staticBody`) and leaders
+   * ⇒ no movement (_displaceable). The tiles it may cross follow its movement (`motion`): a hovering enemy walks the
+   * ground, so it stays on ground-passable tiles.
    */
   displace(e, dir, distance) {
     if (!this._displaceable(e) || !dir) return 0;
@@ -1911,17 +2086,64 @@ export class Battle {
   }
 
   /**
-   * A tile a summon must not take: a living unit stands on it, or it is the home tile of an ally piece that has not
-   * deployed yet or waits to redeploy (a token parked there would keep that unit off the field for the whole battle).
+   * A tile no automatic placement may take (the 突袭 landing tile, tactical points, summon / device tiles): a living
+   * unit stands on it, or it is the rest tile (restTile) of an ally piece that has not deployed yet or waits to
+   * redeploy — the tile a knocked-out operator lies on ("倒地干员所在地块…所有我方单位在此处的部署行为将被阻止", PRTS
+   * 卫戍协议/帮助 §作战阶段 单位部署), else its home tile (a token parked there would keep that unit off the field).
    */
   isReservedTile(r, c) {
     if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || r >= ROWS || c < 0 || c >= COLS) return true;
     const u = this._occ[r * COLS + c];
     if (u && u.alive) return true;
     for (const a of this.allyUnits) {
-      if (!a.alive && !a.removed && a.homeR === r && a.homeC === c && (a.kind === 'op' || a.kind === 'token')) return true;
+      if (a.alive || a.removed || (a.kind !== 'op' && a.kind !== 'token')) continue;
+      const [tr, tc] = this.restTile(a);
+      if (tr === r && tc === c) return true;
     }
     return false;
+  }
+
+  /**
+   * The knocked-out operator (isDown) lying on (r, c), other than `except`, or null. Official (PRTS 卫戍协议/帮助 §作战阶段
+   * 单位部署): "干员退场后…原地留下一个“倒地干员”…满足再部署条件时，移除场上的该倒地干员并自动部署至该位置" and "倒地干员所在
+   * 地块视为可部署，但所有我方单位在此处的部署行为将被阻止" — its tile (`body`, _layBody) takes no other ally: `_deploy`
+   * (initial deploys, redeploys, the 突袭 landing, summons), `spawnDevice` and `relocate` refuse it.
+   */
+  downOn(r, c, except = null) {
+    for (const a of this.allyUnits) {
+      if (a === except || !this.isDown(a)) continue;
+      const [br, bc] = a.body ?? [a.tileR, a.tileC];
+      if (br === r && bc === c) return a;
+    }
+    return null;
+  }
+
+  /**
+   * The tile a withdrawn ally comes back on (redeploy, _checkRedeploys): a down operator's body tile (isDown) — where it
+   * fell, or its home (_layBody) — else its home tile.
+   */
+  restTile(u) {
+    return this.isDown(u) ? (u.body ? [u.body[0], u.body[1]] : [u.tileR, u.tileC]) : [u.homeR, u.homeC];
+  }
+
+  /**
+   * Where a knocked-out operator lies (it redeploys there): the tile it fell on, except — "若干员被击倒的位置为其他干员或
+   * 召唤物的初始位置，则在被击倒后，尝试返回其自身的初始位置" (PRTS 卫戍协议/帮助) — a tile that is another board piece's
+   * home (a piece with a board uid: the 初始位置 is the prep placement — whether that piece is on the field, waiting or
+   * gone: a summon only leaves its home free once it has expired or been killed, so a removed one must count too), where
+   * it goes back to its own home tile when that is in the rect and free (isReservedTile: no living unit, no other body,
+   * no other waiting piece's tile). It stays where it fell when its home is taken [ASSUMED: one attempt, at the
+   * knock-out]. Only an operator moved off its board tile — a 突袭 jump, 乌尔比安's anchor — can fall elsewhere. Sets
+   * `u.body` (b.snap `down` carries it); x / y / tileR / tileC keep where it fell, so the `kill` / `death` handlers
+   * (被击倒时 effects) still act there.
+   */
+  _layBody(u) {
+    const r = u.tileR, c = u.tileC, hr = u.homeR, hc = u.homeC;
+    u.body = [r, c];
+    if (r === hr && c === hc) return;
+    if (!this.allyUnits.some((a) => a !== u && a.uid != null && (a.kind === 'op' || a.kind === 'token') && a.homeR === r && a.homeC === c)) return;
+    if (!this.grid.inRect(hr, hc) || this.isReservedTile(hr, hc)) return;
+    u.body = [hr, hc];
   }
 
   /**
@@ -2103,8 +2325,9 @@ export class Battle {
 
   /**
    * Compact full snapshot of this field (DESIGN §8.2 b.snap), plus (only when non-empty):
-   *   down: [[id, respawnAt, respawnTime, state]] — knocked-out operators waiting to redeploy on their own tile
-   *         (isDown): the game time their respawn timer ends, its length (s) and constants.js DOWN_STATE;
+   *   down: [[id, respawnAt, respawnTime, state, row, col]] — operators that left the field waiting to redeploy (isDown): the
+   *         game time their respawn timer ends, its length (s), constants.js DOWN_STATE and the tile they lie on (and
+   *         come back on: _layBody — where they fell, or their home);
    *   elem: [[id, element, fill, cooldownEnd, cooldown]] — the element gauge each unit shows (damage.js elementView).
    */
   snapshot() {
@@ -2125,7 +2348,7 @@ export class Battle {
     let down = null;
     for (const u of this.allyUnits) {
       if (!this.isDown(u)) continue;
-      (down || (down = [])).push([u.id, r2(u.respawnAt), r2(Math.max(0, u.respawnAt - u.deathAt)), this._downState(u)]);
+      (down || (down = [])).push([u.id, r2(u.respawnAt), r2(Math.max(0, u.respawnAt - u.deathAt)), this._downState(u), ...this.restTile(u)]);
     }
     if (down) snap.down = down;
     let elem = null;
@@ -2139,21 +2362,31 @@ export class Battle {
   }
 
   /**
-   * A knocked-out operator waiting to redeploy on its own tile (DESIGN §5.5: after its respawn time, when the tile is
-   * free and DP ≥ cost): killed — or entering the battle knocked out (FORCED_EXIT, 联防) — not withdrawn, not removed
-   * for good, after it was deployed. The client keeps its model on the field knocked down with a redeploy countdown
-   * (b.snap `down`, render/units.js); summons, devices and enemies simply leave.
+   * An operator lying on the field, waiting to redeploy on that tile (DESIGN §5.5: after its respawn time, when the tile
+   * is free and DP ≥ cost; _layBody, downOn). PRTS 卫戍协议/帮助 §作战阶段 单位部署: "干员退场后，将返回隐藏的待部署区，并原地
+   * 留下一个“倒地干员”以供查看信息，满足再部署条件时，移除场上的该倒地干员并自动部署至该位置。" — every 退场 (GitHub #60, the owner's
+   * decision of 2026-10-04): knocked out ('killed'), entering the battle knocked out (FORCED_EXIT, 联防) and forced out
+   * by its own effects ('retreat': 史尔特尔's 余烬, 耀骑士临光 S2, 骑士戒律 + 竞技旗, 伊内丝 S3; 'merchant': a 商人 that cannot
+   * pay) — except the 突袭 retreat ('raid', redeployed at once on its landing tile); not removed for good, after it was
+   * deployed. A forced exit stays no kill: its 'die' / `death` reason is not 'killed' (no 被击倒 effect, 不屈, 阿戈尔, no
+   * knock-down count). The client keeps its model on that tile knocked down with a redeploy countdown (b.snap `down`,
+   * render/units.js); summons, devices and enemies simply leave.
    */
   isDown(u) {
-    return !!u && u.side === 'ally' && u.kind === 'op' && !u.alive && !u.removed && (u.removeReason === 'killed' || u.removeReason === FORCED_EXIT)
+    return !!u && u.side === 'ally' && u.kind === 'op' && !u.alive && !u.removed && u.removeReason !== 'raid'
       && u.deploySeq > 0 && Number.isFinite(u.respawnAt);
   }
 
-  /** constants.js DOWN_STATE of a down operator: its timer runs, or it waits for its tile / the DP (_checkRedeploys). */
+  /**
+   * constants.js DOWN_STATE of a down operator: its timer runs, or it waits for its tile / the DP — the same checks as
+   * _checkRedeploys (a living unit or another body on its rest tile). No ally may take the tile it lies on (downOn), so
+   * WAIT_TILE is a safeguard only.
+   */
   _downState(u) {
     if (this.time + 1e-9 < u.respawnAt) return DOWN_STATE.COUNTING;
-    const occ = this._occ[u.homeR * COLS + u.homeC];
-    if (occ && occ.alive && occ !== u) return DOWN_STATE.WAIT_TILE;
+    const [r, c] = this.restTile(u);
+    const occ = this._occ[r * COLS + c];
+    if ((occ && occ.alive && occ !== u) || this.downOn(r, c, u)) return DOWN_STATE.WAIT_TILE;
     const ps = this.getPlayer(u.ownerId);
     return !ps || ps.dp + 1e-9 < u.base.cost ? DOWN_STATE.WAIT_DP : DOWN_STATE.COUNTING;
   }

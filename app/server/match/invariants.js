@@ -7,7 +7,8 @@
 //   pieces   unique uids; hand 10 / temp 5 slots; chess carry ≤ equipPerChess known items; a normal piece holds ≤ 1
 //            copy, an elite ≤ goldenCopies; merges are immediate (never `mergeCount` normal copies of one chess, never
 //            two copies of a mergeable normal item); every token's owner chess is deployed
-//   board    tiles inside the own region and legal for the piece; no items on the board; chess count ≤ deploy cap
+//   board    tiles inside the own region and legal for the piece (a range-bound summon inside its owner's attack
+//            range); no items on the board; chess count ≤ deploy cap
 //            (where a merge's elite goes — a consumed deployed copy's tile, else the hand — needs the state before the
 //            merge: audit.js checks it per merge)
 //   bonds    ps.bonds equals a fresh computeBonds() (every mutation recomputed them); every bond's layers 0 … BOND_LAYER_CAP
@@ -16,7 +17,7 @@
 //   match    phase known; teamLp / boss pool within range; combat fields match the alive players
 
 import { PHASE, BOND_LAYER_CAP } from '../../shared/constants.js';
-import { FIELD, canPlace, positionClass, parseKey } from './board.js';
+import { FIELD, canPlace, placeClass, positionClass, parseKey } from './board.js';
 import { computeBonds } from './bondsMeta.js';
 
 const PHASES = new Set(Object.values(PHASE));
@@ -71,7 +72,9 @@ export function collectViolations(m, { limit = 25 } = {}) {
     const boardChessUids = new Set();
     for (const p of ps.board.values()) if (p.kind === 'chess') boardChessUids.add(p.uid);
     const itemCounts = new Map();
-    const countItem = (it) => itemCounts.set(it.id, (itemCounts.get(it.id) || 0) + 1);
+    // A copy gained as the previous prep ended (PlayerState.acquireItem deferMerge) waits until the next prep.
+    // It does not count toward "merges are immediate" until that prep's checkItemMerges consumes it.
+    const countItem = (it) => { if (it.deferMerge) return; itemCounts.set(it.id, (itemCounts.get(it.id) || 0) + 1); };
     for (const p of all) {
       note(ps, p);
       if (p.kind === 'chess') {
@@ -110,7 +113,11 @@ export function collectViolations(m, { limit = 25 } = {}) {
       if (!(r >= FIELD.r0 && r <= FIELD.r1 && c >= FIELD.c0 && c <= FIELD.c1)) fail(`${id}: piece outside the board at ${k}`);
       if (p.kind === 'item') { fail(`${id}: item ${p.id} stands on the board`); continue; }
       const rec = p.kind === 'token' ? gd.token(p.id) : gd.chess(p.id);
-      if (rec && !canPlace(dmap, positionClass(rec), r, c)) fail(`${id}: ${p.id} on an illegal tile ${k}`);
+      const cls = p.kind === 'chess' ? placeClass(ps, rec) : positionClass(rec);
+      if (rec && !canPlace(dmap, cls, r, c)) fail(`${id}: ${p.id} on an illegal tile ${k}`);
+      // a "只能部署在召唤者攻击范围内" summon inside its owner's attack range (PlayerState.summonRange: a pure read)
+      const range = p.kind === 'token' && typeof ps.summonRange === 'function' ? ps.summonRange(p) : null;
+      if (range && !range.has(k)) fail(`${id}: ${p.id} on ${k}, outside its owner's attack range`);
       if (p.kind === 'chess') deployed++;
     }
     if (deployed > ps.deployCap) fail(`${id}: ${deployed} chess deployed > cap ${ps.deployCap}`);
