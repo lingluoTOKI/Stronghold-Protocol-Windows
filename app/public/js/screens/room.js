@@ -221,7 +221,7 @@ export function RoomScreen() {
   // confirmed player's id goes along: if they left and someone else took the seat meanwhile, the server refuses it.
   const kick = async (seat, name, playerId) => {
     if (inFlight.current) return;
-    const ok = await confirmDialog({ title: '移出同盟', text: `确定将「${name || '博士'}」移出同盟吗？对方可以凭同盟密钥重新加入。`, okText: '移出', danger: true });
+    const ok = await confirmDialog({ title: '移出同盟', text: html`<p class="modal__text">确定将「${name || '博士'}」移出同盟吗？</p><p class="modal__text">只有点「移出」才会执行，对方可凭同盟密钥重新加入；点「取消」则不会移出。</p>`, okText: '移出', danger: true });
     if (ok) run(`kick${seat}`, () => net.request('room.kick', { seat, playerId }));
   };
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
