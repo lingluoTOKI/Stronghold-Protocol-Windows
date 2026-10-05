@@ -274,7 +274,7 @@ function MatchScreen() {
     priv, stage: gd.stage(pub?.stageId), editable, field: deployField,
     getChess: gd.chess, getToken: gd.token, getItem: gd.item, getEffect: gd.effect,
   }), [priv, pub?.stageId, editable, gd.ready, deployField]);
-  live.current = { pub, priv, field, editable, placeCtx, watching, watchWho, home, myId, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
+  live.current = { pub, priv, field, editable, placeCtx, watching, watchWho, home, myId, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, pen, armedCard, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------
   // the own prep board: the normal board, or — in the prep of a boss round — the player's half of the boss field
@@ -1091,6 +1091,8 @@ function MatchScreen() {
         e.preventDefault();
         return;
       }
+      // E toggles the chat / emote dock (prep and battle alike)
+      if (act === 'chat') { e.preventDefault(); setEmoteOpen(!L.emoteOpen); return; }
       // Space pauses / resumes a solo battle (the official battle key)
       if (act === 'ready' && (L.canPause || L.paused)) {
         e.preventDefault();
@@ -1098,6 +1100,8 @@ function MatchScreen() {
         togglePauseRef.current(!L.paused);
         return;
       }
+      // X cycles the battle speed 1x/2x/4x (the runner no-ops outside the own battle)
+      if (act === 'speed') { e.preventDefault(); cycleSpeed(); return; }
       if (L.pub?.phase !== PHASE.PREP || !L.priv) return;
       e.preventDefault(); // a focused HUD button must not also activate (Space) — see shortcutFor
       if (act === 'ready' && e.target instanceof HTMLElement && e.target.closest('button, [role="button"]')) e.target.blur();
@@ -1109,11 +1113,18 @@ function MatchScreen() {
         return;
       }
       if (!L.editable) return;
+      if (act === 'buy') {
+        const a = L.armedCard;
+        if (a && Number.isInteger(a.i)) actions.buy(a.i);
+        return;
+      }
       const reason = shopBlockReason(act, { priv: L.priv, editable: L.editable });
       if (reason) { audio.sfx('error', { volume: 0.5 }); return; }
       if (act === 'refresh') actions.refresh();
       else if (act === 'freeze') actions.freeze();
       else if (act === 'levelUp') actions.levelUp();
+      else if (act === 'sell') sellSel();
+      else if (act === 'retreat') retreatSel();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

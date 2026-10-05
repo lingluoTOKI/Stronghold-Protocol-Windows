@@ -1546,6 +1546,11 @@ export function shortcutFor(e) {
   if (code === 'KeyR' || key === 'r') return 'refresh';
   if (code === 'KeyF' || key === 'f') return 'freeze';
   if (code === 'KeyD' || key === 'd') return 'levelUp';
+  if (code === 'KeyS' || key === 's') return 'sell';
+  if (code === 'KeyB' || key === 'b') return 'buy';
+  if (code === 'KeyQ' || key === 'q') return 'retreat';
+  if (code === 'KeyE' || key === 'e') return 'chat';
+  if (code === 'KeyX' || key === 'x') return 'speed';
   if (code === 'Space' || key === ' ') return 'ready';
   return null;
 }

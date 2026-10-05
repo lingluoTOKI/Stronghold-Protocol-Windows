@@ -283,7 +283,10 @@ export function ShopBar({ priv, editable, collapsed, onCollapse, onBuy, onLevel,
   // collapsed tab's early return (hook order)
   const armedSlot = armedSlotOf(armed, slots, showReward ? reward.slots : null);
   const armedSig = armedSlot ? `${armedSlot.kind}:${armedSlot.id}` : '';
-  useEffect(() => { onArm?.(armedSlot ? { kind: armedSlot.kind === 'item' ? 'item' : 'chess', id: armedSlot.id } : null); }, [armedSig]);
+  useEffect(() => {
+    const am = typeof armed === 'string' ? /^([cir]):(\d+):(.*)$/.exec(armed) : null;
+    onArm?.(armedSlot ? { kind: armedSlot.kind === 'item' ? 'item' : 'chess', id: armedSlot.id, i: am && am[1] !== 'r' ? Number(am[2]) : null } : null);
+  }, [armedSig]);
   useEffect(() => () => onArm?.(null), []);
   /** First tap arms + opens the detail; the second buys (or says why it can't). */
   const tapCard = (kind, idx, slot, detailKind, reason, buy) => {
