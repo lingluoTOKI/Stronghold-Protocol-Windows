@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor } from '../../../shared/constants.js';
-import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo } from '../ui/components.js';
+import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, confirmDialog } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton } from '../ui/guide.js';
 import { LoadoutButton } from './loadout.js';
@@ -227,6 +227,13 @@ export function LobbyScreen() {
   const [busy, setBusy] = useState(null);
   const [recent] = useState(recentRooms);
   const alive = useRef(true);
+  const [matching, setMatching] = useState(false);       // 服务器匹配中
+  const [matchCount, setMatchCount] = useState(0);       // 当前已匹配人数
+  const [matchTarget, setMatchTarget] = useState(MAX_SEATS); // 目标人数(服务器返回)
+  const [matchWait, setMatchWait] = useState(false);     // 超时等待中(等待AI补位选择)
+  const [matchChoice, setMatchChoice] = useState(0);     // coop 创建时选定的队友人数：0=直接建(手动加AI), 2/3/4=匹配到该人数
+  const MATCH_OPTS = [{ v: 0, key: 'direct', label: '直接建' }, { v: 2, key: 'p2', label: '2 人' }, { v: 3, key: 'p3', label: '3 人' }, { v: 4, key: 'p4', label: '4 人' }];
+  const matchState = useRef({ active: false });          // 供事件回调读取的当前匹配状态
   const inFlight = useRef(false); // synchronous guard against double clicks (state updates are async)
   useEffect(() => () => { alive.current = false; }, []);
 
@@ -235,6 +242,50 @@ export function LobbyScreen() {
 
   const pickMode = (m) => { setRoomMode(m); savePref('lobby.mode', m); };
   const pickDifficulty = (d) => { setDifficulty(d); savePref('lobby.difficulty', d); };
+  const clearMatch = () => {
+    matchState.current.active = false;
+    setMatching(false); setMatchCount(0); setMatchTarget(MAX_SEATS); setMatchWait(false);
+  };
+  const leaveMatch = () => {
+    if (!matchState.current.active) return;
+    net.request('match.cancel').catch(() => {}); // best effort
+    clearMatch();
+  };
+  const startMatch = async () => {
+    if (matching || !online) return;
+    matchState.current.active = true;
+    setMatching(true); setMatchWait(false); setMatchCount(1);
+    const tgt = matchChoice >= 2 ? matchChoice : MAX_SEATS;
+    setMatchTarget(tgt);
+    try { await net.request('match.enqueue', { difficulty, target: tgt }); }
+    catch (err) { toastError(err); if (alive.current) clearMatch(); }
+  };
+  const topUp = () => {
+    if (!matchState.current.active) return;
+    net.request('match.topUp').catch((err) => toastError(err));
+  };
+  useEffect(() => {
+    const offStatus = net.on('match.status', (m) => {
+      if (!matchState.current.active) return;
+      setMatchCount(Math.min(m.count, m.target)); setMatchTarget(m.target);
+    });
+    const offTimeout = net.on('match.timeout', async (m) => {
+      if (!matchState.current.active) return;
+      setMatchWait(true);
+      const msg = m.count >= 2
+        ? ('目前有 ' + m.count + ' 人匹配中，仍未凑满 ' + m.target + ' 人。是否用 AI 队友补齐剩余空位立即开始？')
+        : ('匹配超时（当前仅你 ' + m.count + ' 人）。是否用 AI 队友补齐到 ' + m.target + ' 人立即开始？');
+      const ok = await confirmDialog({ title: 'AI 补位', text: msg, okText: '用 AI 补位', cancelText: '继续等待' });
+      if (!alive.current || !matchState.current.active) return;
+      setMatchWait(false);
+      if (ok) topUp();
+    });
+    const offFound = net.on('match.found', () => { clearMatch(); });
+    const offState = net.on('room.state', () => { if (matchState.current.active) clearMatch(); });
+    const offClosed = net.on('room.closed', () => { if (matchState.current.active) clearMatch(); });
+    return () => { offStatus(); offTimeout(); offFound(); offState(); offClosed(); };
+  }, []);
+  useEffect(() => () => { if (matchState.current.active) net.request('match.cancel').catch(() => {}); }, []);
 
   const run = async (kind, fn) => {
     if (inFlight.current) return;
@@ -246,7 +297,11 @@ export function LobbyScreen() {
       if (alive.current) setBusy(null);
     }
   };
-  const create = () => run('create', () => net.request('room.create', { mode: roomMode, difficulty }));
+  const create = () => {
+    // coop + 选定了队友人数(≥2) → 直接进入匹配池; 否则(纯手动)直接建房
+    if (roomMode === 'coop' && matchChoice >= 2) return startMatch();
+    return run('create', () => net.request('room.create', { mode: roomMode, difficulty }));
+  };
   const join = (c = code) => {
     const k = normalizeCode(c);
     if (!CODE_RE.test(k)) { toast(`同盟密钥为 ${ROOM_CODE_LEN} 位字母或数字`, 'warn'); return; }
@@ -309,6 +364,22 @@ export function LobbyScreen() {
               : html`<span class="t-dim">向同伴索取 ${ROOM_CODE_LEN} 位同盟密钥，或直接打开邀请链接</span>`}
           </div>
         <//>
+        <div class="match-choice-wrap">
+          ${roomMode === 'coop' && !matching
+            ? html`<div class="match-choice">
+                <div class="match-choice__head">
+                  <span class="match-choice__label">队友人数</span>
+                  <span class="match-choice__sub t-dim">${matchChoice >= 2 ? ('满 ' + matchChoice + ' 人即开局') : '手动建 / 匹配入伙'}</span>
+                </div>
+                <div class="match-choice__opts">
+                  ${MATCH_OPTS.map((o) => html`<button key=${o.key} type="button"
+                    class=${'match-choice__opt num' + (matchChoice === o.v ? ' is-on' : '')}
+                    onClick=${() => setMatchChoice(o.v)}>${o.label}</button>`)}
+                </div>
+              </div>`
+            : null}
+        </div>
+
         <${TipsPanel} />
       </section>
 
@@ -317,19 +388,32 @@ export function LobbyScreen() {
         <div class="diff-list">
           ${DIFFICULTIES.map((d) => html`<${DifficultyCard} key=${d} roomMode=${roomMode} difficulty=${d} selected=${difficulty === d} onSelect=${pickDifficulty} />`)}
         </div>
+      
         <div class="create-box">
+
+          <div class="create-box__acts">
           <${Tooltip} block=${true} text=${online ? null : '正在连接服务器…'}>
-            <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" loading=${busy === 'create'} disabled=${!online} onClick=${create}>
-              ${roomMode === 'solo' ? '开始独立模拟' : '创建同盟'}
+            <${Button} variant="primary" size="xl" block=${true} iconRight=${matching ? null : 'chevrons'} loading=${busy === 'create'} disabled=${!online || matching} onClick=${create}>
+              ${roomMode === 'solo' ? '开始独立模拟' : (matchChoice >= 2 ? `匹配 ${matchChoice} 人创建同盟` : '创建同盟')}
             <//>
+          </div>
           <//>
+          ${roomMode === 'coop' && matching
+            ? html`<div class="match-queue">
+                <span class="t-lo">${matchWait ? '等待你的 AI 补位选择…' : '正在匹配队友…'}</span>
+                <span class="num match-queue__count">${matchCount}<span class="t-dim">/${matchTarget}</span></span>
+                <${Button} variant="ghost" size="sm" icon="x" onClick=${leaveMatch}>取消<//>
+              </div>`
+            : null}
           <div class="create-box__hint">
             ${online
-              ? html`<span>${roomMode === 'solo' ? '创建后即可开始模拟' : '创建后可邀请好友或添加 AI 队友'}</span>`
+              ? html`<span>${roomMode === 'solo' ? '创建后即可开始模拟' : (matchChoice >= 2 ? '服务器将自动匹配同难度的队友，满员即开局' : '创建后可邀请好友 / 添加 AI 队友')}</span>`
               : html`<${Spinner} size="sm" label="CONNECTING" />`}
           </div>
         </div>
       </section>
+
+              
     </div>
   </div>`;
 }

@@ -213,6 +213,12 @@ export class Lobby {
     this.resyncTimers = new Map();
     /** per-network limit warnings: at most one log line per 10 s (the rest are counted) */
     this.limitLog = { at: -Infinity, suppressed: 0 };
+    /** server matchmaking pool (自加): difficulty -> array of queued playerIds, FIFO. */
+    this.matchPool = new Map();
+    /** playerId -> { difficulty, queuedAt, session } for everyone currently matching. */
+    this.matchMeta = new Map();
+    /** playerId -> timer that fires the AI top-up prompt after MATCH_TIMEOUT_MS. */
+    this.matchTimers = new Map();
   }
 
   /** @param {string} code @returns {Room | null} */
@@ -291,6 +297,9 @@ export class Lobby {
       case 'room.loadout': return this.loadout(session, msg);
       case 'room.spectate': return this.spectate(session, msg);
       case 'room.removeSpectator': return this.removeSpectator(session, msg);
+      case 'match.enqueue': return this.matchEnqueue(session, msg);
+      case 'match.cancel': return this.matchCancel(session);
+      case 'match.topUp': return this.matchTopUp(session);
       default:
         if (typeof msg.t === 'string' && msg.t.startsWith('g.')) return this.routeGame(session, msg);
         return fail(ERR.BAD_MSG, `unhandled type ${String(msg.t).slice(0, 32)}`);
@@ -300,6 +309,8 @@ export class Lobby {
   /** The session's socket closed. @param {import('./net.js').Session} session */
   onDisconnect(session) {
     this.clearResync(session.playerId); // the next resume resyncs immediately
+    // a player queued for matchmaking who drops out leaves the pool (they resume by enqueuing again)
+    if (this.matchMeta.has(session.playerId)) this.matchRemove(session.playerId);
     const room = this.roomOf(session);
     // a solo run may be resumed within singleReconnectTime (24 h); everything else keeps the registry's window
     session.resumeWindowMs = room && room.match && room.mode === 'solo' ? this.soloResumeWindowMs() : null;
@@ -1009,4 +1020,191 @@ export class Lobby {
     if (!session || session.roomCode !== room.code) return false;
     return sendSession(session, msg);
   }
+
+  // ---------------------------------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------------------------------
+  // Server matchmaking (自加): a global pool keyed by "difficulty|target" of players who asked to match. A bucket
+  // is formed as a coop room when it holds `target` queued players (the desired total incl. the host); the first of
+  // them (FIFO) becomes the room host, the rest join in order; everyone gets match.found then room.state. The host
+  // keeps 踢人 / addBot / setDifficulty powers via the existing room.kick / room.addBot / room.setDifficulty.
+  // A wait that runs out fires match.timeout; the player may confirm an AI top-up (match.topUp) which forms the room
+  // from the same bucket (fewest queued first) and fills the remaining seats with AI bots up to the bucket target.
+  // ---------------------------------------------------------------------------------------------------
+  static MATCH_TARGET = 4; // default target when the client omits it (kept for compat)
+  static MATCH_TIMEOUT_MS = 20000;
+
+  /** @param {import('./net.js').Session} session @param {{ difficulty: string, target?: number }} msg */
+  matchEnqueue(session, { difficulty, target }) {
+    // coop matchmaking only: a player in a room leaves it first (like create/join); a running match must end first
+    const cur = this.roomOf(session);
+    if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
+    if (cur) this.removeMember(cur, session.playerId);
+    const tgt = Math.min(MAX_SEATS, Math.max(2, Number.isInteger(target) ? target : Lobby.MATCH_TARGET));
+    // idempotent: re-enqueueing just updates the difficulty/target / restarts the timer
+    this.matchRemove(session.playerId, { keepPool: true });
+    const pid = session.playerId;
+    const key = difficulty + '|' + tgt;
+    if (!this.matchPool.has(key)) this.matchPool.set(key, []);
+    const bucket = this.matchPool.get(key);
+    if (!bucket.includes(pid)) bucket.push(pid);
+    this.matchMeta.set(pid, { difficulty, target: tgt, queuedAt: this.now(), session });
+    this.startMatchTimer(pid, key);
+    this.log.info(`[lobby] match ${pid.slice(0, 8)} queued (${difficulty},${tgt}), ${bucket.length}/${tgt}`);
+    this.broadcastMatchStatus(key);
+    // try to fill a room now that this player may complete a bucket
+    this.tryMatch(key);
+    return OK;
+  }
+
+  /** @param {import('./net.js').Session} session */
+  matchCancel(session) {
+    const pid = session.playerId;
+    if (!this.matchMeta.has(pid)) return fail(ERR.ALREADY, 'you are not matching');
+    this.matchRemove(pid);
+    return OK;
+  }
+
+  /** @param {import('./net.js').Session} session */
+  matchTopUp(session) {
+    const pid = session.playerId;
+    const meta = this.matchMeta.get(pid);
+    if (!meta) return fail(ERR.ALREADY, 'you are not matching');
+    const key = meta.difficulty + '|' + meta.target;
+    // form a room from everyone still queued in this bucket (fewest first); the requester joins too
+    this.tryMatch(key, { force: true, requester: pid });
+    return OK;
+  }
+
+  /** Remove a player from the pool (and its bucket). @returns {boolean} whether it was queued */
+  matchRemove(playerId, { keepPool = false } = {}) {
+    const meta = this.matchMeta.get(playerId);
+    if (!meta) return false;
+    const key = meta.difficulty + '|' + meta.target;
+    const bucket = this.matchPool.get(key);
+    if (bucket) {
+      const i = bucket.indexOf(playerId);
+      if (i >= 0) bucket.splice(i, 1);
+      if (bucket.length === 0) this.matchPool.delete(key);
+    }
+    this.matchMeta.delete(playerId);
+    this.clearMatchTimer(playerId);
+    if (!keepPool) this.broadcastMatchStatus(key);
+    return true;
+  }
+
+  /** (Re)arm the AI top-up prompt timer for a queued player. */
+  startMatchTimer(playerId, key) {
+    this.clearMatchTimer(playerId);
+    const t = setTimeout(() => {
+      this.matchTimers.delete(playerId);
+      const meta = this.matchMeta.get(playerId);
+      if (!meta) { return; } // cancelled meanwhile
+      const metaKey = meta.difficulty + '|' + meta.target;
+      if (metaKey !== key) return; // re-queued meanwhile
+      const bucket = this.matchPool.get(key) || [];
+      const session = meta.session;
+      if (session && session.connected) {
+        sendSession(session, { t: 'match.timeout', difficulty: meta.difficulty, count: bucket.length, target: meta.target });
+      }
+    }, Lobby.MATCH_TIMEOUT_MS);
+    this.matchTimers.set(playerId, t);
+  }
+
+  clearMatchTimer(playerId) {
+    const t = this.matchTimers.get(playerId);
+    if (t) { clearTimeout(t); this.matchTimers.delete(playerId); }
+  }
+
+  /** Count of queued players in a difficulty|target bucket. */
+  matchCount(key) {
+    const bucket = this.matchPool.get(key) || [];
+    return bucket.length;
+  }
+
+  /**
+   * Form a coop room from a difficulty|target bucket when possible.
+   * @param {string} key e.g. "NORMAL|3"
+   * @param {{ force?: boolean, requester?: string }} [opts] force = top-up (use whoever is queued + AI to the target)
+   */
+  tryMatch(key, { force = false, requester = null } = {}) {
+    const bucket = this.matchPool.get(key);
+    if (!bucket || bucket.length === 0) return;
+    const meta0 = this.matchMeta.get(bucket[0]);
+    if (!meta0) { this.matchPool.delete(key); return; }
+    const target = meta0.target;
+    const pick = force ? bucket.slice(0, target) : (bucket.length >= target ? bucket.slice(0, target) : null);
+    if (!pick) return; // not enough players, keep waiting
+    const sessions = pick.map((pid) => this.matchMeta.get(pid)?.session).filter(Boolean);
+    if (sessions.length === 0) { this.matchPool.delete(key); return; }
+    // drop them from the pool first (formRoom joins them; avoid re-entrancy)
+    for (const pid of pick) { this.matchMeta.delete(pid); this.clearMatchTimer(pid); }
+    const remain = (this.matchPool.get(key) || []).filter((pid) => !pick.includes(pid));
+    if (remain.length === 0) this.matchPool.delete(key); else this.matchPool.set(key, remain);
+    this.broadcastMatchStatus(key);
+    const [difficulty] = key.split('|');
+    const room = this.formMatchRoom(difficulty, sessions, target);
+    if (!room) {
+      // rollback: nothing was joined; put them back so the wait can continue
+      for (const s of sessions) if (s.connected) this.matchEnqueue(s, { difficulty, target });
+      return;
+    }
+    // announce each matched player (match.found then room.state via broadcastState)
+    for (const s of sessions) if (s.connected) sendSession(s, { t: 'match.found', code: room.code, difficulty, target });
+  }
+
+  /**
+   * Create a coop room and seat the given sessions in it (the first is the host). Fills the remaining seats with AI
+   * bots up to `target` when forced top-up needs them. @returns {Room | null}
+   */
+  formMatchRoom(difficulty, sessions, target) {
+    if (this.rooms.size >= this.opts.maxRooms) return null;
+    const code = this.genCode();
+    if (!code) return null;
+    const room = new Room(code, 'coop', difficulty, this.now());
+    room.seats[0] = this.humanSeat(0, sessions[0]);
+    room.hostId = sessions[0].playerId;
+    this.rooms.set(code, room);
+    sessions[0].roomCode = code;
+    sessions[0].notice = null;
+    sessions[0].pendingResult = null;
+    for (let i = 1; i < sessions.length; i++) {
+      const s = sessions[i];
+      if (!room.freeSeat()) break;
+      room.seats[room.freeSeat()] = this.humanSeat(room.freeSeat(), s);
+      s.roomCode = code;
+      s.notice = null;
+      s.pendingResult = null;
+    }
+    // top-up: fill empty seats with AI bots until the total seat count reaches `target`
+    const used = new Set(room.seats.filter((x) => x && x.isBot).map((x) => x.name));
+    let seated = room.seats.filter((x) => x && x.seat != null).length;
+    while (room.freeSeat() >= 0 && seated < target) {
+      const idx = room.freeSeat();
+      const name = BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`;
+      let playerId;
+      do playerId = 'ai_' + randomBytes(4).toString('hex'); while (room.seatOf(playerId));
+      room.seats[idx] = { seat: idx, playerId, name, isBot: true, ready: true, connected: true, left: false };
+      used.add(name);
+      seated++;
+    }
+    this.log.info(`[lobby] match ${code} formed (${difficulty}) by ${sessions.map((s) => s.name).join(', ')}`);
+    this.broadcastState(room);
+    return room;
+  }
+
+  /** Broadcast the current queue state of a difficulty|target bucket to its queued players. */
+  broadcastMatchStatus(key) {
+    const bucket = this.matchPool.get(key) || [];
+    const count = bucket.length;
+    const meta0 = bucket.length ? this.matchMeta.get(bucket[0]) : null;
+    const difficulty = meta0 ? meta0.difficulty : key.split('|')[0];
+    const target = meta0 ? meta0.target : Lobby.MATCH_TARGET;
+    for (const pid of bucket) {
+      const meta = this.matchMeta.get(pid);
+      if (meta && meta.session && meta.session.connected) {
+        sendSession(meta.session, { t: 'match.status', difficulty, count, target });
+      }
+    }
+  }
+
 }

@@ -258,6 +258,13 @@ export const C2S = {
   // room.closed { reason: 'kicked' }). room.leave / g.leave leave a spectator seat like a player seat.
   'room.spectate': { code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.removeSpectator': { playerId: isId },
+  // server matchmaking (自加): queue into a global matching pool; the server forms a 4-human co-op room when enough
+  // same-difficulty queued players are ready. enqueue carries the desired difficulty (coop only).
+  'match.enqueue': { difficulty: (v) => DIFFICULTIES.includes(v), target: (v) => v == null || isInt(v, 2, MAX_SEATS), $optional: ['target'] },
+  'match.cancel': {},
+  // after match.timeout, the player confirms an AI top-up: the server forms a room from the same-difficulty
+  // queued players (fewest first) and fills the rest with AI bots up to MATCH_TARGET (自加)
+  'match.topUp': {},
 
   // match
   'g.infoReady': {},
@@ -311,6 +318,10 @@ export const C2S = {
 export const S2C = [
   'welcome', 'ok', 'error', 'pong',
   'room.state', 'room.closed',
+  // server matchmaking pushes (自加): match.status { queued, count, target, difficulty } when the queue changes;
+  // match.timeout { difficulty, count, target } when a wait ran out (AI top-up choice); match.found { code } then
+  // room.state follows (players are joined into the formed room automatically)
+  'match.status', 'match.timeout', 'match.found',
   'm.public', 'm.private', 'm.field', 'm.toast', 'm.ticker', 'm.emote', 'm.chat', 'm.result',
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)
   'm.unitStats',
