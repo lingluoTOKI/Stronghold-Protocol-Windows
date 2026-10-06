@@ -1209,7 +1209,10 @@ function equipCheck(ctx, itemPiece, targetPiece) {
 
 /** Whether equipping `itemId` attaches it (true) or consumes it on equip (false: no slot is used / replaced). */
 export function itemAttaches(item) {
-  return !(typeof item?.kind === 'string' && item.kind.startsWith('consume_on_equip'));
+  // consume_on_equip_or_delayed (博士投影) stays equipped until its effect lands: it occupies a slot and replaces an
+  // equipped item like a normal equip. Plain consume_on_equip never attaches.
+  return !(typeof item?.kind === 'string' && item.kind.startsWith('consume_on_equip')
+    && item.kind !== 'consume_on_equip_or_delayed');
 }
 
 /**
