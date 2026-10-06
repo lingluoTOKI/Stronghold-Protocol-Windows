@@ -4,7 +4,7 @@ export const RHINE_CHARACTERS = Object.freeze({ mayer: 'char_242_otter', silence
 export const RHINE_BALANCE = Object.freeze({
   thresholds: [3, 6, 9], baseAttack: 300, attackPerLayer: 3,
   mayerLayerStep: 5, mayerAttack: [2, 4], mayerSummons: [1, 2], ptilopsisLayersPerMember: [2, 4],
-  sariaLayerStep: 3, sariaHealBonus: [0.01, 0.02], ifritInheritance: [0.30, 0.60],
+  sariaLayerStep: 3, sariaHealBonus: [0.01, 0.02], ifritInheritance: [0.80, 1.00],
   sharingCount: 6, researchSharing: [0.15, 0.25],
   astgenneFirstSkillLayers: [3, 6], dorothyTrapLayers: [2, 4], dorothyBattleLayerCap: [24, 48], dorothyTrapLimit: [4, 5],
   successPoints: 2, failurePoints: 1, breakthroughPoints: [5, 5],
