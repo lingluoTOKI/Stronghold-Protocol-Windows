@@ -65,6 +65,7 @@
 import { net as appNet } from '../net.js';
 import { store as appStore } from '../store.js';
 import { unitStatsEntry, fxForm } from '../../../shared/protocol.js';
+import { MAX_SEATS } from '../../../shared/constants.js';
 
 const TICK = 1 / 30;
 /** Fast-forward budget per frame (ticks) when far behind. */
@@ -152,9 +153,9 @@ function deepFreeze(root) {
  * Browser sim loader: the /sim/ modules + the data files (own frozen copies — the server's data is frozen too, so a
  * content bug that writes into a record fails identically on both sides).
  */
-export async function loadBrowserSim({ base = '/sim/', dataBase = '/data/', fetchFn = (...a) => globalThis.fetch(...a) } = {}) {
-  const [spec, simdata, support] = await Promise.all([
-    import(`${base}spec.js`), import(`${base}simdata.js`), import(`${base}content/support/index.js`),
+export async function loadBrowserSim({ base = '/sim/', rhineEnabled = true, dataBase = rhineEnabled ? '/data/' : '/data/vanilla/', fetchFn = (...a) => globalThis.fetch(...a) } = {}) {
+  const [spec, simdata] = await Promise.all([
+    import(`${base}spec.js`), import(`${base}simdata.js`),
   ]);
   const fetchOnce = async (n) => {
     try {
@@ -169,8 +170,7 @@ export async function loadBrowserSim({ base = '/sim/', dataBase = '/data/', fetc
   if (missing.length) throw new Error(`simulation data unavailable: ${missing.join(', ')}`);
   const raw = {};
   SIM_DATA_FILES.forEach((n, i) => { raw[n] = deepFreeze(files[i]); });
-  simdata.setSimData(raw);
-  if (typeof support.setGameData === 'function') support.setGameData(null); // re-read through the injected data
+  // Each battle owns its data. Loading another room's profile must never replace a running battle's content.
   return { spec, ds: new simdata.DataSource(raw, null) };
 }
 
@@ -196,7 +196,7 @@ export function createBattleRunner(deps) {
   const setIv = deps.setInterval || ((fn, ms) => globalThis.setInterval(fn, ms));
   const clearIv = deps.clearInterval || ((h) => globalThis.clearInterval(h));
   const doc = deps.doc !== undefined ? deps.doc : (typeof document !== 'undefined' ? document : null);
-  const loadSim = deps.loadSim || (() => loadBrowserSim());
+  const loadSim = deps.loadSim || ((opts) => loadBrowserSim(opts));
   const logger = deps.logger || SIM_LOGGER;
 
   const listeners = new Map();
@@ -211,8 +211,14 @@ export function createBattleRunner(deps) {
   /** @type {Map<string, any>} battleId → entry */
   const entries = new Map();
   let cur = null;              // entry on screen
-  let simP = null;
+  const simPromises = new Map();
+  const enabledOf = (msg) => typeof msg?.rhineEnabled === 'boolean' ? msg.rhineEnabled
+    : msg?.dataProfile ? msg.dataProfile !== 'vanilla' : true;
+  const initial = store?.get?.();
+  let activeProfile = enabledOf(initial?.match?.public ?? initial?.room);
+  let lastStoreProfile = activeProfile;
   let startSeq = 0;
+  let clearEpoch = 0;
   let loading = null;          // b.start being prepared
   let rafH = null;
   let ivH = null;
@@ -236,11 +242,20 @@ export function createBattleRunner(deps) {
   // of having unspawned enemies silently removed from the total by the timeout.
   const spawnDone = (e) => { const q = e && e.battle && e.battle._pending; return !Array.isArray(q) || q.length === 0; };
 
-  function ensureSim() {
-    if (!simP) {
-      simP = loadSim().catch((err) => { simP = null; throw err; });
+  function ensureSim(enabled = activeProfile) {
+    if (!simPromises.has(enabled)) {
+      const promise = Promise.resolve().then(() => loadSim({ rhineEnabled: enabled, dataBase: enabled ? '/data/' : '/data/vanilla/' }))
+        .catch((err) => { if (simPromises.get(enabled) === promise) simPromises.delete(enabled); throw err; });
+      simPromises.set(enabled, promise);
     }
-    return simP;
+    return simPromises.get(enabled);
+  }
+
+  function selectProfile(enabled) {
+    if (enabled !== activeProfile) {
+      activeProfile = enabled;
+      clear();
+    }
   }
 
   /** Counted leaks so far of every normal field simulated here: { [fieldId]: n } (user playtest #3 item 2). */
@@ -481,13 +496,13 @@ export function createBattleRunner(deps) {
       msg.bossDmg = pool && Number.isFinite(pool.cum) ? pool.cum : 0;
       if (pool && pool.byPlayer) {
         const by = {};
-        for (const pid of Object.keys(pool.byPlayer).slice(0, 4)) by[pid] = pool.byPlayer[pid];
+        for (const pid of Object.keys(pool.byPlayer).slice(0, MAX_SEATS)) by[pid] = pool.byPlayer[pid];
         msg.by = by;
       }
     } else {
       msg.leaks = Math.min(1e6, p.leaks);
-      // 联防: the leakers' enemies still standing (shared/protocol.js b.progress `left`, ≤ 4 players)
-      if (p.left) msg.left = Object.fromEntries(Object.entries(p.left).slice(0, 4));
+      // 联防: the leakers' enemies still standing (shared/protocol.js b.progress `left`, at most MAX_SEATS players)
+      if (p.left) msg.left = Object.fromEntries(Object.entries(p.left).slice(0, MAX_SEATS));
     }
     try { net.send('b.progress', msg); } catch { /* offline */ }
   }
@@ -715,6 +730,9 @@ export function createBattleRunner(deps) {
 
   async function onStart(msg) {
     if (!msg || typeof msg !== 'object' || !msg.spec || typeof msg.battleId !== 'string') return;
+    const enabled = typeof msg.rhineEnabled === 'boolean' || msg.dataProfile ? enabledOf(msg)
+      : typeof msg.spec.rhineEnabled === 'boolean' || msg.spec.dataProfile ? enabledOf(msg.spec) : activeProfile;
+    selectProfile(enabled);
     const speed = Number(msg.speed) > 0 ? Number(msg.speed) : 2;
     const existing = entries.get(msg.battleId);
     if (existing) {
@@ -738,10 +756,11 @@ export function createBattleRunner(deps) {
       return;
     }
     const seq = ++startSeq;
+    const epoch = clearEpoch;
     loading = { battleId: msg.battleId, fieldId: msg.fieldId, kind: msg.kind };
     publishState();
     let sim;
-    try { sim = await ensureSim(); } catch (err) {
+    try { sim = await ensureSim(enabled); } catch (err) {
       console.warn('[runner] simulation unavailable', err);
       if (seq === startSeq) { loading = null; publishState(); }
       return;
@@ -787,7 +806,7 @@ export function createBattleRunner(deps) {
       await yieldFrame();
       if (seq !== startSeq) {
         // superseded while preparing: an authoritative battle must still finish (it is kept), a replica is dropped
-        if (e.authoritative) { entries.set(e.battleId, e); evict(); if (e.leaks) leaksDirty = true; schedule(); }
+        if (e.authoritative && epoch === clearEpoch && enabled === activeProfile) { entries.set(e.battleId, e); evict(); if (e.leaks) leaksDirty = true; schedule(); }
         return;
       }
     }
@@ -829,6 +848,7 @@ export function createBattleRunner(deps) {
 
   /** Drop every battle (a new round's prep, the match ended, the player left). */
   function clear() {
+    ++clearEpoch;
     ++startSeq;
     loading = null;
     for (const e of entries.values()) {
@@ -856,6 +876,11 @@ export function createBattleRunner(deps) {
   if (store && typeof store.subscribe === 'function') {
     offs.push(store.subscribe((s) => {
       const pub = s && s.match && s.match.public ? s.match.public : null;
+      const storeProfile = enabledOf(pub ?? s?.room);
+      if (storeProfile !== lastStoreProfile) {
+        lastStoreProfile = storeProfile;
+        selectProfile(storeProfile);
+      }
       // solo pause (DESIGN §14): the local battle clocks follow m.public.paused
       setPaused(!!(pub && pub.paused));
       const phase = pub ? pub.phase : null;
@@ -865,7 +890,7 @@ export function createBattleRunner(deps) {
         if (entries.size || loading) clear();
       }
       // warm the simulation up as soon as a match runs (the first b.start then starts at once)
-      if (phase && phase !== 'LOBBY' && !simP) ensureSim().catch(() => {});
+      if (phase && phase !== 'LOBBY') ensureSim().catch(() => {});
     }));
   }
   if (doc && typeof doc.addEventListener === 'function') {
@@ -882,7 +907,7 @@ export function createBattleRunner(deps) {
     state,
     battleClock,
     stats() {
-      return { ...stats, avgTickMs: stats.ticks ? stats.stepMs / stats.ticks : 0, entries: entries.size, loadingSim: !!simP };
+      return { ...stats, avgTickMs: stats.ticks ? stats.stepMs / stats.ticks : 0, entries: entries.size, loadingSim: simPromises.has(activeProfile) };
     },
     /**
      * Live stats of unit `unitId` of the battle on screen (null: no such battle / unit, or `fieldId` names another

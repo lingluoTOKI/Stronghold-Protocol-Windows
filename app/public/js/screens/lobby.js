@@ -11,10 +11,12 @@
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor } from '../../../shared/constants.js';
-import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, confirmDialog } from '../ui/components.js';
+import { openingBanCounts } from '../../../shared/openingBans.js';
+import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, confirmDialog, Modal } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton } from '../ui/guide.js';
 import { LoadoutButton } from './loadout.js';
+import { BulletinButton } from './title.js';
 import { net, identity } from '../net.js';
 import { store, useStore, shallowEqual, loadPref, savePref } from '../store.js';
 import { getConfig, getMode, getStage, useData } from '../data.js';
@@ -81,9 +83,11 @@ const MODE_CARDS = [
  * Text for a difficulty card, preferring data/config.json.
  * @param {'solo'|'coop'} roomMode
  * @param {string} difficulty
- * @returns {{ code: string, desc: string, effects: string[], rounds: number, hidden: boolean, stageNote: string }}
+ * @param {number|null} [playerCount] occupied human + AI seats; null while a co-op room has not been assembled
+ * @returns {{ code: string, desc: string, effects: string[], rounds: number, hidden: boolean, stageNote: string,
+ *   openingBans: { core: number, addon: number }, openingBanNote: string }}
  */
-export function difficultyInfo(roomMode, difficulty) {
+export function difficultyInfo(roomMode, difficulty, playerCount = null) {
   const fallback = MODE_TEXT[roomMode === 'solo' ? 'single' : 'multi'][difficulty] || { code: '', desc: '', effects: [] };
   // modeIdFor() lower-cases the difficulty: never call it with a value the server did not validate.
   const m = DIFFICULTIES.includes(difficulty) ? getMode(modeIdFor(roomMode, difficulty)) : null;
@@ -91,6 +95,14 @@ export function difficultyInfo(roomMode, difficulty) {
     ? m.effectDescList.map((e) => String(e).replace(/^[·•\s]+/, '')).filter(Boolean)
     : fallback.effects;
   const rounds = Number.isFinite(m?.lastRound) ? m.lastRound : roomMode === 'solo' && difficulty === 'FUNNY' ? 9 : 14;
+  const knownCount = roomMode === 'solo' ? 1 : Number.isInteger(playerCount) && playerCount > 0 ? playerCount : null;
+  const configuredBans = getConfig()?.bans;
+  const openingBans = openingBanCounts(difficulty, knownCount ?? 1, configuredBans);
+  const largeRoomNotes = knownCount == null ? [5, 6].map(count => {
+    const bans = openingBanCounts(difficulty, count, configuredBans);
+    return bans.core !== openingBans.core ? `${count} 人（含 AI）时核心 ${bans.core}` : '';
+  }).filter(Boolean) : [];
+  const conditional = largeRoomNotes.length ? `；${largeRoomNotes.join('；')}` : '';
   return {
     code: typeof m?.code === 'string' ? m.code : fallback.code,
     desc: typeof m?.desc === 'string' ? m.desc : fallback.desc,
@@ -98,6 +110,8 @@ export function difficultyInfo(roomMode, difficulty) {
     rounds,
     hidden: difficulty !== 'FUNNY',
     stageNote: stageNote(Array.isArray(m?.stages) && m.stages.length ? m.stages : STAGE_POOL[difficulty]),
+    openingBans,
+    openingBanNote: `开局 BAN：核心 ${openingBans.core} / 附加 ${openingBans.addon}${conditional}`,
   };
 }
 
@@ -208,7 +222,7 @@ function DifficultyCard({ roomMode, difficulty, selected, onSelect }) {
       </span>
     </span>
     <span class="diff-card__desc">${info.desc}</span>
-    <span class="diff-card__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}${info.stageNote ? html`<span key="stage" class="diff-card__stage"><${Icon} name="rook" />${info.stageNote}</span>` : null}</span>
+    <span class="diff-card__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}<span key="bans" class="diff-card__bans">${info.openingBanNote}</span>${info.stageNote ? html`<span key="stage" class="diff-card__stage"><${Icon} name="rook" />${info.stageNote}</span>` : null}</span>
     <span class="diff-card__check" aria-hidden="true"><${Icon} name="check" /><span>已选定</span></span>
   </button>`;
 }
@@ -229,10 +243,10 @@ export function LobbyScreen() {
   const alive = useRef(true);
   const [matching, setMatching] = useState(false);       // 服务器匹配中
   const [matchCount, setMatchCount] = useState(0);       // 当前已匹配人数
-  const [matchTarget, setMatchTarget] = useState(MAX_SEATS); // 目标人数(服务器返回)
-  const [matchWait, setMatchWait] = useState(false);     // 超时等待中(等待AI补位选择)
-  const [matchChoice, setMatchChoice] = useState(0);     // coop 创建时选定的队友人数：0=直接建(手动加AI), 2/3/4=匹配到该人数
-  const MATCH_OPTS = [{ v: 0, key: 'direct', label: '直接建' }, { v: 2, key: 'p2', label: '2 人' }, { v: 3, key: 'p3', label: '3 人' }, { v: 4, key: 'p4', label: '4 人' }];
+  const [matchTarget, setMatchTarget] = useState(MAX_SEATS); // 上限人数(固定4,服务器返回)
+  const [matchWait, setMatchWait] = useState(false);     // 20s 超时等待中(选择继续等待/加AI/不加AI)
+  const [onlineCount, setOnlineCount] = useState(null);  // 实时在线玩家数(/api/online)
+  const [coopCreate, setCoopCreate] = useState(() => (loadPref('lobby.coopCreate', 'match') === 'direct' ? 'direct' : 'match')); // coop 建立方式: direct 直接建房 / rhine 莱茵科研(直接建房) / match 匹配队友
   const matchState = useRef({ active: false });          // 供事件回调读取的当前匹配状态
   const inFlight = useRef(false); // synchronous guard against double clicks (state updates are async)
   useEffect(() => () => { alive.current = false; }, []);
@@ -242,6 +256,10 @@ export function LobbyScreen() {
 
   const pickMode = (m) => { setRoomMode(m); savePref('lobby.mode', m); };
   const pickDifficulty = (d) => { setDifficulty(d); savePref('lobby.difficulty', d); };
+  const pickCoopCreate = (v) => {
+    if (matchState.current.active) leaveMatch(); // 切换建立方式一律先退出匹配池
+    setCoopCreate(v); savePref('lobby.coopCreate', v);
+  };
   const clearMatch = () => {
     matchState.current.active = false;
     setMatching(false); setMatchCount(0); setMatchTarget(MAX_SEATS); setMatchWait(false);
@@ -254,31 +272,33 @@ export function LobbyScreen() {
   const startMatch = async () => {
     if (matching || !online) return;
     matchState.current.active = true;
-    setMatching(true); setMatchWait(false); setMatchCount(1);
-    const tgt = matchChoice >= 2 ? matchChoice : MAX_SEATS;
-    setMatchTarget(tgt);
-    try { await net.request('match.enqueue', { difficulty, target: tgt }); }
+    setMatching(true); setMatchWait(false); setMatchCount(1); setMatchTarget(MAX_SEATS);
+    try { await net.request('match.enqueue', { difficulty, mode: coopCreate === 'rhine' ? 'rhine' : 'vanilla' }); }
     catch (err) { toastError(err); if (alive.current) clearMatch(); }
   };
   const topUp = () => {
     if (!matchState.current.active) return;
     net.request('match.topUp').catch((err) => toastError(err));
   };
+  const startNow = () => {
+    if (!matchState.current.active) return;
+    net.request('match.startNow').catch((err) => toastError(err));
+  };
+  const waitMore = () => {
+    if (!matchState.current.active) return;
+    net.request('match.waitMore').catch((err) => toastError(err));
+  };
   useEffect(() => {
     const offStatus = net.on('match.status', (m) => {
       if (!matchState.current.active) return;
-      setMatchCount(Math.min(m.count, m.target)); setMatchTarget(m.target);
+      setMatchCount(Math.min(m.count, m.target || MAX_SEATS)); setMatchTarget(m.target || MAX_SEATS);
     });
-    const offTimeout = net.on('match.timeout', async (m) => {
+    // 20s 等待结束：进入超时选择态，由玩家选 继续等待 / 加AI开始 / 不加AI开始（三选UI）
+    const offTimeout = net.on('match.timeout', (m) => {
       if (!matchState.current.active) return;
+      setMatchCount(Math.min(m.count, m.target || MAX_SEATS));
+      setMatchTarget(m.target || MAX_SEATS);
       setMatchWait(true);
-      const msg = m.count >= 2
-        ? ('目前有 ' + m.count + ' 人匹配中，仍未凑满 ' + m.target + ' 人。是否用 AI 队友补齐剩余空位立即开始？')
-        : ('匹配超时（当前仅你 ' + m.count + ' 人）。是否用 AI 队友补齐到 ' + m.target + ' 人立即开始？');
-      const ok = await confirmDialog({ title: 'AI 补位', text: msg, okText: '用 AI 补位', cancelText: '继续等待' });
-      if (!alive.current || !matchState.current.active) return;
-      setMatchWait(false);
-      if (ok) topUp();
     });
     const offFound = net.on('match.found', () => { clearMatch(); });
     const offState = net.on('room.state', () => { if (matchState.current.active) clearMatch(); });
@@ -286,6 +306,22 @@ export function LobbyScreen() {
     return () => { offStatus(); offTimeout(); offFound(); offState(); offClosed(); };
   }, []);
   useEffect(() => () => { if (matchState.current.active) net.request('match.cancel').catch(() => {}); }, []);
+
+  // 主界面实时在线玩家数（自加）：轮询 /api/online（同源，静态服务），每 5s 刷新
+  useEffect(() => {
+    let live = true;
+    const poll = async () => {
+      try {
+        const r = await fetch('/api/online', { headers: { accept: 'application/json' } });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (live) setOnlineCount(typeof j.online === 'number' ? j.online : (v) => v);
+      } catch { /* offline/网络抖动：保留上一次数字 */ }
+    };
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => { live = false; clearInterval(id); };
+  }, []);
 
   const run = async (kind, fn) => {
     if (inFlight.current) return;
@@ -298,8 +334,11 @@ export function LobbyScreen() {
     }
   };
   const create = () => {
-    // coop + 选定了队友人数(≥2) → 直接进入匹配池; 否则(纯手动)直接建房
-    if (roomMode === 'coop' && matchChoice >= 2) return startMatch();
+    // coop: 「直接建立」→ 建 4 席房间大厅（可邀请好友/加AI，host 手动开始）; 「匹配队友」→ 进公共匹配池
+    if (roomMode === 'coop') {
+      if (coopCreate === 'direct') return run('create', () => net.request('room.create', { mode: 'coop', difficulty }));
+      return startMatch(); // 「匹配队友」普通池 / 「新模式匹配」莱茵池：均进匹配池，按模式分组
+    }
     return run('create', () => net.request('room.create', { mode: roomMode, difficulty }));
   };
   const join = (c = code) => {
@@ -322,7 +361,13 @@ export function LobbyScreen() {
     <header class="topbar">
       <div class="topbar__left">
         <${Button} variant="ghost" size="sm" icon="chevronLeft" onClick=${backToTitle} title="返回标题">返回<//>
+        <${BulletinButton} />
         <${PingPill} ms=${conn.ping} online=${online} />
+        <div class="online-pill" title=${onlineCount == null ? '在线玩家数加载中…' : `当前 ${onlineCount} 位博士在线`}>
+          <${Icon} name="users" />
+          <span class="num online-pill__n">${onlineCount == null ? '—' : onlineCount}</span>
+          <${MicroLabel}>ONLINE<//>
+        </div>
       </div>
       <div class="topbar__center">
         <${MicroLabel} tone="mint">SIMULATION PROTOCOL SELECT<//>
@@ -364,22 +409,36 @@ export function LobbyScreen() {
               : html`<span class="t-dim">向同伴索取 ${ROOM_CODE_LEN} 位同盟密钥，或直接打开邀请链接</span>`}
           </div>
         <//>
-        <div class="match-choice-wrap">
-          ${roomMode === 'coop' && !matching
-            ? html`<div class="match-choice">
-                <div class="match-choice__head">
-                  <span class="match-choice__label">队友人数</span>
-                  <span class="match-choice__sub t-dim">${matchChoice >= 2 ? ('满 ' + matchChoice + ' 人即开局') : '手动建 / 匹配入伙'}</span>
+        ${roomMode === 'coop'
+          ? html`<div class="lobby-coop-create">
+              <div class="create-box__mode">
+                <span class="create-box__mode-label">建立方式</span>
+                <div class="create-box__mode-opts">
+                  <button type="button" class=${`create-box__mode-opt${coopCreate === 'direct' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('direct')} aria-pressed=${coopCreate === 'direct' ? 'true' : 'false'}>
+                    <span class="create-box__mode-opt-icon"><${Icon} name="plus" /></span>
+                    <span class="create-box__mode-opt-text">
+                      <span class="create-box__mode-opt-name">直接建立</span>
+                      <span class="create-box__mode-opt-desc">创建即莱茵扩展 · 房内可切回原版，邀好友/加AI</span>
+                    </span>
+                  </button>
+                  <button type="button" class=${`create-box__mode-opt${coopCreate === 'match' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('match')} aria-pressed=${coopCreate === 'match' ? 'true' : 'false'}>
+                    <span class="create-box__mode-opt-icon"><${Icon} name="users" /></span>
+                    <span class="create-box__mode-opt-text">
+                      <span class="create-box__mode-opt-name">匹配队友</span>
+                      <span class="create-box__mode-opt-desc">原版玩法 · 进公共池，20s 满 4 自动开局</span>
+                    </span>
+                  </button>
+                  <button type="button" class=${`create-box__mode-opt${coopCreate === 'rhine' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('rhine')} aria-pressed=${coopCreate === 'rhine' ? 'true' : 'false'}>
+                    <span class="create-box__mode-opt-icon"><${Icon} name="robot" /></span>
+                    <span class="create-box__mode-opt-text">
+                      <span class="create-box__mode-opt-name">新模式匹配</span>
+                      <span class="create-box__mode-opt-desc">莱茵扩展玩法 · 进公共池，满 4 自动开局</span>
+                    </span>
+                  </button>
                 </div>
-                <div class="match-choice__opts">
-                  ${MATCH_OPTS.map((o) => html`<button key=${o.key} type="button"
-                    class=${'match-choice__opt num' + (matchChoice === o.v ? ' is-on' : '')}
-                    onClick=${() => setMatchChoice(o.v)}>${o.label}</button>`)}
-                </div>
-              </div>`
-            : null}
-        </div>
-
+              </div>
+            </div>`
+          : null}
         <${TipsPanel} />
       </section>
 
@@ -390,24 +449,39 @@ export function LobbyScreen() {
         </div>
       
         <div class="create-box">
-
           <div class="create-box__acts">
           <${Tooltip} block=${true} text=${online ? null : '正在连接服务器…'}>
             <${Button} variant="primary" size="xl" block=${true} iconRight=${matching ? null : 'chevrons'} loading=${busy === 'create'} disabled=${!online || matching} onClick=${create}>
-              ${roomMode === 'solo' ? '开始独立模拟' : (matchChoice >= 2 ? `匹配 ${matchChoice} 人创建同盟` : '创建同盟')}
+              ${roomMode === 'solo' ? '开始独立模拟' : coopCreate === 'direct' ? '直接建立' : coopCreate === 'rhine' ? '新模式匹配' : '匹配建房'}
             <//>
           </div>
           <//>
           ${roomMode === 'coop' && matching
-            ? html`<div class="match-queue">
-                <span class="t-lo">${matchWait ? '等待你的 AI 补位选择…' : '正在匹配队友…'}</span>
-                <span class="num match-queue__count">${matchCount}<span class="t-dim">/${matchTarget}</span></span>
-                <${Button} variant="ghost" size="sm" icon="x" onClick=${leaveMatch}>取消<//>
-              </div>`
+            ? (matchWait
+              ? html`<${Modal} open=${true} title="等待超时" micro="MATCHMAKING TIMEOUT" tone="mint" width="5rem" onClose=${leaveMatch}
+                  actions=${html`
+                    <${Button} variant="secondary" icon="clock" onClick=${waitMore}>继续等待<//>
+                    <${Button} variant="secondary" icon="bot" onClick=${topUp}>加AI开始<//>
+                    <${Button} variant="primary" icon="play" onClick=${startNow}>不加AI开始<//>
+                    <${Button} variant="ghost" icon="x" onClick=${leaveMatch}>取消<//>
+                  `}>
+                  <div class="match-timeout__body">
+                    <span class="t-lo">当前匹配到 ${matchCount} 名博士</span>
+                    <span class="num match-timeout__n">${matchCount}<span class="t-dim">/${matchTarget}</span></span>
+                  </div>
+                <//>`
+              : html`<div class="match-queue">
+                  <span class="t-lo">正在匹配队友…（${matchTarget} 人满员即自动开局）</span>
+                  <span class="num match-queue__count">${matchCount}<span class="t-dim">/${matchTarget}</span></span>
+                  <${Button} variant="ghost" size="sm" icon="x" onClick=${leaveMatch}>取消<//>
+                </div>`)
             : null}
           <div class="create-box__hint">
             ${online
-              ? html`<span>${roomMode === 'solo' ? '创建后即可开始模拟' : (matchChoice >= 2 ? '服务器将自动匹配同难度的队友，满员即开局' : '创建后可邀请好友 / 添加 AI 队友')}</span>`
+              ? html`<span>${roomMode === 'solo' ? '创建后即可开始模拟'
+                  : coopCreate === 'direct' ? '创建即莱茵扩展，可邀请好友 / 添加 AI；房内可切回原版'
+                  : coopCreate === 'rhine' ? '新模式匹配：进公共池，满 4 人自动开局；未满时可继续等待或加 AI'
+                  : '原版玩法：进入公共匹配池，20 秒内满 4 人自动开局；未满时可继续等待或加 AI'}</span>`
               : html`<${Spinner} size="sm" label="CONNECTING" />`}
           </div>
         </div>

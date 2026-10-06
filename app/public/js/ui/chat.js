@@ -36,6 +36,9 @@ export function ensureChatCss(doc = globalThis.document) {
     '.chat-dock__panel::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--mint-500,#4ed8af),rgba(78,216,175,.18) 55%,transparent);pointer-events:none;}',
     /* 标题栏：COMMS 小标签 + 中文标题 + 切角关闭方钮 */
     '.chat-dock__head{display:flex;align-items:center;gap:.1rem;padding:.1rem .12rem;border-bottom:1px solid var(--line,rgba(78,216,175,.13));user-select:none;}',
+    '.chat-dock__head--drag{cursor:grab;}',
+    '.chat-dock__head--drag:active{cursor:grabbing;}',
+    '.chat-dock__panel.is-moved{position:fixed;z-index:960;margin:0;bottom:auto;left:auto;}',
     '.chat-dock__tag{font-family:var(--font-mono,ui-monospace,monospace);font-size:max(.1rem,9px);font-weight:700;letter-spacing:.2em;color:var(--mint-500,#4ed8af);opacity:.85;}',
     '.chat-dock__title{flex:1;font-family:var(--font-mono,ui-monospace,monospace);font-size:max(.15rem,12px);font-weight:700;letter-spacing:.16em;color:var(--text-hi,#f2f2f2);}',
     '.chat-dock__close{width:.34rem;min-width:26px;height:.34rem;min-height:26px;display:grid;place-items:center;background:rgba(8,11,10,.85);border:1px solid var(--line-2,#3e4b45);color:var(--text-lo,#8a948f);font-size:max(.14rem,12px);line-height:1;cursor:pointer;padding:0;transition:color .15s,border-color .15s,background .15s;}',
@@ -119,6 +122,15 @@ export function ChatDock({ open, onToggle, disabled = false }) {
     return null;
   });
   const sizeRef = useRef(size);
+  // 面板位置可自由拖拽移动；位置记忆在 localStorage['sp-chat-pos']，双击标题栏复位
+  const [pos, setPos] = useState(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('sp-chat-pos'));
+      if (v && typeof v.x === 'number' && typeof v.y === 'number') return v;
+    } catch { /* 无记忆位置 */ }
+    return null;
+  });
+  const posRef = useRef(pos);
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const mountedRef = useRef(false);
@@ -217,6 +229,53 @@ export function ChatDock({ open, onToggle, disabled = false }) {
     try { localStorage.removeItem('sp-chat-size'); } catch { /* 忽略 */ }
   };
 
+  // 拖拽标题栏移动整个面板。
+  // 流畅性：拖动过程中直接用 DOM transform 平移面板（不触发 React 重渲染），
+  // 松开时才把最终位置写回 state + localStorage，避免高频 setState 造成卡顿。
+  const beginDrag = (e) => {
+    if (e.button != null && e.button !== 0) return;
+    const panel = e.currentTarget.closest && e.currentTarget.closest('.chat-dock__panel');
+    if (!panel) return;
+    e.preventDefault();
+    const r = panel.getBoundingClientRect();
+    const start = { x: e.clientX, y: e.clientY, left: r.left, top: r.top };
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // 先把面板从「锚定在按钮上方」切成 fixed 定位（含视口当前坐标），再随指针平移
+    posRef.current = { x: r.left, y: r.top };
+    setPos({ x: r.left, y: r.top });
+    panel.classList.add('is-moved');
+    panel.style.left = r.left + 'px';
+    panel.style.top = r.top + 'px';
+    document.body.style.userSelect = 'none';
+    const move = (ev) => {
+      panel.style.transform = 'translate(' + (ev.clientX - start.x) + 'px,' + (ev.clientY - start.y) + 'px)';
+    };
+    const up = (ev) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      document.body.style.userSelect = '';
+      panel.style.transform = '';
+      const next = {
+        x: Math.round(Math.min(vw - 16, Math.max(0, start.left + (ev.clientX - start.x)))),
+        y: Math.round(Math.min(vh - 16, Math.max(0, start.top + (ev.clientY - start.y)))),
+      };
+      posRef.current = next;
+      setPos(next);
+      panel.style.left = next.x + 'px';
+      panel.style.top = next.y + 'px';
+      try { localStorage.setItem('sp-chat-pos', JSON.stringify(next)); } catch { /* 忽略 */ }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  const resetPos = () => {
+    posRef.current = null;
+    setPos(null);
+    try { localStorage.removeItem('sp-chat-pos'); } catch { /* 忽略 */ }
+  };
+
   return html`
     <div class="chat-dock">
       <button type="button" class=${cx('ewheel__btn', 'chat-dock__btn', open && 'is-on')}
@@ -227,12 +286,14 @@ export function ChatDock({ open, onToggle, disabled = false }) {
       </button>
 
       ${open ? html`
-        <div class=${cx('chat-dock__panel', size && 'is-sized')} role="dialog" aria-label="房间聊天"
-          style=${size ? `width:${size.w}px;height:${size.h}px` : undefined}>
-          <div class="chat-dock__head">
+        <div class=${cx('chat-dock__panel', size && 'is-sized', pos && 'is-moved')} role="dialog" aria-label="房间聊天"
+          style=${[size && `width:${size.w}px;height:${size.h}px`, pos && `left:${pos.x}px;top:${pos.y}px`].filter(Boolean).join(';') || undefined}>
+          <div class="chat-dock__head chat-dock__head--drag" title="拖动移动聊天框 · 双击复位位置"
+            onPointerDown=${beginDrag} onDoubleClick=${resetPos}>
             <span class="chat-dock__tag">COMMS</span>
             <span class="chat-dock__title">房间聊天</span>
             <button type="button" class="chat-dock__close" aria-label="收起" title="收起 (Esc)"
+              onPointerDown=${(e) => e.stopPropagation()}
               onClick=${() => onToggle(false)}>✕</button>
           </div>
 

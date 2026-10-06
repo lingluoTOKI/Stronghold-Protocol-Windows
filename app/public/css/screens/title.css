@@ -255,3 +255,21 @@
   font-size: .13rem;
   color: var(--text-dim);
 }
+
+
+
+/* ---- server bulletin (mail icon + red dot, next to 玩法说明; opens a centered Modal) ----- */
+.bulletin-btn { position: relative; display: inline-flex; align-items: center; }
+.bulletin-btn__icon { position: relative; }
+.bulletin-btn__icon.has-new,
+.bulletin-btn__icon.has-new .icon { color: #ff5c5c; }
+.bulletin-btn__icon.has-new .icon { filter: drop-shadow(0 0 .06rem rgba(255,92,92,.55)); }
+.bulletin-modal-box.modal__box { max-width: 92vw; }
+.bulletin-modal__when { color: #6d8f80; font-size: .2rem; letter-spacing: .05em; margin-bottom: .18rem; }
+.bulletin-modal__item + .bulletin-modal__item { border-top: 1px dashed #24322c; margin-top: .18rem; padding-top: .18rem; }
+.bulletin-modal__row { display: flex; flex-wrap: wrap; gap: .14rem .18rem; align-items: baseline; }
+.bulletin-modal__ver { color: #17f9b7; font-weight: 700; font-size: .22rem; }
+.bulletin-modal__time { color: #6d8f80; font-size: .2rem; }
+.bulletin-modal__title { color: #e8f5ee; font-weight: 600; font-size: .26rem; }
+.bulletin-modal__content { margin: .1rem 0 0; color: #b7ccc1; font-size: .2rem; line-height: 1.5; }
+.bulletin-modal__empty { color: #6d8f80; font-size: .22rem; text-align: center; padding: .3rem 0; }

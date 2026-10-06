@@ -66,8 +66,10 @@
 // ground point, i.e. on the pointer (render/app.js).
 
 import { UF, ANIM } from '../../../shared/constants.js';
+import { rhineDevice } from '../../../shared/rhineResearch.js';
 import { SpineActor } from './spine.js';
-import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, hudRings, ringArc, HUD_DISC, ELEMENT_RING } from './textures.js';
+import { ResearchDeviceActor } from './rhineDevices.js';
+import { diamondTexture, unitSpriteTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, hudRings, ringArc, HUD_DISC, ELEMENT_RING } from './textures.js';
 import { COLORS, TIER_COLORS, ENEMY_FRAME, UNIT, PROJ, statusIconKey, statusIconSuppressed } from './style.js';
 import { drawCrate, rowDepthKey, ROW_KEY, deviceBoxOf, DEVICE_BOX } from './tiles.js';
 
@@ -210,6 +212,10 @@ const dollRoles = (idle, die, attack = null) => Object.freeze({
   idle, deploy: idle, die, attack: attack ? Object.freeze({ begin: null, loop: attack, end: null }) : null, attackDown: null, skill: null,
 });
 export const FORMS = Object.freeze({
+  token_10025_doroth_recttp: Object.freeze({
+    dorothyCritical: Object.freeze({ roles: Object.freeze({}), tint: 0xff665c }),
+    dorothyNormal: Object.freeze({ roles: Object.freeze({}), tint: 0xffffff }),
+  }),
   char_1023_ghost2: Object.freeze({
     doll: Object.freeze({ change: 'Start_B', end: 'Die_B', leave: 'Start_2', roles: dollRoles('Idle_B', 'Die_B_2') }),
   }),
@@ -312,6 +318,7 @@ export class UnitView {
     // enemies: the official prefab's size factor (1 for operators, summons and enemies at the standard size)
     this.modelK = this.isEnemy ? enemyModelScale(ctx.lookupDef ? ctx.lookupDef(info) : null) : 1;
     this.isToken = info.kind === 'token';
+    this.researchDevice = this.isToken ? rhineDevice(info.defId) : null;
     this.golden = !!info.golden;
     this.tier = clamp(Number(info.tier) || 1, 1, 6);
     this.x = Number(info.x) || 0; this.y = Number(info.y) || 0; this.z = 0;
@@ -325,7 +332,7 @@ export class UnitView {
     this.facing = this.dir === 'LEFT' ? -1 : 1;
     this.visFacing = this.isEnemy ? -1 : this.facing;
     this.hp = Number(info.maxHp) || 1; this.maxHp = Number(info.maxHp) || 1; this.ghostHp = this.hp;
-    this.sp = 0; this.spMax = 0;
+    this.sp = Number(info.sp) || 0; this.spMax = Number(info.spMax) || 0;
     this.flags = 0; this.anim = ANIM.IDLE;
     this.statuses = new Set();
     this.alive = true;
@@ -373,6 +380,7 @@ export class UnitView {
     this.fallback = new P.Sprite(P.Texture.EMPTY);
     this.fallback.anchor.set(0.5, 1);
     this.body.addChild(this.fallback);
+    this.researchActor = this.researchDevice ? new ResearchDeviceActor(this) : null;
     this.actor = null;
     this.spineReady = false;
     this._modelDirty = false;            // died / stood up since the last frame: update() checks Front ⇄ Back (_syncModel)
@@ -405,19 +413,26 @@ export class UnitView {
   // the first frame it is actually visible: never for a unit whose Spine model is ready before that, and never as
   // an image-less placeholder that the avatar replaces a moment later (the placeholder only shows when the avatar
   // is missing or still loading after PIC_WAIT_MS).
-  _loadPicture() {
+  _loadPicture(retry = false) {
     const a = this.ctx.assets;
-    // (an ICE_TOKENS unit takes no picture: the token fallback would be its owner's face — assets.js tokenAvatarUrl)
-    const url = ICE_TOKENS.has(this.info.defId) ? null : a && (a.picture ? a.picture(this.info.avatar) || a.picture(this.info.defId) || a.picture(this.info.spine) : null);
+    // An ice marker has no portrait; research devices instead prefer their uncropped full sprite.
+    const picture = !ICE_TOKENS.has(this.info.defId) && a?.picture ? a.picture(this.info.avatar) || a.picture(this.info.defId) || a.picture(this.info.spine) : null;
+    const urls = this.researchDevice ? [...new Set([this.researchDevice.sprite, picture, this.researchDevice.icon].filter(Boolean))] : [picture].filter(Boolean);
     this._pic = { key: String(this.info.avatar || this.info.defId || 'unknown'), color: this._frameColor(), img: null, state: 'none', shown: null, t0: nowMs() };
-    if (!url || !a.image) return;
-    const cached = typeof a.imageNow === 'function' ? a.imageNow(url) : null;
+    if (!urls.length || !a?.image) return;
+    const cached = typeof a.imageNow === 'function' ? a.imageNow(urls[0]) : null;
     if (cached) { this._pic.img = cached; this._pic.state = 'img'; return; }
     this._pic.state = 'wait';
     const pic = this._pic;
-    Promise.resolve().then(() => a.image(url)).then((img) => {
-      if (img) { pic.img = img; pic.state = 'img'; } else pic.state = 'none';
-    }, () => { pic.state = 'none'; });
+    Promise.resolve().then(async () => {
+      for (const url of urls) {
+        let img = null;
+        try { img = await a.image(url, retry ? { retry: true } : undefined); } catch { /* Try the fallback icon if the full sprite failed. */ }
+        if (this.destroyed) return;
+        if (img) { pic.img = img; pic.state = 'img'; return; }
+      }
+      pic.state = 'none';
+    });
   }
 
   /** Put the right diamond on the fallback sprite (called while the fallback is visible). */
@@ -427,12 +442,15 @@ export class UnitView {
     let want = pic.state === 'img' ? 'img' : 'placeholder';
     if (pic.state === 'wait' && nowMs() - pic.t0 < PIC_WAIT_MS) want = null;
     if (!want || pic.shown === want) return;
-    this.fallback.texture = diamondTexture(pic.key, want === 'img' ? pic.img : null, pic.color, { enemy: this.isEnemy, golden: this.golden, ice: ICE_TOKENS.has(this.info.defId) });
+    // Research art depicts the whole device; a portrait's diamond mask would crop its chassis/leaves away.
+    this.fallback.texture = this.researchDevice && want === 'img' ? unitSpriteTexture(pic.img)
+      : diamondTexture(pic.key, want === 'img' ? pic.img : null, pic.color, { enemy: this.isEnemy, golden: this.golden, ice: ICE_TOKENS.has(this.info.defId) });
     pic.shown = want;
   }
 
   /** @param {boolean} [retry] load again even after a remembered failure (assets.js acquire `{ retry }`) */
   _loadSpine(retry = false) {
+    if (this.researchDevice) return;
     const a = this.ctx.assets;
     if (!a || !a.spineEntry || !a.spine) return;
     const id = this.info.spine || this.info.defId;
@@ -455,7 +473,7 @@ export class UnitView {
    */
   retryAssets() {
     if (this.destroyed) return;
-    if (!this._pic || this._pic.state === 'none') this._loadPicture();
+    if (!this._pic || this._pic.state === 'none') this._loadPicture(true);
     if (this.actor) return;
     if (!this._spineBusy) { this._retryAt = 0; this._loadSpine(true); return; }
     if (this._spineHidden && !this._stuckAt && !globalThis.document?.hidden) this._stuckAt = nowMs() + SPINE_STUCK_MS;
@@ -528,6 +546,12 @@ export class UnitView {
       if (!this.actor && this._spineTries < SPINE_RETRY_MS.length) this._retryAt = nowMs() + SPINE_RETRY_MS[this._spineTries++];
     });
   }
+
+  setResearchStage(stage) {
+    if (this.researchActor) { this.researchActor.setStage(stage); this.info.researchStage = this.researchActor.stage; }
+  }
+
+  onResearchFx(kind, extra) { this.researchActor?.trigger(kind, extra); }
 
   _formSpec() {
     return this.form ? FORMS[this.info.spine || this.info.defId]?.[this.form] || null : null;
@@ -915,6 +939,7 @@ export class UnitView {
     this.root.position.set(bx, by);
     this.root.alpha = alpha;
     this.root.zIndex = unitDepthKey(cam, this.x, this.y, this.lift);
+    this.researchActor?.advance(dt);
     // off-screen: nothing to animate or draw (bounds / hit-testing still follow `screen`)
     if (this._cull(bx, by, s, dt)) return;
     const flip = this.isEnemy ? (ENEMY_MODEL_FACES_LEFT ? -this.visFacing : this.visFacing) : this.visFacing;
@@ -935,7 +960,7 @@ export class UnitView {
       this.fallback.visible = this.swapT < 1;
       const sc = s * UNIT.modelScale * this.modelK;
       const flashK = this.flash > 0 ? this.flash : 0;
-      let tint = this.baseTint;
+      let tint = this._formSpec()?.tint ?? this.baseTint;
       if (this.down) tint = DOWN_LOOK.tint;
       else if (this.flags & UF.FROZEN) tint = 0x9fd4ff;
       else if (this.flags & UF.COLD) tint = 0xcfe6ff;
@@ -971,14 +996,16 @@ export class UnitView {
       const bob = this.alive ? Math.sin(t * 2.4 + this.bob) * s * 0.03 : 0;
       this.fallback.scale.set(size / 160);
       this.fallback.position.set(0, -s * 0.08 + bob);
-      this.fallback.tint = this.down ? DOWN_LOOK.tint : this.flash > 0 ? mixTint(0xffffff, 0xff8a80, this.flash) : (this.flags & UF.FROZEN ? 0x9fd4ff : 0xffffff);
+      if (this.researchActor) this.researchActor.update(t, s);
+      const formTint = this._formSpec()?.tint ?? 0xffffff;
+      this.fallback.tint = this.down ? DOWN_LOOK.tint : this.flash > 0 ? mixTint(formTint, 0xff8a80, this.flash) : (this.flags & UF.FROZEN ? 0x9fd4ff : formTint);
       if (!this.alive) this.fallback.alpha = Math.max(0, this.fallback.alpha);
     }
     this.flash = Math.max(0, this.flash - dt * 6);
 
     // facing chevron on the ground, like the original's orange › (research 09 §1.2: prep and combat): own prep pieces
     // on the board (app.js sets _showFacing; bench pieces have none); battle / scouting allies whose dir is known
-    const wedge = this._showFacing !== undefined ? this._showFacing && this.prep : this.hasDir && this.info.kind !== 'device';
+    const wedge = !this.researchDevice && (this._showFacing !== undefined ? this._showFacing && this.prep : this.hasDir && this.info.kind !== 'device');
     if (wedge && this.alive) {
       if (!this.facingArrow) {
         this.facingArrow = new P.Sprite(fxAtlas().tex.chevron);
@@ -1012,7 +1039,7 @@ export class UnitView {
 
     // head height: operators/tokens are uniform chibis; enemies vary (setup-pose bounds, when known; else the chibi
     // headroom × their official model factor)
-    let headTiles = UNIT.headroom;
+    let headTiles = this.researchActor?.look.head ?? UNIT.headroom;
     if (this.isEnemy && spineShown && this.actor.entry.bounds) headTiles = clamp(this.actor.height * UNIT.modelScale * this.modelK * 0.92, 0.55, this.isBoss ? 3.2 : 2.2);
     else if (this.isEnemy && this.isBoss) headTiles = 2.2;
     else if (this.isEnemy && spineShown) headTiles = clamp(UNIT.headroom * this.modelK, 0.55, 2.2);
@@ -1072,6 +1099,7 @@ export class UnitView {
     this.shieldBar.visible = !!shielded;
     if (shielded) { this.shieldBar.position.set(x0, cy - bh / 2 - 1); this.shieldBar.width = bw; this.shieldBar.height = Math.max(1.5, bh * 0.35); }
     // SP
+    const researchCharge = this.researchDevice?.key === 'energy';
     const showSp = showBars && !this.isEnemy && this.spMax > 0;
     this.spBg.visible = this.spFill.visible = showSp;
     const spH = Math.max(2, bh * 0.6);
@@ -1080,10 +1108,11 @@ export class UnitView {
       const active = !!(this.flags & UF.SKILL);
       const k = clamp(this.sp / this.spMax, 0, 1);
       ready = !active && k >= 0.999;
-      const sy = cy + bh / 2 + spH / 2 + 1.5;
+      // Research charge belongs beneath the device, rather than above its tower with the HP bar.
+      const sy = researchCharge ? this.screen.y + s * .1 : cy + bh / 2 + spH / 2 + 1.5;
       this.spBg.position.set(x0 - 1, sy); this.spBg.width = bw + 2; this.spBg.height = spH + 2;
       this.spFill.position.set(x0, sy); this.spFill.width = bw * k; this.spFill.height = spH;
-      this.spFill.tint = active ? COLORS.spActive : ready ? COLORS.spReady : COLORS.sp;
+      this.spFill.tint = researchCharge ? ready ? COLORS.spReady : 0xffbc70 : active ? COLORS.spActive : ready ? COLORS.spReady : COLORS.sp;
       this._spY = sy;
     }
     this.spGlow.visible = ready;

@@ -27,3 +27,13 @@ desktop.ini
 *.swp
 .idea/
 .vscode/
+
+# --- 本地补丁 / 备份 / 参考目录（不入库） ---
+merge-tmp/
+merge_backup/
+rhine_ref/
+rhine_upstream/
+rollback_tmp/
+*.bak
+*.bak2
+*.bak3

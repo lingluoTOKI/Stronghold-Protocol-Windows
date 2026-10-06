@@ -44,6 +44,7 @@ import {
   alliesAround, passiveBuff, fxOn, battleStore, contentInfo, itemsOf, directMods,
 } from '../support/index.js';
 import { mitigate, hasHp, periodicDamage, isHpLoss } from '../../damage.js';
+import { RHINE_BOND, RHINE_EQUIPMENT } from '../../../../shared/rhineResearch.js';
 
 // =====================================================================================================================
 // data helpers
@@ -155,6 +156,25 @@ export function carries(battle, u, key) {
   const g = runtime(battle).grants.get(u);
   if (g) for (const x of g.values()) if (x.lent && x.key === key) return true;
   return false;
+}
+
+/** Mainframes contribute one strongest, layer-derived base bonus per owner, never one bonus per copy.
+ * Read active grants rather than item ids so a borrowed terminal/mainframe disappears with its Scope. */
+export function rhineEquipmentAttack(battle, ownerId, layers) {
+  let best = 0;
+  for (const [u, grants] of runtime(battle).grants) {
+    if (u.ownerId !== ownerId || !onField(u) || u.removed || u.hidden || !memberOf(battle, u, RHINE_BOND)) continue;
+    const active = [...grants.values()].filter((g) => !g.scope.disposed);
+    const combo = active.some((g) => g.key === RHINE_EQUIPMENT.terminal.key);
+    for (const grant of active) {
+      if (grant.key !== RHINE_EQUIPMENT.mainframe.key) continue;
+      const p = bp(itemRecord(grant.id), 'rhine_mainframe');
+      if (!p) continue;
+      const rate = num(combo ? p.combo_atk_per_layer : p.atk_per_layer);
+      best = Math.max(best, Math.max(0, num(layers)) * Math.max(0, rate));
+    }
+  }
+  return best;
 }
 
 // =====================================================================================================================
@@ -365,6 +385,20 @@ function onAttackEnemies(S, u, fn) {
 
 /** Generic buff-key behaviours (shared by several items). */
 const BY_BUFF = {
+  rhine_terminal(battle, u, p, S) {
+    const update = () => {
+      const bond = battle.getPlayer(u.ownerId)?.bonds?.[RHINE_BOND];
+      const value = onField(u) && bond?.active
+        ? Math.min(Math.max(0, num(p.max_attack_speed)), Math.floor(Math.max(0, num(bond.layers)) / Math.max(1, num(p.layer_step, 10))) * num(p.attack_speed))
+        : 0;
+      if (u.findBuff(S.key('researchSpeed'))?.mods?.aspd === value) return;
+      S.stat('researchSpeed', { aspd: value });
+    };
+    S.on('battleStart', update); S.on('deploy', update); S.on('death', update); S.on('tick', update);
+    update();
+  },
+  // The live grant is consumed by rhineEquipmentAttack; the generic stat buff supplies carrier HP.
+  rhine_mainframe() {},
   // 源石溶剂: the text's "每秒流失 damage 点生命值" is officially 每秒受到 damage 点真实伤害 (PRTS 盟约记录 修正 "并非流失", 备注
   // "造成无来源真实持续环境伤害"; the `periodic_damage` template — also 狂暴宿主 "自身每秒受到N无来源真实伤害"): a damage instance,
   // not a 流失 — shields, damage-taken modifiers and the target-side `hit` effects apply, and it is a "受到伤害" for 受击回复
@@ -872,6 +906,7 @@ export function installItem(battle, u, itemId, { lent = false } = {}) {
     S.dispose();
     if (grant.timer) grant.timer.cancel();
     if (gm.get(gid) === grant) gm.delete(gid);
+    if (key === RHINE_EQUIPMENT.terminal.key || key === RHINE_EQUIPMENT.mainframe.key) battle.emit('rhineEquipmentChange', { unit: u });
   };
   gm.set(gid, grant);
   try {
@@ -890,6 +925,7 @@ export function installItem(battle, u, itemId, { lent = false } = {}) {
       S.onDispose(() => { hs.own[h.type] = Math.max(0, hs.own[h.type] - 1); hammerRelease(battle, rt, u, hs); });
     }
     if (BY_ITEM[key]) BY_ITEM[key](battle, u, rec, S, grant);
+    if (key === RHINE_EQUIPMENT.terminal.key || key === RHINE_EQUIPMENT.mainframe.key) battle.emit('rhineEquipmentChange', { unit: u });
   } catch (e) {
     battle._handlerError?.(`item:${itemId}`, u, e);
   }

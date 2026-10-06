@@ -8,9 +8,9 @@
 // entry/loading illustration names) it is layered under the CSS art; otherwise the screen is
 // pure CSS/SVG (radar, ridgelines, glow), so it never issues a request that can 404.
 
-import { useMemo, useState } from '../../vendor/hooks.module.js';
+import { useMemo, useState, useEffect, useRef } from '../../vendor/hooks.module.js';
 import { NAME_MAX_LEN, APP_VERSION } from '../../../shared/constants.js';
-import { html, Button, Icon, MicroLabel, TextField, PingPill } from '../ui/components.js';
+import { html, Button, Icon, MicroLabel, TextField, PingPill, Modal } from '../ui/components.js';
 import { GuideButton } from '../ui/guide.js';
 import { toast } from '../ui/toasts.js';
 import { net, identity } from '../net.js';
@@ -177,6 +177,54 @@ const STATUS_TEXT = {
   idle: '准备连接', connecting: '正在连接服务器', connected: '已连接服务器', handshaking: '正在验证身份',
   online: '已连接服务器', reconnecting: '连接中断，正在重连', closed: '连接已关闭',
 };
+
+export function BulletinButton() {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [hasNew, setHasNew] = useState(false);
+  const SEEN_KEY = 'sp.bulletinSeen';
+  useEffect(() => {
+    let dead = false;
+    const load = () => {
+      fetch('/api/announcements', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (dead || !d || !Array.isArray(d.items)) return;
+          setData(d);
+          const seen = localStorage.getItem(SEEN_KEY);
+          setHasNew(!!d.updatedAt && seen !== d.updatedAt);
+        })
+        .catch(() => { if (!dead) setFailed(true); });
+    };
+    load();
+    const iv = setInterval(load, 60000);
+    return () => { dead = true; clearInterval(iv); };
+  }, []);
+  const markSeen = () => { if (data && data.updatedAt) { localStorage.setItem(SEEN_KEY, data.updatedAt); setHasNew(false); } };
+  const items = (data && Array.isArray(data.items) ? data.items : []).slice().reverse();
+  return html`<span class="bulletin-btn">
+    <${Button} variant="ghost" size="sm" icon="mail" class=${`bulletin-btn__icon${hasNew ? ' has-new' : ''}`}
+      title="服务器更新公告" aria-label="服务器更新公告"
+      onClick=${() => { const n = !open; setOpen(n); if (n) markSeen(); }} aria-expanded=${open}>
+    <//>
+    <${Modal} open=${open} onClose=${() => setOpen(false)} title="服务器更新公告"
+      micro="SERVER BULLETIN" width="min(24rem, 90vw)" class="bulletin-modal-box">
+      ${failed ? html`<div class="bulletin-modal__empty">暂无法连接公告服务</div>` : null}
+      ${!failed && !data ? html`<div class="bulletin-modal__empty">加载中…</div>` : null}
+      <div class="bulletin-modal__when">最近更新：${when || '—'}</div>
+      ${items.map((it, i) => html`<div class="bulletin-modal__item" key=${i}>
+        <div class="bulletin-modal__row">
+          ${it.version ? html`<span class="bulletin-modal__ver">v${it.version}</span>` : null}
+          ${it.time ? html`<span class="bulletin-modal__time">${it.time}</span>` : null}
+          <span class="bulletin-modal__title">${it.title || ''}</span>
+        </div>
+        ${it.content ? html`<div class="bulletin-modal__content">${it.content}</div>` : null}
+      </div>`)}
+      ${!failed && data && !items.length ? html`<div class="bulletin-modal__empty">暂无公告</div>` : null}
+    <//>
+  </span>`;
+}
 
 /** Title screen component. */
 export function TitleScreen() {

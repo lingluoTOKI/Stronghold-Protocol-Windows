@@ -83,7 +83,7 @@ export const initialState = Object.freeze({
   emotes: [],
   chat: [],  // 房间文字聊天（自加）最近 m.chat
   clock: { offset: 0, rtt: null, synced: false },
-  ui: { pendingJoin: null, restoring: false, buildStale: false },
+  ui: { pendingJoin: null, restoring: false, buildStale: false, dataProfile: 'rhine', dataGeneration: 0, dataReady: false, dataError: null },
 });
 
 /** The app-wide store singleton. */

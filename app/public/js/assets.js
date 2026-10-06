@@ -825,11 +825,12 @@ export function createAssets(options) {
     now: opts.spineNow,
   });
 
-  /** Image element (cached; failures resolve to null). */
-  function image(u) {
+  /** Image element (cached; failures resolve to null). An explicit retry forgets only a completed failure. */
+  function image(u, options) {
     const s = str(u);
     if (!s) return Promise.resolve(null);
     let e = images.get(s);
+    if (e && options?.retry && e.done && !e.value) { images.delete(s); e = null; }
     if (!e) {
       e = { value: null, done: false, promise: null };
       e.promise = Promise.resolve().then(() => loadImage(s)).then(
@@ -902,7 +903,7 @@ export function createAssets(options) {
       sfx: (group, key) => sfxUrl(m(), group, key),
       unit: (id, kind, idx) => unitSfxUrl(m(), id, kind, idx),
     },
-    /** Cached image element promise (null on failure). */
+    /** Cached image element promise (null on failure); `{ retry: true }` retries a completed failure only. */
     image,
     /** Already-loaded image element or null (sync). */
     imageNow(u) { const e = images.get(str(u) || ''); return e && e.done ? e.value : null; },

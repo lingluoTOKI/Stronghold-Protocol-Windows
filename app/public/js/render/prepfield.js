@@ -14,6 +14,14 @@
 // spawn point" over research 08 §4.1's pen): `leaderStand` finds it in m.private.nextEnemies (an entry with `start`, the
 // leader's spawn tile on the boss field, server/match/waves.js previewOf) — the Final Assault prep shows it standing
 // there instead of in the pen, and lights its hit tiles in red beside an operator's orange range preview (render/app.js).
+import { GEO } from '../../../shared/constants.js';
+
+/** Circular range: transform the centre only; clip to the simulated field, never the reserve rows. */
+export function circleToDisp(xf, circle) {
+  if (!circle) return null;
+  const p = xf.toDisp(circle.row, circle.col);
+  return { ...circle, ...p, bounds: xf.kind === 'bossPrep' ? GEO.BOSS_RECT : GEO.NORMAL_RECT };
+}
 
 /** Board row → display (boss-field) row: row − 7 (server/match/board.js BOARD_ROWS_ABOVE_BOSS is +7, the inverse). */
 export const BOSS_ROW_SHIFT = -7;

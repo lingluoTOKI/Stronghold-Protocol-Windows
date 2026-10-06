@@ -294,9 +294,23 @@
   position: static; margin-top: .02rem; font-size: .11rem; font-weight: 500; color: var(--text-dim); white-space: nowrap;
   background: rgba(8, 11, 10, .85); border: 1px dashed rgba(255, 255, 255, .25);
 }
+/* a bond whose members include disabled chess (bannedPerBond over m.public.bannedChess): a red user badge top-right */
+.bslot__ban {
+  position: absolute; top: .02rem; right: .02rem; z-index: 3;
+  display: inline-flex; align-items: center; gap: .02rem;
+  font-size: .11rem; font-weight: 700; line-height: 1; color: #fff;
+  background: rgba(255, 84, 84, .95); border: 1px solid rgba(255, 180, 180, .6);
+  padding: .02rem .04rem; border-radius: .06rem; box-shadow: 0 0 .08rem rgba(0, 0, 0, .55);
+  pointer-events: auto;
+}
+.bslot__ban .icon { width: .12rem; height: .12rem; }
+.bslot__ban b { font-family: var(--font-num); }
 
 /* ---- team panel ------------------------------------------------------------------------------------------- */
 .team { position: absolute; left: .22rem; top: 2.36rem; display: flex; flex-direction: column; gap: .14rem; pointer-events: none; }
+/* Six rows fit above the open shop without covering the sixth member's controls. */
+.team--large { gap: .1rem; }
+.team--large .pavatar { --pa: .68rem; }
 .team__row { position: relative; display: flex; align-items: center; gap: .1rem; pointer-events: auto; }
 .team__btn {
   position: relative; padding: 0; background: none; border: 0;

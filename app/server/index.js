@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Network, SessionRegistry, NET_DEFAULTS } from './net.js';
 import { Lobby } from './lobby.js';
-import { getData, loadData } from './data.js';
+import { getData, loadData, getDataProfile } from './data.js';
 import { PROTOCOL_VERSION, APP_VERSION } from '../shared/constants.js';
 import { MEDIA_PREFIX, AUDIO_EXTS } from '../shared/media.js';
 
@@ -328,6 +328,27 @@ function sendJson(req, res, status, obj) {
   const body = Buffer.from(JSON.stringify(obj));
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': body.length, 'Cache-Control': 'no-store' });
   res.end(req.method === 'HEAD' ? undefined : body);
+}
+
+/**
+ * Announcements loader with mtime-based hot reload: editing `announcements.json` on the server is
+ * reflected on the next request without a restart, so "什么时候更新" stays live for players.
+ * @param {string} filePath
+ * @returns {() => { updatedAt: string|null, items: Array<{version?:string,time?:string,title:string,content:string}> }}
+ */
+function createAnnouncements(filePath) {
+  let cache = null;
+  let cacheMtime = -1;
+  return () => {
+    try {
+      const st = fs.statSync(filePath);
+      if (st.mtimeMs !== cacheMtime) {
+        cache = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        cacheMtime = st.mtimeMs;
+      }
+    } catch { /* missing/unreadable → empty announcements */ cache = { updatedAt: null, items: [] }; cacheMtime = -1; }
+    return cache || { updatedAt: null, items: [] };
+  };
 }
 
 /** Split an absolute request URL into raw path + query (also accepts absolute-form URLs). */
@@ -633,10 +654,13 @@ export async function startServer(opts = {}) {
   for (const k of ['lobbyGraceMs', 'maxRooms', 'maxRoomsPerAddr', 'maxMatchesPerAddr', 'resyncMinGapMs', 'soloReconnectWindowMs']) {
     if (opts[k] != null) lobbyOptions[k] = opts[k];
   }
-  const lobby = new Lobby({ registry, log, MatchClass: opts.MatchClass, getData: () => data, seedFn: opts.seedFn, options: lobbyOptions });
+  const lobby = new Lobby({ registry, log, MatchClass: opts.MatchClass, getData: () => data,
+    getDataProfile: enabled => enabled ? data : (opts.vanillaData ?? getDataProfile(false, { dir: dataDir, vanillaDir: opts.vanillaDir, log })),
+    seedFn: opts.seedFn, options: lobbyOptions });
   const network = new Network({ registry, handler: lobby, log, options: netOptions });
   const serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, log });
   const startedAt = Date.now();
+  const getAnnouncements = createAnnouncements(path.join(ROOT, 'announcements.json'));
   // The tag is per process (see buildTag): read the browser runtime once, here, not on every /healthz.
   resetBuildTag();
   buildTag();
@@ -677,6 +701,10 @@ export async function startServer(opts = {}) {
     if (parts.rawPath === '/api/status') {
       const st = lobby.stats();
       sendJson(req, res, 200, { online: Math.max(network.connectionCount, 0), activeRooms: st.matches });
+      return;
+    }
+    if (parts.rawPath === '/api/announcements') {
+      sendJson(req, res, 200, { ok: true, ...getAnnouncements() });
       return;
     }
     await serveStatic(req, res, parts.rawPath, parts.query);

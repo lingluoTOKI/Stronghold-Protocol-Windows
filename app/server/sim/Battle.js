@@ -31,7 +31,7 @@ import { createRng } from './rng.js';
 import { Grid } from './grid.js';
 import { Unit } from './units.js';
 import { makeBuff, STATUS, RESIST_STATUSES } from './buffs.js';
-import { dealDamage as pipeDamage, heal as pipeHeal, applyHpLoss, makeDamageInfo, reduceElement, palsyBuff, elementView, leaderHitCancelled } from './damage.js';
+import { dealDamage as pipeDamage, heal as pipeHeal, canReceiveHeal, applyHpLoss, makeDamageInfo, reduceElement, palsyBuff, elementView, leaderHitCancelled } from './damage.js';
 import { absoluteRangeKeys, canTargetEnemy, extendedGrid, evadesGround, enemyStealthed, stealthOffKey } from './targeting.js';
 import { bodyKeys, bodyInKeys, bodyInRadius } from './body.js';
 import { normDir, mirrorDir, localOrder, localBefore } from './dir.js';
@@ -43,6 +43,7 @@ import { resolveProfile } from './professions.js';
 import { unitInfo, snapshotUnits } from './snapshot.js';
 import { toDataSource, normalizeRoute, normalizeStage, normalizeToken, normalizeEnemy } from './simdata.js';
 import { installContent, setupUnitKit } from './content/index.js';
+import { withGameData } from './content/support/dataScope.js';
 
 const DEFAULT_RECTS = { normal: GEO.NORMAL_RECT, unite: GEO.UNITE_RECT, boss: GEO.BOSS_RECT, hidden: GEO.BOSS_RECT };
 let hookSeq = 0;
@@ -172,7 +173,7 @@ export class Battle {
     // ---- content
     this.contentMode = opts.content ?? 'full';
     this._safe(() => installContent(this, { mode: this.contentMode, extra: opts.extraContent }), 'installContent');
-    for (const u of this.allyUnits) if (!u.kit) this._setupUnit(u);
+    for (const u of this.allyUnits) if (!u.kit) withGameData(this.data, () => this._setupUnit(u));
     if (typeof opts.setup === 'function') this._safe(() => opts.setup(this), 'opts.setup');
   }
 
@@ -347,6 +348,10 @@ export class Battle {
   // lifecycle
 
   start() {
+    return withGameData(this.data, () => this._start());
+  }
+
+  _start() {
     if (this.started) return;
     this.started = true;
     this._safe(() => this._spawnStageDevices(), 'stageDevices');
@@ -398,6 +403,10 @@ export class Battle {
   }
 
   step() {
+    return withGameData(this.data, () => this._step());
+  }
+
+  _step() {
     if (this.finished || this._stepping) return; // re-entrant step() from a hook is a no-op
     // forceEnd() requested while stepping (content hook, repeated engine errors) is deferred to the end of the
     // current phase: the remaining phases are skipped and the result is built once, so nothing mutates it later.
@@ -637,7 +646,7 @@ export class Battle {
         if (h.removed) continue;
         this._frameName[d] = name;
         this._frameOwner[d] = h.owner;
-        try { h.fn(ctx, this); } catch (e) { this._handlerError(`hook:${name}`, h.owner, e); }
+        try { withGameData(this.data, () => h.fn(ctx, this)); } catch (e) { this._handlerError(`hook:${name}`, h.owner, e); }
         if (h.once) this.off(h);
         if (ctx && ctx.stopPropagation) break;
       }
@@ -1597,7 +1606,7 @@ export class Battle {
     for (const a of this.allyUnits) {
       if (!a.alive || !a.deployed || a.hidden || a.kind === 'device') continue;
       if (!set.has(a.tileR * COLS + a.tileC)) continue;
-      if (a !== healer && (a.s.flags.noHeal || (a.profile && a.profile.noHeal))) continue;
+      if (!canReceiveHeal(healer, a)) continue;
       const injured = a.hp < a.s.maxHp - 1e-6;
       const elem = includeElement && (a.elem.burn + a.elem.neural + a.elem.necrosis + a.elem.apoptosis + a.elem.erosion) > 0;
       if (injured || elem) out.push(a);
@@ -2412,7 +2421,7 @@ export class Battle {
     this._frameName[d] = label;
     this._frameOwner[d] = owner;
     this._frameCtx[d] = null;
-    try { return fn(); } catch (e) { this._handlerError(label, owner, e); return undefined; } finally { this._emitDepth--; }
+    try { return withGameData(this.data, fn); } catch (e) { this._handlerError(label, owner, e); return undefined; } finally { this._emitDepth--; }
   }
 
   _handlerError(label, owner, e, internal = false) {
