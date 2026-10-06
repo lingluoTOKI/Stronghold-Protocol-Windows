@@ -1,4 +1,4 @@
-// Room screen (同盟等待室): 4 seat cards (avatar frame, name, ready state, AI badge, host crown),
+// Room screen (同盟等待室): MAX_SEATS seat cards (avatar frame, name, ready state, AI badge, host crown),
 // host controls (difficulty picker, add/remove AI in co-op, start), invite code with copy code /
 // copy link, ready toggle and leave.
 //
@@ -11,7 +11,7 @@
 // button for 观战中 and offers 入座 (room.join of the room) while a player seat is free.
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
+import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS, PHASE } from '../../../shared/constants.js';
 import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyTag, DifficultyIcon, Tooltip, confirmDialog, doctorNo,
 } from '../ui/components.js';
@@ -22,9 +22,11 @@ import { LoadoutButton } from './loadout.js';
 import { net } from '../net.js';
 import { store, useStore, shallowEqual, emptyMatch, isSpectating } from '../store.js';
 import { difficultyInfo } from './lobby.js';
+import { data, dataProfileId, useData } from '../data.js';
+import { loadoutStore } from '../ui/loadoutSync.js';
 
 /**
- * Seats padded to the room's capacity (co-op 4, solo 1), each null or a seat record.
+ * Seats padded to the room's capacity (co-op MAX_SEATS, solo 1), each null or a seat record.
  * @param {any} room room.state payload
  * @returns {(null | {seat:number, playerId:any, name:string, isBot:boolean, ready:boolean, connected:boolean})[]}
  */
@@ -185,11 +187,35 @@ function DifficultyPicker({ room, isHost, busy, onPick }) {
   </div>`;
 }
 
+/** All players see the same setting; only the host can change it in the waiting room. */
+export function RhineToggle({ room, isHost, busy = false, online = true, onPick }) {
+  const enabled = room?.rhineEnabled !== false;
+  const disabled = !isHost || !!busy || !online || !!room?.inMatch || (!!room?.phase && room.phase !== PHASE.LOBBY);
+  return html`<div class="rhine-setting" data-testid="rhine-toggle">
+    <span class="rhine-setting__label">莱茵生命扩展</span>
+    <div class="rhine-setting__choices" role="group" aria-label="莱茵生命扩展">
+      ${[[true, '开启'], [false, '原版']].map(([value, label]) => html`<button key=${label} type="button"
+        class=${`rhine-setting__option${enabled === value ? ' is-active' : ''}`} disabled=${disabled}
+        data-testid=${value ? 'rhine-enabled' : 'rhine-vanilla'} aria-pressed=${enabled === value ? 'true' : 'false'}
+        onClick=${() => !disabled && enabled !== value && onPick(value)}>${label}</button>`)}
+    </div>
+    <span class="rhine-setting__desc">${enabled ? '科研装置 · 扩展干员 · 莱茵装备' : '官方原版干员与规则'}${isHost ? '' : ' · 由房主选择'}</span>
+  </div>`;
+}
+
+export function roomProfileReady(room, ui, cache = data) {
+  return !!ui?.dataReady && ui.dataProfile === dataProfileId(room?.rhineEnabled)
+    && ui.dataGeneration === cache.generation && ui.dataProfile === cache.profileId;
+}
+
 /** Room screen component. */
 export function RoomScreen() {
   const room = useStore((s) => s.room);
   const me = useStore((s) => s.me, shallowEqual);
   const conn = useStore((s) => s.connection, shallowEqual);
+  const ui = useStore((s) => s.ui, shallowEqual);
+  const loadoutSync = useStore((s) => s.sync, Object.is, loadoutStore);
+  useData('config');
   const [busy, setBusy] = useState(null);
   const alive = useRef(true);
   const inFlight = useRef(false); // synchronous guard against double clicks (state updates are async)
@@ -200,7 +226,9 @@ export function RoomScreen() {
   const coop = room.mode !== 'solo';
   const facts = roomFacts(room, me.playerId);
   const myReady = !!facts.mine?.ready;
-  const info = difficultyInfo(room.mode, room.difficulty);
+  const info = difficultyInfo(room.mode, room.difficulty, facts.occupied.length);
+  const profileReady = roomProfileReady(room, ui);
+  const controlsReady = profileReady && loadoutSync === 'synced' && !busy;
 
   const run = async (kind, fn) => {
     if (inFlight.current) return;
@@ -213,8 +241,8 @@ export function RoomScreen() {
     }
   };
 
-  const toggleReady = () => run('ready', () => net.request('room.ready', { ready: !myReady }));
-  const start = () => run('start', () => net.request('room.start', {}));
+  const toggleReady = () => controlsReady && run('ready', () => net.request('room.ready', { ready: !myReady }));
+  const start = () => controlsReady && run('start', () => net.request('room.start', {}));
   const addBot = () => run('add', () => net.request('room.addBot', {}));
   const removeBot = (seat) => run(`rm${seat}`, () => net.request('room.removeBot', { seat }));
   // the host removes a human before the match (community report #17): asked first; the player may join again. The
@@ -225,6 +253,7 @@ export function RoomScreen() {
     if (ok) run(`kick${seat}`, () => net.request('room.kick', { seat, playerId }));
   };
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
+  const setRhine = (enabled) => run('rhine', () => net.request('room.setRhine', { enabled }));
   // spectator seats: the host frees one; a spectator takes a free player seat with room.join of this room
   const removeSpectator = (playerId) => run(`rs${playerId}`, () => net.request('room.removeSpectator', { playerId }));
   const sit = () => run('sit', () => net.request('room.join', { code: room.code }));
@@ -253,6 +282,10 @@ export function RoomScreen() {
     ? html`<span class="t-orange"><${Icon} name="wifiOff" />连接中断，正在重连…</span>`
     : facts.spectating
       ? html`<span class="t-lo"><${Icon} name="eye" />观战中 · 不占博士席位，模拟开始后可切换观看各位博士</span>`
+    : !profileReady
+      ? html`<span class=${ui.dataError ? 't-orange' : 't-lo'} role="status">${ui.dataError || '正在载入所选模拟数据…'}</span>`
+    : loadoutSync !== 'synced'
+      ? html`<span class="t-lo" role="status">正在同步本局干员调配…</span>`
     : !coop
       ? html`<span class="t-mint">*模拟协议已就绪，准许进入模拟</span>`
     : facts.isHost
@@ -284,7 +317,11 @@ export function RoomScreen() {
       </div>
     </header>
 
-    <main class=${`seats${coop ? '' : ' seats--solo'}`}>
+    <div class="room-options">
+      <${RhineToggle} room=${room} isHost=${facts.isHost} busy=${busy} online=${online} onPick=${setRhine} />
+    </div>
+
+    <main class=${`seats${coop ? '' : ' seats--solo'}`} style=${`--seat-count:${facts.seats.length}`}>
       ${facts.seats.map((s, i) => html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
         myId=${me.playerId} busy=${busy} onAddBot=${addBot} onRemoveBot=${removeBot} onKick=${kick} />`)}
       ${coop ? null : html`<aside class="solo-brief brackets">
@@ -293,6 +330,7 @@ export function RoomScreen() {
         <p>${info.desc}</p>
         <ul>
           ${info.effects.map((e) => html`<li key=${e}>${e}</li>`)}
+          <li>${info.openingBanNote}</li>
           <li>共 <b class="num">${info.rounds}</b> 回合${info.hidden ? '，满足条件时进入隐秘核心' : ''}</li>
           <li>独立模拟中休整期与机变阶段不限时</li>
         </ul>
@@ -303,7 +341,10 @@ export function RoomScreen() {
     <footer class="room-bar">
       <div class="room-bar__left">
         <span class="room-bar__label">模拟难度<${MicroLabel}>DIFFICULTY<//></span>
-        <${DifficultyPicker} room=${room} isHost=${facts.isHost} busy=${busy} onPick=${setDifficulty} />
+        <div class="room-bar__difficulty">
+          <${DifficultyPicker} room=${room} isHost=${facts.isHost} busy=${busy} onPick=${setDifficulty} />
+          ${coop ? html`<span class="room-bar__bans">${info.openingBanNote}<span class="t-dim"> · ${facts.occupied.length} 人（含 AI）</span></span>` : null}
+        </div>
       </div>
       <div class="room-bar__center">
         <div class="ready-count" hidden=${!coop}>
@@ -316,15 +357,15 @@ export function RoomScreen() {
         <div class="room-bar__status">${statusLine}</div>
       </div>
       <div class="room-bar__right">
-        <${LoadoutButton} from="room" size="lg" class="room-loadout" />
+        <${LoadoutButton} from="room" size="lg" class="room-loadout" disabled=${!profileReady || !!busy} />
         ${facts.isHost
           ? html`<${Tooltip} text=${facts.canStart ? null : '仍有博士未准备就绪'}>
-              <${Button} variant="primary" size="xl" icon="play" loading=${busy === 'start'} disabled=${!facts.canStart || !online} onClick=${start}>开始模拟<//>
+              <${Button} variant="primary" size="xl" icon="play" loading=${busy === 'start'} disabled=${!facts.canStart || !online || !controlsReady} onClick=${start}>开始模拟<//>
             <//>`
           : facts.spectating
             ? html`<${Button} variant="secondary" size="xl" icon="eye" disabled=${true}>观战中<//>`
           : html`<${Button} variant=${myReady ? 'primary' : 'secondary'} size="xl" icon=${myReady ? 'check' : 'hourglass'} active=${myReady}
-              loading=${busy === 'ready'} disabled=${!online || !facts.mine} onClick=${toggleReady}>${myReady ? '已就绪' : '准备就绪'}<//>`}
+              loading=${busy === 'ready'} disabled=${!online || !facts.mine || !controlsReady} onClick=${toggleReady}>${myReady ? '已就绪' : '准备就绪'}<//>`}
       </div>
     </footer>
   </div>`;

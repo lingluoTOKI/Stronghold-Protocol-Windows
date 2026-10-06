@@ -26,7 +26,7 @@ const isList = (v, max, item) => Array.isArray(v) && v.length <= max && v.every(
 // ---- client-side combat (DESIGN §14): b.progress / b.result payloads -------------------------------------------
 
 /** Size limits of a b.result payload (the whole frame also obeys the 64 KB inbound limit). */
-export const RESULT_LIMITS = Object.freeze({ players: 4, leaked: 400, unitsEnd: 64, unitStats: 160, layerGains: 40, mods: 16, unspawned: 400 });
+export const RESULT_LIMITS = Object.freeze({ players: MAX_SEATS, leaked: 400, unitsEnd: 64, unitStats: 160, layerGains: 40, mods: 16, unspawned: 400 });
 const BIG = 1e13;
 const isStat = (v) => v === undefined || isNum(v, 0, BIG);
 const isModVal = (v) => v === null || isNum(v, -BIG, BIG) || isStr(v, 64) || isBool(v);
@@ -232,6 +232,7 @@ const target = (v) => {
   if (!v || typeof v !== 'object') return false;
   if (v.area === 'board') return isInt(v.row, 0, GEO.ROWS - 1) && isInt(v.col, 0, GEO.COLS - 1);
   if (v.area === 'hand') return isInt(v.idx, 0, GEO.HAND_SIZE - 1);
+  if (v.area === 'research') return v.idx == null || isInt(v.idx, 0, 2);
   return false;
 };
 
@@ -240,11 +241,12 @@ export const C2S = {
   // session & lobby
   hello: { name: (v) => isStr(v, NAME_MAX_LEN) && v.trim().length > 0, token: (v) => v == null || isStr(v, 64), version: (v) => v == null || isInt(v, 0, 1e6), $optional: ['token', 'version'] },
   ping: { c: (v) => typeof v === 'number' && Number.isFinite(v) },
-  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v) },
+  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), rhineEnabled: isBool, $optional: ['rhineEnabled'] },
   'room.join': { code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.leave': {},
   'room.ready': { ready: isBool },
   'room.setDifficulty': { difficulty: (v) => DIFFICULTIES.includes(v) },
+  'room.setRhine': { enabled: isBool },
   'room.addBot': {},
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_SEATS - 1) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the
@@ -258,6 +260,20 @@ export const C2S = {
   // room.closed { reason: 'kicked' }). room.leave / g.leave leave a spectator seat like a player seat.
   'room.spectate': { code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.removeSpectator': { playerId: isId },
+  // server matchmaking (自加): one big pool per difficulty, capped at MAX_SEATS humans. enqueue carries only the
+  // difficulty; the server forms a co-op room when the bucket holds 4 humans (auto-start), or on the player's choice
+  // after the 20s wait: match.topUp (fill the rest with AI bots up to MAX_SEATS then start), match.startNow (start with
+  // whoever is queued, no AI), match.waitMore (keep waiting another 20s). `target` is kept optional for old clients and
+  // ignored. `match.found` then `room.state` follow (players are joined into the formed room automatically).
+  'match.enqueue': { difficulty: (v) => DIFFICULTIES.includes(v), target: (v) => v == null || isInt(v, 2, MAX_SEATS), $optional: ['target'] },
+  'match.cancel': {},
+  // after match.timeout: confirm an AI top-up — form a room from the same-difficulty queued players and fill the
+  // remaining seats with AI bots up to MAX_SEATS, then start (自加)
+  'match.topUp': {},
+  // after match.timeout: start with whoever is still queued (no AI fill), then start (自加)
+  'match.startNow': {},
+  // after match.timeout: keep waiting another 20s window (自加)
+  'match.waitMore': {},
 
   // match
   'g.infoReady': {},
@@ -279,9 +295,11 @@ export const C2S = {
   'g.art': { itemUid: isUid, row: (v) => isInt(v, 0, GEO.ROWS - 1), col: (v) => isInt(v, 0, GEO.COLS - 1), dir: isDir, $optional: ['dir'] },
   'g.destroy': { uid: isUid },
   'g.reward': { idx: (v) => isInt(v, 0, 5) },
-  'g.choice': { idx: (v) => isInt(v, 0, 5) },
+  'g.choice': { idx: (v) => isInt(v, 0, 8) },
   'g.ready': { ready: isBool },
   'g.emote': { id: (v) => EMOTES.includes(v) },
+  // 房间文字聊天（自加）：文本 1–200 字符，须非空白
+  'g.chat': { text: (v) => isStr(v, 200) && v.trim().length > 0 },
   'g.watch': { fieldId: (v) => isStr(v, 32) },
   'g.autoplay': { on: isBool },
   // solo pause (official PauseUp / ResumeUp, DESIGN §14): freezes the running battle (field clock, deadlines, the
@@ -309,7 +327,11 @@ export const C2S = {
 export const S2C = [
   'welcome', 'ok', 'error', 'pong',
   'room.state', 'room.closed',
-  'm.public', 'm.private', 'm.field', 'm.toast', 'm.ticker', 'm.emote', 'm.result',
+  // server matchmaking pushes (自加): match.status { queued, count, target, difficulty } when the queue changes;
+  // match.timeout { difficulty, count, target } when the 20s wait ran out (player chooses continue / AI top-up / start
+  // now); match.found { code } then room.state follows (players are joined into the formed room automatically)
+  'match.status', 'match.timeout', 'match.found',
+  'm.public', 'm.private', 'm.field', 'm.toast', 'm.ticker', 'm.emote', 'm.chat', 'm.result',
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)
   'm.unitStats',
   // client-side combat (DESIGN §14): b.start { battleId, fieldId, kind, spec, authoritative, startAt, serverNow, elapsed,

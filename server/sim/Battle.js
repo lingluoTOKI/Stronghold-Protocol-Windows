@@ -31,7 +31,7 @@ import { createRng } from './rng.js';
 import { Grid } from './grid.js';
 import { Unit } from './units.js';
 import { makeBuff, STATUS, RESIST_STATUSES } from './buffs.js';
-import { dealDamage as pipeDamage, heal as pipeHeal, applyHpLoss, makeDamageInfo, reduceElement, palsyBuff, elementView, leaderHitCancelled } from './damage.js';
+import { dealDamage as pipeDamage, heal as pipeHeal, canReceiveHeal, applyHpLoss, makeDamageInfo, reduceElement, palsyBuff, elementView, leaderHitCancelled } from './damage.js';
 import { absoluteRangeKeys, canTargetEnemy, extendedGrid, evadesGround, enemyStealthed, stealthOffKey } from './targeting.js';
 import { bodyKeys, bodyInKeys, bodyInRadius } from './body.js';
 import { normDir, mirrorDir, localOrder, localBefore } from './dir.js';
@@ -43,6 +43,7 @@ import { resolveProfile } from './professions.js';
 import { unitInfo, snapshotUnits } from './snapshot.js';
 import { toDataSource, normalizeRoute, normalizeStage, normalizeToken, normalizeEnemy } from './simdata.js';
 import { installContent, setupUnitKit } from './content/index.js';
+import { withGameData } from './content/support/dataScope.js';
 
 const DEFAULT_RECTS = { normal: GEO.NORMAL_RECT, unite: GEO.UNITE_RECT, boss: GEO.BOSS_RECT, hidden: GEO.BOSS_RECT };
 let hookSeq = 0;
@@ -172,7 +173,7 @@ export class Battle {
     // ---- content
     this.contentMode = opts.content ?? 'full';
     this._safe(() => installContent(this, { mode: this.contentMode, extra: opts.extraContent }), 'installContent');
-    for (const u of this.allyUnits) if (!u.kit) this._setupUnit(u);
+    for (const u of this.allyUnits) if (!u.kit) withGameData(this.data, () => this._setupUnit(u));
     if (typeof opts.setup === 'function') this._safe(() => opts.setup(this), 'opts.setup');
   }
 
@@ -347,6 +348,10 @@ export class Battle {
   // lifecycle
 
   start() {
+    return withGameData(this.data, () => this._start());
+  }
+
+  _start() {
     if (this.started) return;
     this.started = true;
     this._safe(() => this._spawnStageDevices(), 'stageDevices');
@@ -398,6 +403,10 @@ export class Battle {
   }
 
   step() {
+    return withGameData(this.data, () => this._step());
+  }
+
+  _step() {
     if (this.finished || this._stepping) return; // re-entrant step() from a hook is a no-op
     // forceEnd() requested while stepping (content hook, repeated engine errors) is deferred to the end of the
     // current phase: the remaining phases are skipped and the result is built once, so nothing mutates it later.
@@ -637,7 +646,7 @@ export class Battle {
         if (h.removed) continue;
         this._frameName[d] = name;
         this._frameOwner[d] = h.owner;
-        try { h.fn(ctx, this); } catch (e) { this._handlerError(`hook:${name}`, h.owner, e); }
+        try { withGameData(this.data, () => h.fn(ctx, this)); } catch (e) { this._handlerError(`hook:${name}`, h.owner, e); }
         if (h.once) this.off(h);
         if (ctx && ctx.stopPropagation) break;
       }
@@ -1117,9 +1126,7 @@ export class Battle {
    * a fenced tile blocks no ground enemy, _blockerFor). Checked every tick for every
    * unblocked enemy, moving or not, so an enemy overlapping an operator is taken over as soon as its blocker is gone or
    * the operator's capacity frees up (user playtest #5 item 4). Several blockers in contact → the nearest [ASSUMED],
-   * ties → the first in row-then-column scan order. Never blocked: an enemy holding 不可阻挡 (PRTS 异常效果 BLOCK_FREE
-   * 「无法阻挡/被阻挡，自动解除阻挡」) — the flag itself (恐惧 / 诱导 carry it), 浮空, and 沉睡 (SLEEPING = 无法行动+无敌+不可阻挡:
-   * a sleeper takes no block slot, DESIGN §24.9); once it wakes it is blocked again only by a blocker with room.
+   * ties → the first in row-then-column scan order.
    */
   _checkBlock(e) {
     if (e.blockedBy || e.hidden || !e.alive) return !!e.blockedBy;
@@ -1346,7 +1353,7 @@ export class Battle {
   }
 
   /**
-   * Apply a catalogue status. opts: { duration, source, value, force, refresh, point, resistApplied, reenter } — returns true
+   * Apply a catalogue status. opts: { duration, source, value, force, refresh, point, resistApplied } — returns true
    * when applied. Honours enemy immunities (stun/silence/sleep/frozen/levitate/feared) unless `force`. `beforeStatus`
    * handlers may cancel it or change `duration` / `value`. Official rules (buffs.js STATUS): 抵抗 (the `resist` status)
    * shortens the RESIST_STATUSES by its value (default half; applied after `beforeStatus`; `resistApplied` skips that
@@ -1357,11 +1364,8 @@ export class Battle {
    * then resumes); other statuses refresh to the longer duration. 诱导 (`attract`) walks the enemy to `point`
    * ([r, c] or {x, y}; default the source's tile — a new application moves the point); 恐惧 (`fear`) stamps where it
    * was applied and from where (fear.js stampFear: the fan of 恐惧可达地块 its movement uses). A stunned/sleeping operator
-   * releases the enemies it blocks; a feared/levitated/unblockable/attracted/sleeping enemy is released by its blocker
-   * (沉睡 = 无法行动+无敌+不可阻挡, PRTS 异常效果: the slot frees for the next enemy, the sleeper stays put — DESIGN §24.9).
-   * `statusApplied` reports the final duration and `entered` (the target did not carry the status before) — or, with
-   * `reenter`, entered anyway: a pulse whose own short status the caller re-applies as a fresh one each time (缇缇 S2's
-   * sleep ward, DESIGN §24.8); the buff itself is refreshed as usual.
+   * releases the enemies it blocks; a feared/levitated/unblockable/attracted enemy is released by its blocker.
+   * `statusApplied` reports the final duration and `entered` (the target did not carry the status before).
    * A unit that is 无敌 and 无法选中 at once (a 重生 in progress, a hovering or 永久无敌 leader part) takes no status from
    * the other side, `force` included — PRTS 无敌 "无法被不同阵营选中": so a status carried by the very hit that knocked an
    * enemy out does not land after its 重生's cleanse (DESIGN §21.4). A ground enemy's status never lands on an airborne
@@ -1602,7 +1606,7 @@ export class Battle {
     for (const a of this.allyUnits) {
       if (!a.alive || !a.deployed || a.hidden || a.kind === 'device') continue;
       if (!set.has(a.tileR * COLS + a.tileC)) continue;
-      if (a !== healer && (a.s.flags.noHeal || (a.profile && a.profile.noHeal))) continue;
+      if (!canReceiveHeal(healer, a)) continue;
       const injured = a.hp < a.s.maxHp - 1e-6;
       const elem = includeElement && (a.elem.burn + a.elem.neural + a.elem.necrosis + a.elem.apoptosis + a.elem.erosion) > 0;
       if (injured || elem) out.push(a);
@@ -2417,7 +2421,7 @@ export class Battle {
     this._frameName[d] = label;
     this._frameOwner[d] = owner;
     this._frameCtx[d] = null;
-    try { return fn(); } catch (e) { this._handlerError(label, owner, e); return undefined; } finally { this._emitDepth--; }
+    try { return withGameData(this.data, fn); } catch (e) { this._handlerError(label, owner, e); return undefined; } finally { this._emitDepth--; }
   }
 
   _handlerError(label, owner, e, internal = false) {

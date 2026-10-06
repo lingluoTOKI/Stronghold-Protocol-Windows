@@ -5,8 +5,7 @@
 //   { alts: [{ rel, urls[], kind, bytes? }, …] }  one file; the first alternative
 //        that ends up on disk wins (later alts are fallbacks: other URLs for the
 //        same file, or other sounds of the same bank);
-//   { model: '<key>' }  a Spine model (skel + atlas + page PNGs) from plan.models;
-//   literal(value)  a value emitted as it is (no files: enemies[id].spineLocal).
+//   { model: '<key>' }  a Spine model (skel + atlas + page PNGs) from plan.models.
 // Inputs are the research JSONs (docs/research/03, 05, 07), the official
 // audio_data.json and Ark-Models' models_data.json.
 //
@@ -15,14 +14,11 @@
 // act2autochess match (07 enemy list ∪ act1autochess wave/boss levels used by
 // act2 modes ∪ bosses ∪ their summons ∪ enemy units spawned by operator kits),
 // the 23 bonds, 59 shop items, 40 bands,
-// default-skill icons, profession icons, autochess UI sprites (the 36 battle
-// emotes and the 19 玩法说明 pages included: UI_EXTRAS), BGM and SFX.
+// default-skill icons, profession icons, autochess UI sprites, BGM and SFX.
 
 import { RAW, joinUrl, safeName, urlBase, urlDir } from './sources.mjs';
 import { kindOf } from './formats.mjs';
 import { pickUnitSfx, UI_SFX, BATTLE_SFX, resolveSpec, indexVoice, VOICE_DIRS, VOICE_BATTLE_SLOTS } from './audio.mjs';
-import { literal } from './manifest.mjs';
-import { EMOTE_CATALOG } from '../../shared/constants.js';
 
 /**
  * The voice slots are read from the zh_CN charword table, whose voiceIds are always `CN_*`: the other dubs
@@ -31,10 +27,7 @@ import { EMOTE_CATALOG } from '../../shared/constants.js';
 const VOICE_ID_LANG = 'CN';
 
 /**
- * Enemies whose Spine no community dump carries: the web model is another enemy's (research 07 §5.6). Their official
- * models come from the local client only (tools/local-extract ENEMY_SPINES): `localEnemySpines` adds them as the
- * optional `spineLocal` overlay, which the client draws when data/local-assets.json lists its files (user feedback
- * after 0.1.0, D3: 灼热源石虫 / 炽焰源石虫 were drawn as the plain 源石虫 everywhere).
+ * Enemies with no Spine anywhere: render them with another enemy's model (research 07 §5.6).
  *
  * Why no dump carries them: isHarryh/Ark-Models *indexes* `1305_mhslim` / `1305_mhslim_2` but with an EMPTY
  * `assetList` — registered, never uploaded — so `arkModel()` returns nothing for them and the alias chain below falls
@@ -54,26 +47,8 @@ const LOADING_USED = new Set(['loading_ac_core', 'loading_ac_prototype', 'loadin
 
 const PROFESSIONS = ['caster', 'medic', 'pioneer', 'sniper', 'special', 'support', 'tank', 'warrior'];
 
-/**
- * The 19 official 玩法说明 (tutorial) pages, in the reading order of public/js/ui/guide.js GUIDE_CHAPTERS (a test keeps
- * the two identical): 基础规则 home 1–9, 调度手册 shop 1–6, 进阶图鉴 handbook 1–4.
- */
-export const GUIDE_PAGES = Object.freeze([
-  ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => `autochess_home_${i}`),
-  ...[1, 2, 3, 4, 5, 6].map((i) => `autochess_shop_${i}`),
-  ...[1, 2, 3, 4].map((i) => `autochess_handbook_${i}`),
-]);
-
-/**
- * Extra UI sprites (not in 07-assets.json groups): [group, key, path under ArknightsAssets2 cn assets/dyn].
- * The last two blocks are art that used to come from the local client only (tools/local-extract, DESIGN §13) and that
- * the mirror carries too (GitHub issue #42: a server without the client showed default emote icons): the 36 battle
- * emotes (shared/constants.js EMOTE_CATALOG; the bundle ui/emoticon/theme/[uc]<themeId>.ab → its icon/<picId>.png) and
- * the 19 玩法说明 pages (arts/guidebookpages/[pack]autochess.ab, 1024² like the local copies: displayed at 16:9). Their
- * manifest keys are the data/local-assets.json group and name — ui['emoticon/<dir>/<picId>'], ui['guide/<key>'] — so
- * the client looks both up by the same names (public/js/data.js artUrls: the local file first, then this copy).
- */
-export const UI_EXTRAS = (() => {
+/** Extra UI sprites (not in 07-assets.json groups): [group, key, path under ArknightsAssets2 cn assets/dyn]. */
+const UI_EXTRAS = (() => {
   const L = [];
   const mc = 'ui/autochess/[uc]autochessouter/modechoice/auto_chess_mode_choice_state/';
   for (const m of ['normal', 'hard', 'abyss', 'funny']) L.push(['modeChoice', `${m}_rhodes_island`, `${mc}${m}_rhodes_island.png`]);
@@ -101,9 +76,7 @@ export const UI_EXTRAS = (() => {
   L.push(['prepReady', 'countdown_arrow', `${pr}countdown_arrow.png`]);
   const si = 'ui/autochess/[uc]autochessouter/stageinfo/auto_chess_stage_info_state/';
   for (const k of ['img_title_mode_abyss', 'img_title_mode_funny', 'img_title_mode_hard', 'img_title_mode_normal', 'btn_confirm', 'btn_confirmed']) L.push(['stageInfo', k, `${si}${k}.png`]);
-  for (const e of EMOTE_CATALOG) L.push([`emoticon/${e.dir}`, e.picId, `ui/emoticon/theme/[uc]${e.themeId}/icon/${e.picId}.png`]);
-  for (const k of GUIDE_PAGES) L.push(['guide', k, `arts/guidebookpages/[pack]autochess/${k}.png`]);
-  return Object.freeze(L.map((x) => Object.freeze(x)));
+  return L;
 })();
 
 /** Renames of research 07 `arts` groups to manifest UI groups. */
@@ -149,23 +122,6 @@ function soundAlt(path, sub = 'sfx') {
 
 function soundLeaf(paths, sub = 'sfx', max = 4) {
   return leaf((paths || []).slice(0, max).map((p) => soundAlt(p, sub)));
-}
-
-/**
- * A unit's SFX roles (pickUnitSfx) → { roles: { attack?, hit?, die?, born? } sound leaves, mix: { [role]: { p?, vol? } }
- * | null } — the official play chance / volume of each role's bank (audio.mjs bankMix; community report #30: 猎狗's
- * attack bank is 80 % silence). The caller stores `mix` last in the unit's entry (sfx.units[id].mix).
- */
-function unitSounds(audio, sfx) {
-  const roles = {};
-  let mix = null;
-  for (const r of ['attack', 'hit', 'die', 'born']) {
-    if (!sfx[r]) continue;
-    roles[r] = soundLeaf(sfx[r]);
-    const m = typeof audio.mixOf === 'function' ? audio.mixOf(sfx[r]) : null;
-    if (m) (mix || (mix = {}))[r] = m;
-  }
-  return { roles, mix };
 }
 
 /** Expected bytes for a 07 {url, bytes} record when it matches `url`. */
@@ -273,14 +229,11 @@ export function collectEnemyIds({ assets07, enemies05, maps05, ops03 }) {
  * @param {string[]} [p.extraEnemyIds] more enemy ids that can spawn (e.g. keys of data/enemies.json)
  * @param {string[]} [p.extraTokenIds] more token ids (e.g. token_* keys of data/tokens.json)
  * @param {Record<string,string>} [p.extraHandbook] enemyId → handbook/model id (e.g. from data/bosses.json)
- * @param {Record<string, import('./spine.mjs').LocalSpineMeta>} [p.localEnemySpines] metadata of the enemy models the
- *   local client has (the committed tools/assets/local-enemy-spines.json, never the disk): each planned enemy listed
- *   gets `spineLocal` = { group: 'spine/enemy/<id>', ...meta } beside its web `spine`
  * @returns {{ template: any, models: Map<string, any>, notes: string[] }}
  */
 export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsData, charword = null, voiceLang = 'cn',
   voiceSlots = VOICE_BATTLE_SLOTS,
-  extraEnemyIds = [], extraTokenIds = [], extraHandbook = {}, localEnemySpines = {} }) {
+  extraEnemyIds = [], extraTokenIds = [], extraHandbook = {} }) {
   const notes = [];
   /** @type {Map<string, any>} */
   const models = new Map();
@@ -332,7 +285,8 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
     const short = id.replace(/^char_\d+_/, '');
     const sfx = pickUnitSfx(audio.unitBanks.get(id), { operator: true, projectile: {
       born: audio.bank(`battle.ON_PROJECTILE_BORN.projectile_chr_${short}`), hit: audio.bank(`battle.ON_PROJECTILE_HIT.projectile_chr_${short}`) } });
-    const { roles: u, mix } = unitSounds(audio, sfx);
+    const u = {};
+    for (const r of ['attack', 'hit', 'die', 'born']) if (sfx[r]) u[r] = soundLeaf(sfx[r]);
     const skillSfx = {};
     for (const i of idx) {
       const s = (o.skills || []).find((k) => k.index === i);
@@ -346,7 +300,6 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
     const primarySkill = skillSfx[String(idx[0])];
     if (primarySkill) u.skill = primarySkill;
     if (Object.keys(skillSfx).length > 1) u.skills = skillSfx;
-    if (mix) u.mix = mix;
     if (Object.keys(u).length) unitsSfx[id] = u;
   }
 
@@ -380,8 +333,9 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
     }
     entry.spine = model;
     tokens[id] = entry;
-    const { roles: u, mix } = unitSounds(audio, pickUnitSfx(audio.unitBanks.get(id)));
-    if (mix) u.mix = mix;
+    const sfx = pickUnitSfx(audio.unitBanks.get(id));
+    const u = {};
+    for (const r of ['attack', 'hit', 'die', 'born']) if (sfx[r]) u[r] = soundLeaf(sfx[r]);
     if (Object.keys(u).length) unitsSfx[id] = u;
   }
 
@@ -439,20 +393,15 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
       else notes.push(`${id}: Spine aliased to ${e.spineAliasOf}`);
     }
     e.spine = spine;
-    // the official model from the local client, drawn instead of `spine` when the extraction is installed (optional)
-    const loc = localEnemySpines && Object.hasOwn(localEnemySpines, id) ? localEnemySpines[id] : null;
-    if (loc && typeof loc === 'object') {
-      e.spineLocal = literal({ group: `spine/enemy/${id}`, ...loc });
-      notes.push(`${id}: official Spine from the local client when extracted (spineLocal)`);
-    }
     enemies[id] = e;
     let banks = audio.unitBanks.get(id);
     for (const other of [handbookOf.get(id), e.spineAliasOf, baseIdOf(id)]) {
       if (banks?.size) break;
       if (other) banks = audio.unitBanks.get(other);
     }
-    const { roles: u, mix } = unitSounds(audio, pickUnitSfx(banks));
-    if (mix) u.mix = mix;
+    const sfx = pickUnitSfx(banks);
+    const u = {};
+    for (const r of ['attack', 'hit', 'die', 'born']) if (sfx[r]) u[r] = soundLeaf(sfx[r]);
     if (Object.keys(u).length) unitsSfx[id] = u;
   }
 

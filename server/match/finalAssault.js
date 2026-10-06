@@ -3,8 +3,8 @@
 //
 //   * Merged LP: teamLp = Σ LP of the alive players at the start of the Final Assault (no cap); the Hidden Core
 //     continues with what is left.
-//   * Pairing: alive players by seat → (1,2), (3,4); an odd player is alone on its own field with the `_s` template
-//     (solo modes always use `_s`). Field ids 'b1', 'b2'. In a pair the first player is the LEFT side, the second the
+//   * Pairing: alive players by seat → (1,2), (3,4), (5); an odd player is alone on its own field with the `_s` template
+//     (solo modes always use `_s`). Field ids 'b1', 'b2', 'b3'. In a pair the first player is the LEFT side, the second the
 //     RIGHT side (the sim mirrors the right side: board col c → field col 20 − c with the piece direction RIGHT ↔
 //     LEFT, UP / DOWN unchanged (DESIGN §3, research 09 §1.2 ConvertChessPositionInfoToBossMap); board rows 9–12 →
 //     boss rows 2–5, sim/constants BOSS_ROW_OFFSET). `bossFieldPlacement` gives that mapping for UIs / tools.
@@ -13,8 +13,9 @@
 //     "敌方领袖的总生命值不变" is about the mirrored copies of a pair field sharing it, not about that number); config
 //     bossHpScale.aliveScaling true scales it × alive / 4 (巴哈姆特 12294 "聯機隊友(撤退/死掉)變少，最後boss血條也會變少" — one
 //     community note, no proportion; off until the user confirms it); solo = bloodPoint × config bossHpScale.solo (0.25,
-//     flagged unknown); × the tuning bossHpMul when data/tuning.json still has one (docs/BALANCE.md); bosses are never
-//     scaled by enemyScale.
+//     flagged unknown); matches that started with six occupied seats use twice the equivalent four-seat pool. The
+//     six-seat multiplier is applied only by bossPoolShare, before the pool reaches server fields / client specs;
+//     bosses are never scaled by enemyScale.
 //   * Overtime: bossTurnHpReduceTime counts REAL seconds like the level's 120 s maxPlayTime (which runs out first; the
 //     battle goes on): from 150 real s (300 game s on the 2× field clock) the team loses bossOvertimeDrainPerSec (1) LP
 //     per real second (gamedata.js bossOvertimeDue); m.public.deadline = the 120 s countdown, m.public.overtimeAt = the
@@ -54,7 +55,7 @@ export function bossFieldPlacement(side, row, col, dir = 'RIGHT') {
   return side === 'R' ? { row: r, col: COLS - 1 - col, dir: mirrorDir(d) } : { row: r, col, dir: d };
 }
 
-/** Pair alive players by seat: [[a, b], [c, d]] / [[a, b], [c]] / [[a]]. */
+/** Pair alive players by seat, keeping an odd final player: [[a, b], [c, d], [e]]. */
 export function pairPlayers(alive) {
   const sorted = alive.slice().sort((a, b) => a.seat - b.seat);
   const groups = [];

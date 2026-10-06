@@ -4,11 +4,11 @@ node_modules/
 public/vendor/
 
 # --- game assets: (c) Hypergryph / Yostar, fetched or extracted locally, NEVER committed ----------
-# tools/fetch-assets.mjs → public/assets/** (~270 MB) and public/fonts/** (+ fonts.css)
+# tools/fetch-assets.mjs → public/assets/** (~250 MB) and public/fonts/** (+ fonts.css)
 public/assets/
 public/fonts/
 # tools/local-extract/extract.py → public/assets/local/** and this per-machine manifest
-# (optional: the client and the tests work without it; docs/DEPLOY.md §6 lists what falls back)
+# (optional: the client and the tests work without it)
 data/local-assets.json
 # download caches, upstream tables, ledgers, reports, setup state
 .cache/
@@ -37,3 +37,28 @@ desktop.ini
 .idea/
 .vscode/
 .claude/
+
+# --- 启动器 / Windows 便携包 (scripts/launcher.mjs) ----------------------------------------------
+# 每台机器自己的端口 / 局域网共享 / 上次连的地址，不进版本库
+scripts/launcher.config.json
+
+# --- 本地/部署辅助(不进 git; 上游无这些文件, merge 不受影响) ----------------
+node/
+cloudflared/
+*.tgz
+*.zip
+*.7z
+merge_backup/
+merge-reports/
+merge-tmp/
+rhine_ref/
+rhine_upstream/
+rollback_tmp/
+_gen_local_assets.mjs
+_probe_assets.mjs
+_verify_manifest.mjs
+_merge_chat.ps1
+启动游戏.bat
+本机当服务器.bat
+连接服务器.bat
+stronghold.service

@@ -2,9 +2,10 @@
 //
 // b.snap  = { fieldId, t, units: [[id, x, y, hp, maxHp, sp, spMax, flags, anim]], dp, killed, total }
 // UnitInfo = { id, kind, side, ownerId, defId, name, tier, golden, spine, avatar, x, y, facing, dir, maxHp, motion?, boss?, uid?,
-//   form?, skillIndex?, moduleId?, items? }  (form = the unit's current model form — an enemy's, content/enemies.js setForm:
+//   form?, skillIndex?, moduleId?, items?, researchStage?, researchActive?, sp?, spMax? }  (form = the unit's current model form — an enemy's, content/enemies.js setForm:
 //   掠海漂移体 'crawl', 暴鸰 'bombed', 转译基底·α's forms …; a 傀儡师 fighting as its 替身 'doll', professions.js — a view built
-//   after the change, a field opened mid-battle, draws it: render/units.js FORMS)
+//   after the change, a field opened mid-battle, draws it: render/units.js FORMS. Research devices keep their charge bar,
+//   and Dorothy's critical traps keep their current form in a newly opened field.)
 //   dir = 'UP'|'RIGHT'|'DOWN'|'LEFT' (allies: the deploy direction, sim/dir.js); facing = its horizontal sign (±1).
 //   items = an ally operator's equipped item ids (absent without any).
 // flags bits & anim codes come from shared/constants.js (UF / ANIM); an enemy's stealth bit = its 隐匿 is on (not while it
@@ -48,6 +49,12 @@ export function unitInfo(u) {
     // DESIGN §16: an elite ally's equipped module (uniEquipId | 'none'; display only — a teammate's unit in a shared
     // field shows its owner's module in the detail card)
     moduleId: u.side === 'ally' && d.golden && typeof d.loadout?.moduleId === 'string' ? d.loadout.moduleId : undefined,
+    researchStage: Number.isInteger(u.researchStage) ? u.researchStage : undefined,
+    // Keep the model's stage while a device is disabled; reconnects must not restore its inactive area.
+    researchActive: typeof u.researchActive === 'boolean' ? u.researchActive : undefined,
+    // Independent research charging reuses the ordinary skill-bar slots, including late joins.
+    sp: Number.isFinite(u.researchCharges) ? u.researchCharges : undefined,
+    spMax: Number.isFinite(u.researchChargeMax) ? u.researchChargeMax : undefined,
     // an ally operator's equipped item ids (display: a 变形同构体 wearer counts for the bond it grants — the bond popup's
     // member list and the detail card's bond chips of a teammate's unit)
     items: u.side === 'ally' && u.kind === 'op' && Array.isArray(u.items) && u.items.length ? [...u.items] : undefined,
@@ -89,8 +96,9 @@ export function animOf(u, t) {
 /** Snapshot tuple for one unit. */
 export function unitTuple(u, t) {
   const sk = u.skill;
-  let spMax = sk && !sk.noSkill ? sk.spCost : 0;
-  let sp = sk && !sk.noSkill ? sk.sp : 0;
+  const research = Number.isFinite(u.researchChargeMax);
+  let spMax = research ? u.researchChargeMax : sk && !sk.noSkill ? sk.spCost : 0;
+  let sp = research ? u.researchCharges : sk && !sk.noSkill ? sk.sp : 0;
   if (sk && sk.active && sk.isTimed) {
     // show remaining duration/ammo as a draining bar — ammo out of the activation's real total (base + bullets added:
     // 拉特兰, 逃犯引渡手续, refills; community report #35), so every bullet shortens it

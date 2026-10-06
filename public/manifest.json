@@ -1,0 +1,16 @@
+{
+  "name": "卫戍协议：盟约 · Stronghold Protocol",
+  "short_name": "卫戍协议",
+  "description": "卫戍协议：盟约 · 网页联机复刻（非官方同人作品）",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#060907",
+  "theme_color": "#0c0f0e",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

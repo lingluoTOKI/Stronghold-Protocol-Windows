@@ -114,6 +114,13 @@ export class SnapshotBuffer {
     this.defaultRate = clamp(finite(opts.rate, 2), 0.05, 20);
     this.minRate = finite(opts.minRate, 0.25);
     this.maxRate = finite(opts.maxRate, 8);
+    /**
+     * Local deterministic feed (client-side combat): the playback rate is KNOWN (the battle speed), so it is applied
+     * instantly instead of being estimated from snapshot arrivals. null = network feed: rate is EMA-estimated. Set via
+     * setLocalRate() / clearLocalRate() (view.setLocalFeed).
+     * @type {number|null}
+     */
+    this.localRate = null;
     this.maxExtrapolate = Math.max(0, finite(opts.maxExtrapolate, 0.12));
     this.keep = Math.max(0.5, finite(opts.keep, 2.5));
     this.teleport = Math.max(0.5, finite(opts.teleport, 2.5));
@@ -126,7 +133,7 @@ export class SnapshotBuffer {
     this.snaps = [];
     /** @type {{t:number, at:number}[]} arrival log for rate estimation */
     this.arrivals = [];
-    this.rate = this.defaultRate;
+    this.rate = this.localRate ?? this.defaultRate;
     this.renderT = NaN;
     this.lastNow = NaN;
     this.interval = 0.1 * this.defaultRate / 2; // game s between snapshots (estimated)
@@ -162,10 +169,14 @@ export class SnapshotBuffer {
     }
     this.snaps.push(s);
     this.meta = s.raw;
-    // rate estimate over a ~1.5 s window of arrivals
+    // rate estimate over a ~1.5 s window of arrivals. A local deterministic feed already KNOWS its rate (the battle
+    // speed): hold it exactly so a 1×/2×/4× switch takes effect on the very next frame instead of converging over
+    // ~1.5 s of EMA (which read on screen as a brief stall-then-surge at every speed change).
     this.arrivals.push({ t: s.t, at: now });
     while (this.arrivals.length > 2 && now - this.arrivals[0].at > 1.5) this.arrivals.shift();
-    if (this.arrivals.length >= 4) {
+    if (this.localRate != null) {
+      this.rate = this.localRate;
+    } else if (this.arrivals.length >= 4) {
       const a = this.arrivals[0], b = this.arrivals[this.arrivals.length - 1];
       const dReal = b.at - a.at, dGame = b.t - a.t;
       if (dReal > 0.2 && dGame > 0) this.rate = clamp(this.rate * 0.7 + (dGame / dReal) * 0.3, this.minRate, this.maxRate);
@@ -239,6 +250,24 @@ export class SnapshotBuffer {
   snapToNewest() {
     if (this.snaps.length) this.renderT = this.newestT;
     return this.renderT;
+  }
+
+  /**
+   * Switch to a local deterministic feed at the known battle `speed` (game-s per real second): apply the rate
+   * immediately so a speed change is smooth (no EMA convergence lag). The render clock is left continuous — update()
+   * then advances it at the new rate and the existing gentle steering closes the tiny target offset without a jump.
+   */
+  setLocalRate(speed) {
+    const r = clamp(finite(speed, this.defaultRate), 0.05, 20);
+    this.localRate = r;
+    this.rate = r;
+    return r;
+  }
+
+  /** Return to a network feed: the rate is EMA-estimated from snapshot arrivals again (the current value is kept). */
+  clearLocalRate() {
+    this.localRate = null;
+    return this.rate;
   }
 
   /** Index of the newest snapshot with t ≤ time (−1 when time is before all). */

@@ -4,15 +4,16 @@
 // unknown ids. Tunables come from data/config.json with the documented defaults (research 00-INDEX §2–§8) when a
 // key is missing, so a partial data set (tests, data being regenerated) still yields a working match.
 //
-// No custom balance (DESIGN §14 corrections, research 08 §6): enemy numbers are the official ones — the PRTS
-// per-round enemyScale table of data/config.json, the leader pool = bloodPoint. data/tuning.json only overrides result
-// titles:
+// Enemy numbers follow the official PRTS per-round enemyScale table of data/config.json. The leader pool uses
+// bloodPoint, with a fixed ×2 modifier for matches that started with six occupied seats. data/tuning.json only
+// overrides result titles:
 //   titles[titleId]                                                { stat?, rule? } merged over config.titles
 // (the former enemyHpMul / enemyAtkMul / enemySpeedMul / bossHpMul / flyPlaceholders knobs were removed; a tuning file
 // that still carries them is ignored).
 
 import { getConfig, getMode } from '../data.js';
 import { isShopItem } from '../sim/simdata.js';
+import { OPENING_BANS, openingBanCounts } from '../../shared/openingBans.js';
 
 const own = (map, id) => (map && typeof map === 'object' && typeof id === 'string' && Object.hasOwn(map, id) && map[id] && typeof map[id] === 'object' ? map[id] : null);
 const numOr = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -46,7 +47,7 @@ export const DEFAULTS = Object.freeze({
   dp: { init: 10, perSec: 1, max: 99 },
   unite: { maxHelpers: 2, templates: { 1: 'act1autochess_escaped_single', 2: 'act1autochess_escaped_multi' } },
   timers: { infoCheck: 25, bandDraft: 50, bandTurn: 30, battleCheck: 3, spFirst: 30, spTurn: 16 },
-  bans: { FUNNY: { core: 0, addon: 1 }, NORMAL: { core: 3, addon: 4 }, HARD: { core: 3, addon: 4 }, ABYSS: { core: 3, addon: 4 } },
+  bans: OPENING_BANS,
   bandDraft: { skipsPerPlayer: 1, timeoutBandId: 'band_bldsk' },
   leftoverFundsKeptByBands: ['band_cannot'],
 });
@@ -61,12 +62,14 @@ export class GameData {
   /**
    * @param {Readonly<Record<string, any>>} data server/data.js getData() (may be partial)
    * @param {string} modeId e.g. 'mode_multi_hard'
+   * @param {number} [startingPlayerCount=1] fixed occupied starting seats, including AI
    */
-  constructor(data, modeId) {
+  constructor(data, modeId, startingPlayerCount = 1) {
     this.raw = data && typeof data === 'object' ? data : {};
     this.config = getConfig(this.raw) || {};
     this.modeId = modeId;
     this.mode = getMode(modeId, this.raw) || {};
+    this.startingPlayerCount = startingPlayerCount;
     this.economy = this.config.economy && typeof this.config.economy === 'object' ? this.config.economy : {};
     const chess = this.raw.chess && typeof this.raw.chess === 'object' ? this.raw.chess : {};
     this._chess = chess;
@@ -113,8 +116,9 @@ export class GameData {
    * [difficulty]; with config bossHpScale.aliveScaling (default false) × alive / aliveFull (4) — 巴哈姆特 12294 "聯機隊友
    * (撤退/死掉)變少，最後boss血條也會變少" is one community note without a proportion, kept off until confirmed (it would
    * shorten fights after eliminations, the opposite of the playtest report); `aliveCount` omitted ⇒ a full team. Solo = bloodPoint ×
-   * bossHpScale.solo (0.25 = one player of four, [ASSUMED]). Leaders are never scaled by enemyScale ("领袖单位于服务器的
-   * 生命值加成不受上述加成影响").
+   * bossHpScale.solo (0.25 = one player of four, [ASSUMED]). Six-seat co-op matches use twice the equivalent four-seat
+   * pool, based on their occupied starting seats even after eliminations. Leaders are never scaled by enemyScale
+   * ("领袖单位于服务器的生命值加成不受上述加成影响").
    * @param {string} bossId
    * @param {number} [aliveCount] alive players at the Final Assault / Hidden Core start (co-op)
    * @returns {number}
@@ -130,7 +134,8 @@ export class GameData {
 
   /**
    * Multiplier of bloodPoint for the leader pool (see bossPoolHp): solo = bossHpScale.solo (0.25); co-op = coop (1) ×
-   * min(alive, aliveFull) / aliveFull when bossHpScale.aliveScaling (mode entry first, then the global one).
+   * min(alive, aliveFull) / aliveFull when bossHpScale.aliveScaling (mode entry first, then the global one). Six-seat
+   * co-op starts multiply this once by 2; field copies and client replays receive the resulting shared pool directly.
    * @param {number} [aliveCount]
    */
   bossPoolShare(aliveCount) {
@@ -142,7 +147,8 @@ export class GameData {
     const full = Math.max(1, Math.floor(pick('aliveFull', 4)));
     const n = Number(aliveCount);
     const alive = scaling && Number.isFinite(n) && n >= 1 ? Math.min(full, Math.floor(n)) : full;
-    return pick('coop', 1) * (alive / full);
+    const sixPlayerHp = this.startingPlayerCount === 6 ? 2 : 1;
+    return pick('coop', 1) * (alive / full) * sixPlayerHp;
   }
 
   /** config.titles with the tuning overrides (stat / rule per title id) merged in. */
@@ -422,10 +428,7 @@ export class GameData {
     };
   }
   bans(difficulty) {
-    const b = this.config.bans && this.config.bans[difficulty];
-    const d = DEFAULTS.bans[difficulty] || { core: 0, addon: 0 };
-    if (!b || typeof b !== 'object') return { ...d };
-    return { core: Number.isInteger(b.core) && b.core >= 0 ? b.core : d.core, addon: Number.isInteger(b.addon) && b.addon >= 0 ? b.addon : d.addon };
+    return openingBanCounts(difficulty, this.startingPlayerCount, this.config.bans);
   }
   get bandDraft() {
     const b = this.config.bandDraft && typeof this.config.bandDraft === 'object' ? this.config.bandDraft : {};

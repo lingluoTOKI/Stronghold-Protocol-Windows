@@ -123,19 +123,13 @@ const smoothstep = (a, b, t) => {
   return k * k * (3 - 2 * k);
 };
 
-/**
- * 活性源石 (infection) — the dark originium crust with thin glowing veins, drawn with the palette and the recipe the 3D
- * board's shader uses (`render/board3d/materials.js infectionMaterial`, the same octaves and thresholds over its own
- * world-space noise), so the two boards show ONE material (GitHub #184). Two octaves make the crust mask, the ridge of
- * the fine octave its veins (brightened where the crust is), the rare top of a third one the crystal grains; the crust
- * reaches the tile's edges, so a field of 活性源石 carries on into the neighbouring tile instead of ending in a frame.
- * `mirrored` draws the second variant (`infection2`; `render/tiles.js variantMat` picks between them by tile).
- */
 const _originiumCells = new Map();
 
 /**
- * 活性源石's crust, rendered once per variant into `size × size` pixels (cached: the atlas rebuilds on every board art
- * change, the pattern does not). `mirrored` is the second variant (see `originiumOverlay`).
+ * 活性源石 (infection) — the dark originium crust with thin glowing veins, drawn with the palette and the recipe the 3D
+ * board's shader uses (`render/board3d/materials.js infectionMaterial`): the same octaves and thresholds over its own
+ * world-space noise, so the two boards show ONE material (GitHub #184). Drawn through `drawImage` (so the caller's
+ * transform applies); `putImageData` would ignore it. `mirrored` is the second variant.
  */
 function originiumCanvas(size, mirrored) {
   const key = `${size}:${mirrored ? 1 : 0}`;
@@ -161,8 +155,6 @@ function originiumCanvas(size, mirrored) {
       for (let c = 0; c < 3; c++) {
         const lit = base[c] * (1 - n2) + crust[c] * n2;          // the crust's own shading
         const vc = lit * (1 - ridge) + vein[c] * ridge;          // …and the vein over it
-        // the mixing happens in the shaders' working (linear) space; the canvas stores sRGB (the 3D board's
-        // colorspace_fragment does the same conversion at the end of its fragment shader)
         d[i + c] = linearToSrgb255(Math.max(0, Math.min(1, vc * (1 - grain) + spec[c] * grain)));
       }
       d[i + 3] = Math.round(alpha * 255);
@@ -173,16 +165,7 @@ function originiumCanvas(size, mirrored) {
   return canvas;
 }
 
-/**
- * 活性源石 (infection) — the dark originium crust with thin glowing veins, drawn with the palette and the recipe the 3D
- * board's shader uses (`render/board3d/materials.js infectionMaterial`: the same octaves and thresholds over its own
- * world-space noise), so the two boards show ONE material (GitHub #184: this cell used to be a beveled brick with random
- * crystal clusters while the 3D quad carried the crust). Two octaves make the crust mask, the ridge of the fine octave
- * its veins (brightened where the crust is), the rare top of a third one the crystal grains; the crust reaches the
- * tile's edges, so a field of 活性源石 carries on into the neighbouring tile instead of ending in a frame — the noise
- * wraps, so a repeated cell joins itself. Drawn through `drawImage`, so the callers' transform (the procedura draw path
- * scales a 112 px cell up to the atlas cell) applies; `putImageData` would ignore it.
- */
+/** 活性源石's crust over the concrete (mirrored = second variant). */
 function originiumOverlay(ctx, x, y, s, mirrored = false) {
   ctx.drawImage(originiumCanvas(ORIGINIUM_RES, mirrored), x, y, s, s);
 }
@@ -1220,6 +1203,48 @@ export function diamondTexture(key, img, color, o = {}) {
   _diamonds.set(k, tex);
   while (_diamonds.size > DIAMOND_MAX) _diamonds.delete(_diamonds.keys().next().value);
   return tex;
+}
+
+const _unitIcons = new WeakMap();
+/** Whole-unit art on a transparent square: contain the image, without a portrait frame or clipping mask. */
+export function unitIconTexture(img) {
+  const old = _unitIcons.get(img);
+  if (old) return old;
+  const P = PIXI(), S = DIAMOND_PX;
+  const canvas = makeCanvas(S, S), c = canvas.getContext('2d');
+  const scale = Math.min((S - 16) / img.width, (S - 16) / img.height);
+  const w = img.width * scale, h = img.height * scale;
+  c.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+  const texture = new P.Texture(new P.BaseTexture(canvas));
+  _unitIcons.set(img, texture);
+  return texture;
+}
+
+const _unitSprites = new WeakMap();
+/** Full transparent sprite, with empty export margins trimmed once; never cropped through visible artwork. */
+export function unitSpriteTexture(img) {
+  const cached = _unitSprites.get(img);
+  if (cached) return cached;
+  const P = PIXI(), k = Math.min(1, 384 / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+  const canvas = makeCanvas(w, h), c = canvas.getContext('2d');
+  c.drawImage(img, 0, 0, w, h);
+  let frame;
+  try {
+    const rgba = c.getImageData(0, 0, w, h).data;
+    let left = w, top = h, right = -1, bottom = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (rgba[(y * w + x) * 4 + 3] > 8) {
+      left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+    }
+    if (right >= left) {
+      left = Math.max(0, left - 1); top = Math.max(0, top - 1);
+      right = Math.min(w - 1, right + 1); bottom = Math.min(h - 1, bottom + 1);
+      frame = new P.Rectangle(left, top, right - left + 1, bottom - top + 1);
+    }
+  } catch { /* A remote asset can disallow pixel reads; its untrimmed sprite remains usable. */ }
+  const texture = new P.Texture(new P.BaseTexture(canvas), frame);
+  _unitSprites.set(img, texture);
+  return texture;
 }
 
 const _silhouettes = new WeakMap(); // image → texture (field views are mounted once per match: one canvas per image)

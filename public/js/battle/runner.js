@@ -66,6 +66,7 @@ import { net as appNet } from '../net.js';
 import { store as appStore } from '../store.js';
 import { unitStatsEntry, fxForm } from '../../../shared/protocol.js';
 import { spectateEffects } from './observe.js';
+import { MAX_SEATS } from '../../../shared/constants.js';
 
 const TICK = 1 / 30;
 /** Fast-forward budget per frame (ticks) when far behind. */
@@ -113,6 +114,31 @@ export const LOST_RESULT_CODES = Object.freeze(['DISCONNECTED', 'OFFLINE', 'TIME
 /** Ticks per frame at a speed (same cap as the server pacing: server/match/fields.js maxTicksPerInterval). */
 export const ticksPerFrameCap = (speed) => Math.max(8, Math.ceil((Number(speed) || 2) * 4));
 
+/**
+ * Player-selectable battle playback speeds (HUD speed button cycles 1× → 2× → 4× → 1×). 2× is the server's default
+ * pacing, so it is both the factory default and the middle option.
+ */
+export const SPEED_OPTIONS = Object.freeze([1, 2, 4]);
+export const DEFAULT_SPEED = 2;
+/** localStorage key remembering the chosen battle speed across sessions. */
+const SPEED_STORAGE_KEY = 'sp-battle-speed';
+
+/** Read the remembered speed (falls back to the default; clamps to a valid option). */
+function loadUserSpeed() {
+  try {
+    const raw = Number(globalThis.localStorage?.getItem(SPEED_STORAGE_KEY));
+    return SPEED_OPTIONS.includes(raw) ? raw : DEFAULT_SPEED;
+  } catch { return DEFAULT_SPEED; }
+}
+
+/**
+ * Whether the player may change the playback speed of a battle: only the own authoritative field (the solo run, or a
+ * player's own co-op board that this client simulates and reports). Display replicas — watching a teammate, a 联防
+ * observer field, a boss-pair partner half — are fast-forwarded to the server's clock and must stay on the server
+ * speed, otherwise they can never catch up and the server deadline / takeover fires.
+ */
+const speedControllable = (e) => !!e && e.authoritative !== false && !!e.own && !e.watch;
+
 function deepFreeze(root) {
   const stack = [root];
   while (stack.length) {
@@ -128,9 +154,9 @@ function deepFreeze(root) {
  * Browser sim loader: the /sim/ modules + the data files (own frozen copies — the server's data is frozen too, so a
  * content bug that writes into a record fails identically on both sides).
  */
-export async function loadBrowserSim({ base = '/sim/', dataBase = '/data/', fetchFn = (...a) => globalThis.fetch(...a) } = {}) {
-  const [spec, simdata, support] = await Promise.all([
-    import(`${base}spec.js`), import(`${base}simdata.js`), import(`${base}content/support/index.js`),
+export async function loadBrowserSim({ base = '/sim/', rhineEnabled = true, dataBase = rhineEnabled ? '/data/' : '/data/vanilla/', fetchFn = (...a) => globalThis.fetch(...a) } = {}) {
+  const [spec, simdata] = await Promise.all([
+    import(`${base}spec.js`), import(`${base}simdata.js`),
   ]);
   const fetchOnce = async (n) => {
     try {
@@ -145,8 +171,7 @@ export async function loadBrowserSim({ base = '/sim/', dataBase = '/data/', fetc
   if (missing.length) throw new Error(`simulation data unavailable: ${missing.join(', ')}`);
   const raw = {};
   SIM_DATA_FILES.forEach((n, i) => { raw[n] = deepFreeze(files[i]); });
-  simdata.setSimData(raw);
-  if (typeof support.setGameData === 'function') support.setGameData(null); // re-read through the injected data
+  // Each battle owns its data. Loading another room's profile must never replace a running battle's content.
   return { spec, ds: new simdata.DataSource(raw, null) };
 }
 
@@ -172,7 +197,7 @@ export function createBattleRunner(deps) {
   const setIv = deps.setInterval || ((fn, ms) => globalThis.setInterval(fn, ms));
   const clearIv = deps.clearInterval || ((h) => globalThis.clearInterval(h));
   const doc = deps.doc !== undefined ? deps.doc : (typeof document !== 'undefined' ? document : null);
-  const loadSim = deps.loadSim || (() => loadBrowserSim());
+  const loadSim = deps.loadSim || ((opts) => loadBrowserSim(opts));
   const logger = deps.logger || SIM_LOGGER;
 
   const listeners = new Map();
@@ -187,14 +212,22 @@ export function createBattleRunner(deps) {
   /** @type {Map<string, any>} battleId → entry */
   const entries = new Map();
   let cur = null;              // entry on screen
-  let simP = null;
+  const simPromises = new Map();
+  const enabledOf = (msg) => typeof msg?.rhineEnabled === 'boolean' ? msg.rhineEnabled
+    : msg?.dataProfile ? msg.dataProfile !== 'vanilla' : true;
+  const initial = store?.get?.();
+  let activeProfile = enabledOf(initial?.match?.public ?? initial?.room);
+  let lastStoreProfile = activeProfile;
   let startSeq = 0;
+  let clearEpoch = 0;
   let loading = null;          // b.start being prepared
   let rafH = null;
   let ivH = null;
   let lastPool = null;
   /** solo pause: the runner clock's instant when m.public.paused turned true (null while running) */
   let pausedAt = null;
+  /** Player-selected playback speed (1 / 2 / 4); only drives the own authoritative field on screen. */
+  let userSpeed = loadUserSpeed();
   /** a normal field's leak count (or a battle's bond layers) changed since the last publishState() */
   let leaksDirty = false;
   const stats = { ticks: 0, stepMs: 0, maxFrameMs: 0, catchups: 0, errors: 0, battles: 0, frames: 0 };
@@ -205,12 +238,25 @@ export function createBattleRunner(deps) {
   /** The battle clock: frozen at the pause instant while the solo battle is paused. */
   const clock = () => (pausedAt != null ? pausedAt : now());
   const bossLike = (e) => e.kind === 'boss' || e.kind === 'hidden';
+  // All enemies have left the spawn queue (Battle._pending), mirroring the sim's own auto-finish precondition
+  // (!_pending.length). A skip is allowed only then, so every still-living enemy rushes the gate and costs LP instead
+  // of having unspawned enemies silently removed from the total by the timeout.
+  const spawnDone = (e) => { const q = e && e.battle && e.battle._pending; return !Array.isArray(q) || q.length === 0; };
 
-  function ensureSim() {
-    if (!simP) {
-      simP = loadSim().catch((err) => { simP = null; throw err; });
+  function ensureSim(enabled = activeProfile) {
+    if (!simPromises.has(enabled)) {
+      const promise = Promise.resolve().then(() => loadSim({ rhineEnabled: enabled, dataBase: enabled ? '/data/' : '/data/vanilla/' }))
+        .catch((err) => { if (simPromises.get(enabled) === promise) simPromises.delete(enabled); throw err; });
+      simPromises.set(enabled, promise);
     }
-    return simP;
+    return simPromises.get(enabled);
+  }
+
+  function selectProfile(enabled) {
+    if (enabled !== activeProfile) {
+      activeProfile = enabled;
+      clear();
+    }
   }
 
   /** Counted leaks so far of every normal field simulated here: { [fieldId]: n } (user playtest #3 item 2). */
@@ -244,12 +290,36 @@ export function createBattleRunner(deps) {
 
   function state() {
     const e = cur;
-    if (!e) return loading ? { loading: true, battleId: loading.battleId, fieldId: loading.fieldId, kind: loading.kind, leaks: leakMap(), uniteLeft: uniteLeftMap(), bondLayers: layerMap() } : null;
+    if (!e) return loading ? { loading: true, battleId: loading.battleId, fieldId: loading.fieldId, kind: loading.kind, userSpeed, speedControl: false, leaks: leakMap(), uniteLeft: uniteLeftMap(), bondLayers: layerMap() } : null;
+    // the own authoritative NORMAL field on screen (solo, or each player's own field in multiplayer free-for-all);
+    // never boss / hidden / unite (鑱旈槻) / a watched replica.
+    const skipable = !e.done && !e.battle.finished && speedControllable(e) && !bossLike(e) && e.kind === 'normal';
     return {
       battleId: e.battleId, fieldId: e.fieldId, kind: e.kind, authoritative: e.authoritative, watch: e.watch,
-      done: e.done, own: e.own, members: e.members.slice(), loading: !!loading, speed: e.speed, paused: pausedAt != null,
+      done: e.done, own: e.own, members: e.members.slice(), loading: !!loading,
+      speed: e.effSpeed || e.speed, userSpeed, speedControl: speedControllable(e), paused: pausedAt != null,
+      canSkip: skipable,
+      // a skip is only READY once every enemy has spawned, so the timeout leaks all survivors (drops none unspawned)
+      skipReady: skipable && spawnDone(e),
       leaks: leakMap(), uniteLeft: uniteLeftMap(), bondLayers: layerMap(),
     };
+  }
+
+  /**
+   * Live game clock of the own controllable NORMAL battle on screen: { time: elapsed game seconds,
+   * timeLimit: game-second limit }, or null. Reads the deterministic sim directly (Battle.time / timeLimit, which
+   *   run on game time, independent of the client speed multiplier), so a countdown built from it stays continuous
+   *   across speed switches and joining mid-battle with zero drift. Boss / 联防 / watched / prep fields return null.
+   */
+  function battleClock() {
+    const e = cur;
+    if (!e || loading) return null;
+    const b = e.battle;
+    if (!b || b.finished || e.done) return null;
+    if (!speedControllable(e) || e.kind !== "normal" || bossLike(e)) return null;
+    const tl = Number(b.timeLimit);
+    if (!Number.isFinite(tl) || tl <= 0) return null;
+    return { time: Number(b.time) || 0, timeLimit: tl };
   }
 
   function publishState() {
@@ -321,8 +391,8 @@ export function createBattleRunner(deps) {
   /** Publish the state when a leak count (or a battle's bond layers) changed since the last publish. */
   function flushLeaks() { if (leaksDirty) publishState(); }
 
-  /** Target tick of an entry on its clock. */
-  const targetTick = (e, t) => Math.max(0, Math.floor((((t - e.t0) / 1000) * e.speed) / TICK + 1e-9));
+  /** Target tick of an entry on its clock (uses the entry's live playback speed — user-selected on the own field). */
+  const targetTick = (e, t) => Math.max(0, Math.floor((((t - e.t0) / 1000) * (e.effSpeed || e.speed)) / TICK + 1e-9));
 
   /**
    * Step `n` ticks. `sliced` (a catch-up frame, a hidden-tab step): every EV_SLICE ticks the events drained so far go to
@@ -354,7 +424,8 @@ export function createBattleRunner(deps) {
   function frameOf(e) {
     const snap = e.battle.snapshot();
     const { t: gt, ...rest } = snap || {};
-    return { ...rest, t: 'b.snap', fieldId: e.fieldId, gt: Number.isFinite(gt) ? gt : 0 };
+    // `speed` rides along so the local render feed syncs its interpolation rate on this exact frame (smooth switch)
+    return { ...rest, t: 'b.snap', fieldId: e.fieldId, gt: Number.isFinite(gt) ? gt : 0, speed: e.effSpeed || e.speed };
   }
 
   /** The steps' events, each batch with its own game time: the sliced ones (stepEntry), then the rest at `gt`. */
@@ -426,13 +497,13 @@ export function createBattleRunner(deps) {
       msg.bossDmg = pool && Number.isFinite(pool.cum) ? pool.cum : 0;
       if (pool && pool.byPlayer) {
         const by = {};
-        for (const pid of Object.keys(pool.byPlayer).slice(0, 4)) by[pid] = pool.byPlayer[pid];
+        for (const pid of Object.keys(pool.byPlayer).slice(0, MAX_SEATS)) by[pid] = pool.byPlayer[pid];
         msg.by = by;
       }
     } else {
       msg.leaks = Math.min(1e6, p.leaks);
-      // 联防: the leakers' enemies still standing (shared/protocol.js b.progress `left`, ≤ 4 players)
-      if (p.left) msg.left = Object.fromEntries(Object.entries(p.left).slice(0, 4));
+      // 联防: the leakers' enemies still standing (shared/protocol.js b.progress `left`, at most MAX_SEATS players)
+      if (p.left) msg.left = Object.fromEntries(Object.entries(p.left).slice(0, MAX_SEATS));
     }
     try { net.send('b.progress', msg); } catch { /* offline */ }
   }
@@ -509,12 +580,81 @@ export function createBattleRunner(deps) {
     schedule();
   }
 
+  /**
+   * Change an entry's playback speed while keeping its in-battle game time continuous (no jump / rewind on screen):
+   * gt = (t − t0)·oldSpeed/1000, so after the change t0_new = t − gt·1000/newSpeed.
+   */
+  function reanchor(e, nextSpeed, t = clock()) {
+    const old = e.effSpeed || e.speed;
+    const next = Number(nextSpeed) > 0 ? Number(nextSpeed) : e.speed;
+    e.effSpeed = next;
+    if (next === old) return;
+    const gtSec = ((t - e.t0) / 1000) * old;
+    e.t0 = t - (gtSec * 1000) / next;
+  }
+
+  /**
+   * Apply the player-selected speed: the own authoritative field currently on screen runs at `userSpeed`; every other
+   * entry (background authoritative battles, display replicas of teammates / 联防 / boss partners) stays on the
+   * server speed so it keeps pace with the server clock. Re-anchors each changed clock so nothing jumps.
+   */
+  function applySpeed(t = clock()) {
+    for (const e of entries.values()) {
+      const want = e === cur && speedControllable(e) ? userSpeed : e.speed;
+      if ((e.effSpeed || e.speed) !== want) reanchor(e, want, t);
+      else e.effSpeed = want;
+    }
+  }
+
+  /** Set the playback speed (clamped to a valid option), persist it, and apply it to the live battle. */
+  function setUserSpeed(v) {
+    const next = SPEED_OPTIONS.includes(Number(v)) ? Number(v) : DEFAULT_SPEED;
+    if (next === userSpeed) return;
+    userSpeed = next;
+    try { globalThis.localStorage?.setItem(SPEED_STORAGE_KEY, String(next)); } catch { /* private mode */ }
+    applySpeed();
+    publishState(); // state.speed / userSpeed drive the HUD label and the render feed rate
+    schedule();
+  }
+
+  /** Cycle 1× → 2× → 4× → 1× (HUD speed button). */
+  function cycleSpeed() {
+    const i = SPEED_OPTIONS.indexOf(userSpeed);
+    setUserSpeed(SPEED_OPTIONS[(i + 1) % SPEED_OPTIONS.length]);
+  }
+
+  /**
+   * Solo "skip this battle": end the own normal field at once as a TIMEOUT. Every enemy still on the field is counted
+   * as a leak and costs LP (Battle._timeout, DESIGN 5.5); enemies that never spawned are dropped from the total. The
+   * normal finished() flow then sends b.progress(done) + b.result, and the match advances to the next prep / shop.
+   * The sim is deterministic, so this result is identical to the server's own deadline takeover and passes
+   * validateClientResult (reason 'timeout' is accepted with no real-time deadline on a normal field). Offered only for
+   * the own authoritative NORMAL field on screen -- never boss / hidden / unite or a watched replica.
+   * @returns {boolean} whether a battle was skipped
+   */
+  function skipBattle() {
+    const e = cur;
+    if (!e || e.done || e.battle.finished || !speedControllable(e) || bossLike(e) || e.kind !== 'normal' || !spawnDone(e)) return false;
+    try { e.battle.forceEnd('timeout'); } catch (err) {
+      console.warn('[runner] skip: forceEnd timeout failed', err);
+      try { e.battle.forceEnd('forced'); } catch { /* ignore */ }
+    }
+    if (!e.battle.finished) return false;
+    try { e.battle.drainEvents(); } catch { /* ignore */ }
+    emitFrame(e, false); // render the final (leaked) state once so the rush-home is visible before the settle
+    noteLeaks(e);
+    finished(e);          // reports b.progress(done) + b.result('timeout') -> server settles into the next round
+    publishState();
+    schedule();
+    return true;
+  }
+
   /** Advance one entry to its clock (bounded); render it when it is on screen. */
   function advance(e, t, render) {
     if (e.battle.finished) { if (!e.done) finished(e); return; }
     const behind = targetTick(e, t) - (e.battle.tickCount || 0);
     if (behind <= 0) return;
-    const cap = ticksPerFrameCap(e.speed);
+    const cap = ticksPerFrameCap(e.effSpeed || e.speed);
     const catchingUp = behind > cap * 4;
     if (catchingUp) stats.catchups++;
     const n = Math.min(behind, catchingUp ? CATCHUP_TICKS : cap);
@@ -534,6 +674,10 @@ export function createBattleRunner(deps) {
     stats.frames++;
     const t = clock();
     for (const e of [...entries.values()]) if (running(e)) advance(e, t, e === cur);
+    // publish the instant every enemy has spawned so the HUD skip button enables mid-battle; otherwise state is only
+    // published on leaks / finish / speed changes and skipReady stays stuck at its pre-spawn (false) value
+    const c = cur;
+    if (c && running(c) && spawnDone(c) !== c._pubSpawnDone) { c._pubSpawnDone = spawnDone(c); publishState(); }
     flushLeaks();
     schedule();
   }
@@ -557,14 +701,15 @@ export function createBattleRunner(deps) {
   /** Put an entry on screen: field meta into the store (the game screen enters it), then its current frame. */
   function show(e) {
     cur = e;
-    e.held = [];
-    e.slices = [];
-    e.stale = false;
+  e.held = [];
+  e.slices = [];
+  e.stale = false;
+  applySpeed(); // the newly focused own field takes the user speed; the previously focused one reverts
     let meta = null;
     try { meta = e.battle.fieldMeta(); } catch { meta = { units: [] }; }
     const field = {
       t: 'm.field', ...meta, fieldId: e.fieldId, kind: e.kind, rect: meta.rect ?? e.spec.rect, stageId: meta.stageId ?? e.spec.stageId,
-      live: !e.done, battleId: e.battleId, players: e.members.slice(), local: true, speed: e.speed,
+      live: !e.done, battleId: e.battleId, players: e.members.slice(), local: true, speed: e.effSpeed || e.speed,
       // the watched player's effects column (user playtest #2; undefined for 联防 / boss pairs and server-run fields)
       effects: spectateEffects(e.spec, e.members),
       // which half each player holds (联防: the first helper takes the right half; boss pairs: L / R)
@@ -591,6 +736,9 @@ export function createBattleRunner(deps) {
 
   async function onStart(msg) {
     if (!msg || typeof msg !== 'object' || !msg.spec || typeof msg.battleId !== 'string') return;
+    const enabled = typeof msg.rhineEnabled === 'boolean' || msg.dataProfile ? enabledOf(msg)
+      : typeof msg.spec.rhineEnabled === 'boolean' || msg.spec.dataProfile ? enabledOf(msg.spec) : activeProfile;
+    selectProfile(enabled);
     const speed = Number(msg.speed) > 0 ? Number(msg.speed) : 2;
     const existing = entries.get(msg.battleId);
     if (existing) {
@@ -602,6 +750,7 @@ export function createBattleRunner(deps) {
       if (existing.authoritative && !was) {
         // handover (the partner left): continue from the field's clock and report from now on
         existing.t0 = clock() - ((Number(msg.elapsed) || 0) / speed) * 1000;
+        existing.effSpeed = speed; // realign to the server clock first; applySpeed re-anchors to the user speed below
         existing.lastProgressAt = -Infinity;
         if (existing.battle.finished) { existing.done = false; finished(existing); }
       }
@@ -609,14 +758,15 @@ export function createBattleRunner(deps) {
       loading = null;
       // a resend of what is already on screen (reconnect / resync) only updates the state; switching back shows it
       if (cur !== existing) show(existing);
-      else { publishState(); schedule(); }
+      else { applySpeed(); publishState(); schedule(); }
       return;
     }
     const seq = ++startSeq;
+    const epoch = clearEpoch;
     loading = { battleId: msg.battleId, fieldId: msg.fieldId, kind: msg.kind };
     publishState();
     let sim;
-    try { sim = await ensureSim(); } catch (err) {
+    try { sim = await ensureSim(enabled); } catch (err) {
       console.warn('[runner] simulation unavailable', err);
       if (seq === startSeq) { loading = null; publishState(); }
       return;
@@ -634,7 +784,7 @@ export function createBattleRunner(deps) {
     stats.battles++;
     const e = {
       battleId: msg.battleId, fieldId: msg.fieldId || msg.spec.fieldId, kind: msg.kind || msg.spec.kind, spec: msg.spec, sim, battle,
-      authoritative: !!msg.authoritative, watch: !!msg.watch, own: !msg.watch, speed,
+      authoritative: !!msg.authoritative, watch: !!msg.watch, own: !msg.watch, speed, effSpeed: speed,
       members: (msg.spec.players || []).map((p) => p && p.playerId).filter(Boolean),
       t0: clock() - ((Number(msg.elapsed) || 0) / speed) * 1000, lastProgressAt: -Infinity, done: false, resultSent: false,
       result: null, delivery: null,
@@ -662,7 +812,7 @@ export function createBattleRunner(deps) {
       await yieldFrame();
       if (seq !== startSeq) {
         // superseded while preparing: an authoritative battle must still finish (it is kept), a replica is dropped
-        if (e.authoritative) { entries.set(e.battleId, e); evict(); if (e.leaks) leaksDirty = true; schedule(); }
+        if (e.authoritative && epoch === clearEpoch && enabled === activeProfile) { entries.set(e.battleId, e); evict(); if (e.leaks) leaksDirty = true; schedule(); }
         return;
       }
     }
@@ -704,6 +854,7 @@ export function createBattleRunner(deps) {
 
   /** Drop every battle (a new round's prep, the match ended, the player left). */
   function clear() {
+    ++clearEpoch;
     ++startSeq;
     loading = null;
     for (const e of entries.values()) {
@@ -731,6 +882,11 @@ export function createBattleRunner(deps) {
   if (store && typeof store.subscribe === 'function') {
     offs.push(store.subscribe((s) => {
       const pub = s && s.match && s.match.public ? s.match.public : null;
+      const storeProfile = enabledOf(pub ?? s?.room);
+      if (storeProfile !== lastStoreProfile) {
+        lastStoreProfile = storeProfile;
+        selectProfile(storeProfile);
+      }
       // solo pause (DESIGN §14): the local battle clocks follow m.public.paused
       setPaused(!!(pub && pub.paused));
       const phase = pub ? pub.phase : null;
@@ -740,7 +896,7 @@ export function createBattleRunner(deps) {
         if (entries.size || loading) clear();
       }
       // warm the simulation up as soon as a match runs (the first b.start then starts at once)
-      if (phase && phase !== 'LOBBY' && !simP) ensureSim().catch(() => {});
+      if (phase && phase !== 'LOBBY') ensureSim().catch(() => {});
     }));
   }
   if (doc && typeof doc.addEventListener === 'function') {
@@ -755,8 +911,9 @@ export function createBattleRunner(deps) {
       return () => listeners.get(type)?.delete(fn);
     },
     state,
+    battleClock,
     stats() {
-      return { ...stats, avgTickMs: stats.ticks ? stats.stepMs / stats.ticks : 0, entries: entries.size, loadingSim: !!simP };
+      return { ...stats, avgTickMs: stats.ticks ? stats.stepMs / stats.ticks : 0, entries: entries.size, loadingSim: simPromises.has(activeProfile) };
     },
     /**
      * Live stats of unit `unitId` of the battle on screen (null: no such battle / unit, or `fieldId` names another
@@ -805,6 +962,12 @@ export function createBattleRunner(deps) {
     _frame: frame,
     _pump: pump,
     onStart, onPool, onEnd, clear, ensureSim, redeliver, setPaused,
+    /** Player battle playback speed (own authoritative field only): 1× / 2× / 4×. */
+    getUserSpeed: () => userSpeed,
+    setUserSpeed,
+    cycleSpeed,
+    /** Force-end the own normal field now (remaining enemies leak LP) and settle into the next round. */
+    skipBattle,
     dispose() { clear(); for (const off of offs) { try { off?.(); } catch { /* ignore */ } } },
   };
 }

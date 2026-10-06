@@ -12,9 +12,9 @@
 //   opts.mode        'solo' | 'coop'
 //   opts.difficulty  'FUNNY'|'NORMAL'|'HARD'|'ABYSS'
 //   opts.modeId      string                     modeIdFor(mode, difficulty), e.g. 'mode_multi_hard'
-//   opts.seats       Array<{ seat: 0..3, playerId: string, name: string, isBot: boolean, connected: boolean,
+//   opts.seats       Array<{ seat: 0..MAX_SEATS-1, playerId: string, name: string, isBot: boolean, connected: boolean,
 //                            loadout?: { [baseChessId]: { skill: index, module: uniEquipId|'none'|null } } | null }>
-//                    sorted by seat, 1–4 entries, ≥ 1 human; solo ⇒ exactly 1 human and no bots.
+//                    sorted by seat, 1–MAX_SEATS entries, ≥ 1 human; solo ⇒ exactly 1 human and no bots.
 //                    Bot playerIds start with 'ai_'. Seat indexes may have gaps (e.g. seats 0 and 2).
 //                    `loadout` (DESIGN §16, optional): the human's operator loadout, already checked by the lobby
 //                    (shared/protocol.js checkLoadout); PlayerState re-checks it against opts.data and ignores it for bots.
@@ -130,11 +130,12 @@
 //     human is left at all the match ends ('abandoned'); when nobody alive is left it ends as 'eliminated'.
 
 import { C2S, unitStatsEntry } from '../../shared/protocol.js';
-import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO, modeIdFor, layerGainRoom } from '../../shared/constants.js';
+import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, CHAT_COOLDOWN_MS, CHAT_MAX_LEN, GEO, modeIdFor, layerGainRoom } from '../../shared/constants.js';
 import { Battle } from '../sim/Battle.js';
 import { DataSource } from '../sim/simdata.js';
 import { createRng, deriveSeed } from '../sim/rng.js';
 import { GameData } from './gamedata.js';
+import { deepFreeze } from '../data.js';
 import { RealScheduler } from './scheduler.js';
 import { SharedPool, drawDisabledBonds } from './pool.js';
 import { PlayerState } from './PlayerState.js';
@@ -156,6 +157,9 @@ import { buildResult } from './results.js';
 import { botPrepBeginSteps, botPrepEndSteps, botPickBand, botPickCard } from './bot.js';
 
 const BOT_REHEARSAL_DEFAULT = 3;
+/** Six-seat cooperation supplies an ordinary, usable 信标 to each surviving seat before R10/R12/R14 prep. */
+const SIX_PLAYER_BEACON_ROUNDS = new Set([10, 12, 14]);
+const ROUND_BEACON_ITEM = 'chess_item_5_04_e_a';
 /** Wall-clock ms of bot layout rehearsal per scheduler callback (real time; virtual time runs it in one go). */
 const BOT_SLICE_MS = 8;
 /**
@@ -244,8 +248,23 @@ export class Match {
     this.sendFn = opts.send;
     this.broadcastFn = opts.broadcast;
     this.onEndFn = opts.onEnd;
-    this.data = opts.data && typeof opts.data === 'object' ? opts.data : {};
-    this.gd = new GameData(this.data, this.modeId);
+    // A match keeps the chosen tables and ruleset even if its room's next-match setting or caller options change.
+    const rhineEnabled = opts.rhineEnabled !== false;
+    Object.defineProperties(this, {
+      data: { value: deepFreeze(opts.data && typeof opts.data === 'object' ? opts.data : {}), enumerable: true },
+      rhineEnabled: { value: rhineEnabled, enumerable: true },
+      dataProfile: { value: rhineEnabled ? 'rhine' : 'vanilla', enumerable: true },
+    });
+    const seen = new Set();
+    const startingSeats = opts.seats.filter((s) => {
+      if (!s || typeof s.playerId !== 'string' || seen.has(s.playerId)) return false;
+      seen.add(s.playerId);
+      return true;
+    });
+    if (!startingSeats.length) throw new TypeError('Match: seats required');
+    // Capture occupied seats once: both human and AI seats count, even after a quit or elimination.
+    this.startingPlayerCount = startingSeats.length;
+    this.gd = new GameData(this.data, this.modeId, this.startingPlayerCount);
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
     this.ownsScheduler = !opts.scheduler;
@@ -299,10 +318,7 @@ export class Match {
 
     /** @type {Map<string, PlayerState>} */
     this.players = new Map();
-    const seen = new Set();
-    for (const s of opts.seats) {
-      if (!s || typeof s.playerId !== 'string' || seen.has(s.playerId)) continue;
-      seen.add(s.playerId);
+    for (const s of startingSeats) {
       this.players.set(s.playerId, new PlayerState(this, s));
     }
     if (!this.players.size) throw new TypeError('Match: seats required');
@@ -328,6 +344,7 @@ export class Match {
     this.factions = setup.factions;
     this.bossId = setup.bossId;
     this.hiddenBossId = setup.hiddenBossId;
+    this.openingBans = Object.freeze(this.gd.bans(this.gd.difficulty));
     const bans = drawDisabledBonds(this.gd, this.rngSetup);
     this.disabledBonds = bans.drawn;
     this.staticInactiveBonds = bans.staticOff;
@@ -854,6 +871,8 @@ export class Match {
   publicView() {
     const v = {
       t: 'm.public',
+      rhineEnabled: this.rhineEnabled,
+      dataProfile: this.dataProfile,
       phase: this.phase,
       round: this.round,
       lastRound: this.gd.lastRound,
@@ -861,6 +880,8 @@ export class Match {
       serverNow: this.sched.now(),
       modeId: this.modeId,
       difficulty: this.difficulty,
+      startingPlayerCount: this.startingPlayerCount,
+      openingBans: { ...this.openingBans },
       stageId: this.stageId,
       factions: this.factions.slice(),
       disabledBonds: [...new Set([...this.disabledBonds, ...this.staticInactiveBonds])].sort(),
@@ -999,7 +1020,6 @@ export class Match {
     return { t: 'm.field', fieldId: `n:${ps.playerId}`, kind: 'normal', rect: { ...GEO.NORMAL_RECT }, stageId: this.stageId, units, effects: ps.effectsView(), prep: true, nextEnemies };
   }
 
-  /** Board signature of a prep scout view (units and hand: a shop or funds change is not a board change). */
   /** Board signature of a prep scout view (board, hand and temp rows: a shop or funds change is not a board change).
    *  Hand / temp entries carry their slot — `prepFieldMeta` draws x from it, so a piece moved to another slot is a
    *  change (review of PR #129). */
@@ -1091,6 +1111,7 @@ export class Match {
       case 'g.choice': return this.pickCard(ps, msg.idx);
       case 'g.ready': return ps.setReady(!!msg.ready);
       case 'g.emote': return this.emote(ps, msg.id);
+      case 'g.chat': return this.chat(ps, msg.text);
       case 'g.watch': return this.watch(ps, msg.fieldId);
       case 'g.autoplay': return this.setAutoplay(ps, !!msg.on);
       case 'g.pause': return this.setPause(ps, !!msg.on);
@@ -1109,6 +1130,21 @@ export class Match {
     if (now - ps.lastEmoteAt < EMOTE_COOLDOWN_MS) return fail(ERR.RATE);
     ps.lastEmoteAt = now;
     this.broadcast({ t: 'm.emote', playerId: ps.playerId, id });
+    return OK;
+  }
+
+  /**
+   * 房间文字聊天（自加）：转发本对局内的一条文字消息给所有人。文本已在
+   * shared/protocol.js 的 C2S['g.chat'] 校验（1–200 字符、非空白）；这里再做一次
+   * 长度截断与简单限流（复用与表情类似的思路），广播携带发送者昵称。
+   */
+  chat(ps, text) {
+    const s = typeof text === 'string' ? text.trim().slice(0, CHAT_MAX_LEN) : '';
+    if (!s) return fail(ERR.BAD_MSG, 'empty chat');
+    const now = this.sched.now();
+    if (now - (ps.lastChatAt || 0) < CHAT_COOLDOWN_MS) return fail(ERR.RATE);
+    ps.lastChatAt = now;
+    this.broadcast({ t: 'm.chat', playerId: ps.playerId, name: ps.name || ps.playerId, text: s });
     return OK;
   }
 
@@ -1518,6 +1554,17 @@ export class Match {
       if (ps.alive) continue;
       try { this.dispatcher.dispatchEliminated(ps, 'onRoundStart', { round: r }); } catch (e) { this.reportError('dispatch onRoundStart (eliminated)', e); }
     }
+    if (!this.isSolo && this.startingPlayerCount === 6 && SIX_PLAYER_BEACON_ROUNDS.has(r)) {
+      for (const ps of alive) {
+        // Persistent per-player markers: reconnects or a repeated round entry must never duplicate the supply.
+        const key = `sixPlayerBeacon:${r}`;
+        if (ps.counters[key]) continue;
+        ps.counters[key] = 1;
+        // Use the existing reward path: normal hand placement, overflow temp, onGain and full-inventory warning.
+        const beacon = ps.acquireItem(ROUND_BEACON_ITEM, { source: 'sixPlayerBeacon' });
+        if (beacon) beacon.meta.sixPlayerBeaconRound = r;
+      }
+    }
     for (const ps of alive) ps.recompute();
     this.setDeadline(DELAYS.ROUND_START / 1000, () => this.afterRoundStart(), { silent: this.soloUntimed });
     this.markPublic();
@@ -1896,6 +1943,7 @@ export class Match {
     const spawns = withBounties(this.gd, this.round, wave, ps.bounties, ps.playerId).map((s) => ({ ...s, ownerPlayerId: ps.playerId }));
     const ev = { input, kind: 'normal', round: this.round, spawns };
     this.dispatch(ps, 'onBattleStart', ev);
+    ps.freezeResearch(ev.input || input, 'normal');
     return {
       seed: deriveSeed(this.seed, `n:${this.round}:${ps.seat}`),
       kind: 'normal',
@@ -1969,7 +2017,8 @@ export class Match {
       this._collectSimErrors(f, res);
       for (const pid of f.players) {
         const pp = res.perPlayer && res.perPlayer[pid];
-        this.lastResults.set(pid, pp || { killed: 0, total: 0, leaked: [], perfect: true, layerGains: {}, coins: 0, damageDealt: 0, unitsEnd: [], unitStats: [] });
+        const recorded = pp || { killed: 0, total: 0, leaked: [], perfect: true, layerGains: {}, coins: 0, damageDealt: 0, unitsEnd: [], unitStats: [] };
+        this.lastResults.set(pid, res.synthetic || !pp ? { ...recorded, synthetic: true } : recorded);
         // the views show the layers the battle reached until settle() makes them persistent (DESIGN §20.15)
         const ps = this.players.get(pid);
         const gains = pp && pp.layerGains && typeof pp.layerGains === 'object' ? pp.layerGains : null;
@@ -2072,6 +2121,10 @@ export class Match {
     // protocol ids are ≤ 64 chars (shared/protocol.js isId): the field id is informational, the sequence is unique
     const battleId = seq.length + 1 + String(fieldId).length <= 64 ? `${seq}.${fieldId}` : seq;
     const spec = buildBattleSpec({ ...opts, battleId, fieldId, kind, content: this.battleContent, boss });
+    Object.defineProperties(spec, {
+      rhineEnabled: { value: this.rhineEnabled, enumerable: true },
+      dataProfile: { value: this.dataProfile, enumerable: true },
+    });
     let total = 0;
     for (const x of spec.spawns) if (x && x.tag !== 'boss' && x.tag !== 'part') total += Math.max(1, Math.floor(Number(x.count) || 1));
     return {
@@ -2221,18 +2274,27 @@ export class Match {
   }
 
   /**
-   * The spec a spectator seat is shown: the field's own, minus the players' `contentInfo.funds` — a private number (the
-   * player's funds at the battle start) that no battle effect reads, so the replica still plays the same battle. The
-   * other contentInfo counters stay: battle effects read them (sim/content: handUnits, roundStats.gainedChess).
+   * The spec a spectator seat is shown: the field's own, minus the players' `contentInfo.funds` and research reserve
+   * hand. Neither is read by battle effects; research.devices stays so the replica plays the same battle. The other
+   * contentInfo counters stay: battle effects read them (sim/content: handUnits, roundStats.gainedChess).
    */
   _spectatorSpec(f) {
     if (!f.spectatorSpec) {
       const s = f.spec;
       const strip = (p) => {
-        if (!p || !p.contentInfo || !Object.hasOwn(p.contentInfo, 'funds')) return p;
-        const { funds, ...contentInfo } = p.contentInfo;
-        void funds;
-        return { ...p, contentInfo };
+        if (!p || typeof p !== 'object') return p;
+        let view = p;
+        if (p.contentInfo && Object.hasOwn(p.contentInfo, 'funds')) {
+          const { funds, ...contentInfo } = p.contentInfo;
+          void funds;
+          view = { ...view, contentInfo };
+        }
+        if (p.research && Object.hasOwn(p.research, 'hand')) {
+          const { hand, ...research } = p.research;
+          void hand;
+          view = { ...view, research };
+        }
+        return view;
       };
       f.spectatorSpec = s && Array.isArray(s.players) ? { ...s, players: s.players.map(strip) } : s;
     }
@@ -2244,6 +2306,7 @@ export class Match {
     return {
       t: 'b.start', battleId: f.battleId, fieldId: f.fieldId, kind: f.kind,
       spec: this.spectators.has(pid) ? this._spectatorSpec(f) : f.spec,
+      rhineEnabled: this.rhineEnabled, dataProfile: this.dataProfile,
       authoritative: !!(!f.done && f.mode === 'client' && f.authority === pid && !watch),
       startAt: f.startAt, serverNow: this.sched.now(), elapsed: Math.round(this._fieldElapsed(f) * 1000) / 1000,
       speed: this.gameSpeed, watch: !!watch, done: !!f.done,
@@ -2915,6 +2978,7 @@ export class Match {
         this.dispatch(ps, 'onLayers', { bondId, from: before, to: ps.layers[bondId], reason: 'battle' });
       }
       this._charDamageTickers(ps, r);
+      if (this.lastResults.has(ps.playerId) && !r.synthetic) ps.settleResearch(counted === 0 && r.perfect !== false);
       this.dispatch(ps, 'onBattleResult', { result: r, lpLoss: loss, perfect: counted === 0 && r.perfect !== false, unite: uniteResult || null });
       ps.recompute();
     }
@@ -3011,6 +3075,7 @@ export class Match {
         // `side` + `routes`: the player's half of a pair field (spawn-list edits for one player, e.g. 鸭爵's swap)
         const ev = { input, kind: hidden ? 'hidden' : 'boss', round: this.round, spawns, routes: wave.routes, side: g.length > 1 ? (j === 0 ? 'L' : 'R') : null };
         this.dispatch(ps, 'onBattleStart', ev);
+        ps.freezeResearch(ev.input || input, ev.kind);
         return ev.input && typeof ev.input === 'object' ? ev.input : input;
       });
       const fieldId = `b${i + 1}`;
@@ -3179,6 +3244,7 @@ export class Match {
     // the end condition the server registered first decides (client-side combat: _endFinal — pool 0 → victory, team LP 0
     // → defeat); a boss field's final result may never turn a defeat into a victory (user playtest #6 item 5)
     const victory = this._finalEnding ? this._finalEnding === 'cleared' : this.bossPool.hp <= 0;
+    for (const f of this.fields) for (const pid of f.players) this.players.get(pid)?.settleResearch(victory);
     this._syncTeamLp();
     this.deadline = 0;
     this.overtimeAt = 0;

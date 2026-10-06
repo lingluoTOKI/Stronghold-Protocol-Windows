@@ -22,6 +22,7 @@
 //   (research 09 §1.2); board drops of units go through the wheel before g.move {uid, to, dir} (ui/facing.js).
 
 import { GEO, PHASE, UF } from '../../../shared/constants.js';
+import { isRhineDevice } from '../../../shared/rhineResearch.js';
 import { resolveLoadout, loadoutOptions, MODULE_NONE } from '../../../shared/protocol.js';
 import { resolveRecordLoadout, loadoutRecord, attackRangeGrid } from '../../../shared/loadoutRecord.js';
 import { meleeOnHighGround } from '../../../shared/highGround.js';
@@ -1130,6 +1131,9 @@ export function indexPieces(priv) {
   (Array.isArray(priv?.temp) ? priv.temp : []).forEach((p, idx) => {
     if (isObj(p) && Number.isInteger(p.uid)) map.set(p.uid, { piece: p, area: 'temp', idx });
   });
+  (Array.isArray(priv?.research?.hand) ? priv.research.hand : []).forEach((p, idx) => {
+    if (isObj(p) && Number.isInteger(p.uid)) map.set(p.uid, { piece: p, area: 'research', idx });
+  });
   return map;
 }
 
@@ -1236,6 +1240,19 @@ export function canPlace(ctx, uid, target) {
   const piece = src.piece;
   const isMagic = piece.kind === 'item' && ctx.getItem(piece.id)?.itemType === 'MAGIC';
 
+  const research = piece.kind === 'token' && isRhineDevice(piece.id);
+  if (target.area === 'research') {
+    if (!research) return no('BAD_TARGET', '科研位只能放置科研装置');
+    return src.area === 'research' ? no('ALREADY', '装置已在科研位') : { ok: true, action: 'move' };
+  }
+  if (research && target.area === 'hand') return { ok: true, action: 'move' };
+  if (research && target.area === 'board') {
+    const capacity = ctx.priv?.research?.capacity || 0;
+    if (!capacity) return no('BAD_TARGET', '需要激活三人莱茵生命盟约');
+    const deployed = [...ctx.boardAt.values()].filter(e => isRhineDevice(e.piece.id)).length;
+    if (src.area !== 'board' && deployed >= capacity) return no('BOARD_FULL', `当前最多部署${capacity}台科研装置，请先收回其他装置`);
+  }
+
   if (target.area === 'hand') {
     const idx = target.idx;
     if (!Number.isInteger(idx) || idx < 0 || idx >= GEO.HAND_SIZE) return no('BAD_TILE', '无法放置在该位置');
@@ -1309,7 +1326,10 @@ function equipCheck(ctx, itemPiece, targetPiece) {
 
 /** Whether equipping `itemId` attaches it (true) or consumes it on equip (false: no slot is used / replaced). */
 export function itemAttaches(item) {
-  return !(typeof item?.kind === 'string' && item.kind.startsWith('consume_on_equip'));
+  // consume_on_equip_or_delayed (博士投影) stays equipped until its effect lands: it occupies a slot and replaces an
+  // equipped item like a normal equip. Plain consume_on_equip never attaches.
+  return !(typeof item?.kind === 'string' && item.kind.startsWith('consume_on_equip')
+    && item.kind !== 'consume_on_equip_or_delayed');
 }
 
 /**
@@ -1375,7 +1395,9 @@ export function dropIntent(ctx, uid, target) {
       && itemAttaches(ctx.getItem(ctx.pieces.get(uid)?.piece?.id)) && !equipMerges(ctx, uid);
     return { t: 'g.equip', fields: { itemUid: uid, targetUid: occ.piece.uid }, confirmReplace: full };
   }
-  const to = target.area === 'hand' ? { area: 'hand', idx: target.idx } : { area: 'board', row: target.row, col: target.col };
+  const research = isRhineDevice(ctx.pieces.get(uid)?.piece?.id);
+  const to = target.area === 'research' || (research && target.area === 'hand') ? { area: 'research' }
+    : target.area === 'hand' ? { area: 'hand', idx: target.idx } : { area: 'board', row: target.row, col: target.col };
   return { t: 'g.move', fields: { uid, to } };
 }
 
@@ -1443,7 +1465,7 @@ export function normalizeSp(sp, players = []) {
   if (!isObj(sp)) return null;
   const ids = (Array.isArray(players) ? players : []).filter(isObj).map((p) => p.playerId);
   const order = Array.isArray(sp.order) && sp.order.length ? sp.order.filter((x) => typeof x === 'string') : ids;
-  const cards = (Array.isArray(sp.cards) ? sp.cards : []).slice(0, 6).map((c, idx) => {
+  const cards = (Array.isArray(sp.cards) ? sp.cards : []).slice(0, 9).map((c, idx) => {
     const card = typeof c === 'string' ? { id: c } : isObj(c) ? { ...c } : {};
     return { ...card, idx, takenBy: typeof card.takenBy === 'string' ? card.takenBy : null };
   });
@@ -1645,11 +1667,12 @@ export function rangeGridBox(grid, mirror = false) {
 // ---- keyboard ---------------------------------------------------------------------------------------------------
 
 /**
- * Map a keydown to a game shortcut (R refresh, F freeze, D level-up, Q retreat, X sell, Space ready, Esc close).
+ * Map a keydown to a game shortcut (R refresh, F freeze, D level-up, Q retreat, S sell, B buy, E chat, X speed,
+ * Space ready, Esc close).
  * Space means ready even while a HUD button has focus (a mouse click leaves the shop card / 刷新 focused, and
  * Space must not re-trigger it); the caller prevents the button's own activation. Enter still activates buttons.
  * @param {{ key?: string, code?: string, ctrlKey?: boolean, metaKey?: boolean, altKey?: boolean, repeat?: boolean, target?: any }} e
- * @returns {'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready'|'escape'|null}
+ * @returns {'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'buy'|'chat'|'speed'|'ready'|'escape'|null}
  */
 export function shortcutFor(e) {
   if (!e || e.ctrlKey || e.metaKey || e.altKey) return null;
@@ -1663,26 +1686,28 @@ export function shortcutFor(e) {
   if (code === 'KeyR' || key === 'r') return 'refresh';
   if (code === 'KeyF' || key === 'f') return 'freeze';
   if (code === 'KeyD' || key === 'd') return 'levelUp';
+  if (code === 'KeyS' || key === 's') return 'sell';
+  if (code === 'KeyB' || key === 'b') return 'buy';
   if (code === 'KeyQ' || key === 'q') return 'retreat';
-  if (code === 'KeyX' || key === 'x') return 'sell';
+  if (code === 'KeyE' || key === 'e') return 'chat';
+  if (code === 'KeyX' || key === 'x') return 'speed';
   if (code === 'Space' || key === ' ') return 'ready';
   return null;
 }
 
 /**
- * Whether a press on the field closes the open detail card: a card opened from the field itself (an own piece — tap,
- * right-click or long press — or a battle / teammate unit). Shop, reward, bond-member and intel (enemy) cards stay.
+ * Whether a press on the field closes the open detail card: a card opened BY a field press (a piece, a unit, a special
+ * terrain tile: issue #184) closes on the next press of the field; the ones opened from the shop / hand / HUD stay until
+ * their own close button (or the flow that opened them).
  * @param {{ kind?: string }|null|undefined} detail
  */
-// a card opened BY a field press (a piece, a unit, a special terrain tile: issue #184) closes on the next press of
-// the field; the ones opened from the shop / hand / HUD stay until their own close button (or the flow that opened them)
 export const closesOnFieldPress = (detail) => detail?.kind === 'piece' || detail?.kind === 'unit' || detail?.kind === 'terrain';
 
 /**
  * Whether an open overlay swallows a game shortcut: a modal / the guide own the keyboard (Esc included — they close
  * themselves); the 本局信息 / 敌方情报 drawer is a dialog too — only Esc (it closes the drawer) passes, R / F / D / Space
  * never act behind it.
- * @param {'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready'|'escape'|null} act shortcutFor
+ * @param {'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'buy'|'chat'|'speed'|'ready'|'escape'|null} act shortcutFor
  * @param {{ modal?: boolean, drawer?: boolean }} open
  */
 export function shortcutBlocked(act, { modal = false, drawer = false } = {}) {

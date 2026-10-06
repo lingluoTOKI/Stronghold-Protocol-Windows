@@ -2,7 +2,7 @@
 // unit thumbnails, LP tower, coin badge, official UI sprites. Styles: css/screens/game*.css.
 
 import { useState, useMemo } from '../../vendor/hooks.module.js';
-import { html, Icon, TierChip, Tooltip } from './components.js';
+import { html, Icon, TierChip, Tooltip, seatHue } from './components.js';
 import { data, useData, localAsset } from '../data.js';
 import { parseRichText, rtClassName } from './richText.js';
 import {
@@ -22,8 +22,9 @@ export const GAME_FILES = ['config', 'assets', 'chess', 'bonds', 'items', 'bands
  *   effect: (id:string)=>any, garrison: (id:string)=>any, factions: any, choices: any, list: (name:string)=>any[] }}
  */
 export function useGameData() {
-  const ready = useData(...GAME_FILES);
-  return useMemo(() => makeLookups(ready), [ready]);
+  const settled = useData(...GAME_FILES);
+  const ready = settled && data.isReady(GAME_FILES);
+  return useMemo(() => makeLookups(ready), [ready, data.generation]);
 }
 
 /** Non-hook lookups (for event handlers). */
@@ -245,7 +246,7 @@ export function PlayerAvatar({ player, size = 'md', self = false, class: cls }) 
   const glyph = [...(player?.name || '').trim()][0] || '?';
   const dead = player?.alive === false || player?.status === 'dead';
   const left = player?.status === 'left';
-  const hue = [162, 196, 38, 280][((player?.seat | 0) % 4 + 4) % 4];
+  const hue = seatHue(player?.seat);
   return html`<span class=${cx('pavatar', `pavatar--${size}`, self && 'is-self', dead && 'is-dead', left && 'is-left', player?.isBot && 'is-bot',
       player?.connected === false && !player?.isBot && 'is-offline', cls)} style=${`--seat-hue:${hue}`}>
     <span class="pavatar__img">
