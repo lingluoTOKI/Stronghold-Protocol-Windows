@@ -1131,7 +1131,7 @@ export class Battle {
   _checkBlock(e) {
     if (e.blockedBy || e.hidden || !e.alive) return !!e.blockedBy;
     const f = e.s.flags;
-    if (f.unblockable || f.levitate || f.fear) return false;
+    if (f.unblockable || f.levitate || f.fear || f.sleep) return false;
     const r0 = Math.round(e.y), c0 = Math.round(e.x);
     const w = e.blockWeight ?? 1;
     let u = null, bd = Infinity;
@@ -1418,7 +1418,7 @@ export class Battle {
     }
     const source = opts.source ?? null;
     let entered = true;
-    for (const b of target.buffs) if ((b.status ?? b.key) === key) { entered = false; break; }
+    if (opts.reenter !== true) for (const b of target.buffs) if ((b.status ?? b.key) === key) { entered = false; break; }
     if (tpl.palsy) {
       this.addBuff(target, { ...palsyBuff(value ?? 1), duration, source });
     } else if (tpl.valued != null && typeof tpl.mods === 'function' && opts.refresh == null) {
@@ -1431,7 +1431,7 @@ export class Battle {
       if (key === 'fear' && b && target.side === 'enemy') stampFear(this, target, b, source);
     }
     const f = tpl.flags;
-    if (f && target.side === 'enemy' && (f.levitate || f.unblockable || f.fear)) this._unblock(target);
+    if (f && target.side === 'enemy' && (f.levitate || f.unblockable || f.fear || f.sleep)) this._unblock(target);
     if (f && target.side === 'ally' && f.noBlock) this.releaseBlocked(target);
     if (this._hooks.statusApplied) this.emit('statusApplied', { source, target, status: key, duration, value, entered });
     return true;

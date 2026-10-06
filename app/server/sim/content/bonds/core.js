@@ -372,7 +372,6 @@ function egirDownAtStart(battle, u) {
  * Tokens / devices / empty tiles are never devoured.
  */
 function devour(battle, pid, bb, members) {
-  const memberSet = new Set(members);
   // 联防: an operator down at the end of its own combat (carryState.down — Battle.start forced it out right before
   // battleStart, FORCED_EXIT) takes part in the devour as if it stood on its tile, then stays out: it marks in its turn,
   // it is "the unit in front" of another (the chain goes on through it when it is a member), its base ATK / block count
@@ -383,10 +382,10 @@ function devour(battle, pid, bb, members) {
   const order = members.filter((u) => S.onField(u) || downAtStart(u)).sort(egirOrder);
   const opAt = (u) => {
     const [r, c] = S.frontTile(u);
-    const a = S.allyAt(battle, r, c, pid);
+    const a = S.allyAt(battle, r, c);
     if (a) return S.isOp(a) && a.alive ? a : null;
     const d = battle.downOn(r, c);
-    return d && d.ownerId === pid && downAtStart(d) ? d : null;
+    return d && downAtStart(d) ? d : null;
   };
   const markedBy = new Map(); // marker → [targets]
   const marks = [];
@@ -401,14 +400,14 @@ function devour(battle, pid, bb, members) {
       if ((markedBy.get(t) ?? []).includes(m)) continue;
       seen.add(t);
       mine.push(t);
-      if (memberSet.has(t)) queue.push(t);
+      if (S.isMember(battle, t, 'egirShip')) queue.push(t);
     }
     markedBy.set(m, mine);
     if (!mine.length) continue;
     let atk = 0, block = 0;
     for (const t of mine) { atk += num(t.base.atk, 0); block += num(t.base.blockCnt, 0); marks.push([m, t]); }
     const mods = {};
-    if (atk > 0) mods.atkFlat = atk;
+    if (atk > 0) mods.atkFinal = atk; // 最终加算 (units.js _recalc)
     if (block > 0) mods.blockCnt = block;
     if (Object.keys(mods).length) S.passiveBuff(battle, m, 'bond:egir:devour', mods);
   }
@@ -423,7 +422,7 @@ function devour(battle, pid, bb, members) {
   for (const [m, t] of marks) {
     // (a member down since its own combat — downAtStart — resolves its marks as if it stood; a mark on it resolves nothing:
     // `knocked` — it is off the field)
-    if (knocked(t) || !(m.alive || downAtStart(m))) continue;
+    if (knocked(t)) continue;
     S.fxOn(battle, 'devour', t, 'bond:egirShip', 'devour', { from: m.id });
     if (amount > 0) battle.loseHp(t, mitigate(amount, 'phys', t.s), { source: m, tags: ['bond:egir:devour'] });
     if (!layered.has(t)) {
@@ -457,20 +456,16 @@ function installEgir(battle, pid, bb, members) {
   // Death priority 11: before 不屈 (10), whose redeploy "also consumes a 复活 charge" — with this order the charge is
   // always the one used, same outcome. The marks still pending on a revived member are cancelled (devour).
   const max = reached(battle, pid, 'egirShip', bb.power_bond_char_cnt) ? Math.max(0, Math.floor(num(bb.max_free_respawn_cnt, 0))) : 0;
-  const holders = new Map(); // beneficiary → its in-place revives (mem.revives) at battle start
-  battle.on('battleStart', () => {
-    for (const u of members.filter((x) => S.isOp(x) && (S.onField(x) || egirDownAtStart(battle, x))).sort(egirOrder).slice(0, max)) holders.set(u, u.mem.revives | 0);
-    devour(battle, pid, bb, members);
-  }, { once: true });
+  battle.on('battleStart', () => devour(battle, pid, bb, members), { once: true });
   if (!(max > 0)) return;
-  const used = new Set();
+  const memberOps = new Set(members.filter(S.isOp));
+  const knockedOut = new Set(); // members whose first knock-out of this battle has happened
   let revives = 0;
   battle.on('death', (c) => {
     const u = c.unit;
-    if (c.reason !== 'killed' || !holders.has(u) || used.has(u)) return;
-    used.add(u);
-    if ((u.mem.revives | 0) !== holders.get(u)) return; // saved in place since the battle start: the revive is gone
-    if (u.alive || u.removed) return;
+    if (c.reason !== 'killed' || !memberOps.has(u) || knockedOut.has(u)) return;
+    knockedOut.add(u);
+    if (revives >= max || u.alive || u.removed) return;
     if (!battle.redeploy(u, { free: true })) return;
     revives++;
     S.fxOn(battle, 'revive', u, 'bond:egirShip', 'respawn', { n: revives });

@@ -1351,6 +1351,18 @@ export async function createFieldView(host, options = {}) {
     return hit ? hit.ref : null;
   }
 
+  /**
+   * The ground itself was tapped: nothing stands there, so the TILE explains itself — a special terrain tile (活性源石,
+   * 沼泽, 排气格栅, 深水区, 红/蓝门, 传送) opens its own card (GitHub issue #184; screens/game.js `tileClick` →
+   * gameLogic.terrainInfo). The tile is picked as a BOARD tile (`pickBoardTile`), and the screen maps board → stage once
+   * more with `gameLogic.fieldTile` on a boss-prep board.
+   */
+  function emitTileClick(ev, e) {
+    const t = pickBoardTile(ev.x, ev.y);
+    if (!t || !(t.row >= 0) || !(t.col >= 0)) return;    // outside the board this field draws
+    emit('tileClick', { row: t.row, col: t.col, button: e.button, clientX: e.clientX, clientY: e.clientY });
+  }
+
   const onPointerDown = (e) => {
     if (destroyed) return;
     const ev = evPayload(e);
@@ -1361,18 +1373,20 @@ export async function createFieldView(host, options = {}) {
         const payload = { unitId: v.id, uid: info?.uid ?? null, unit: info, button: e.button, detail: e.button === 2, clientX: e.clientX, clientY: e.clientY };
         emit('pieceClick', payload);
         if (e.button === 2) emit('pieceDetail', payload);
-      } else if (penViews.size) {
-        const pv = penUnitAt(ev.x, ev.y);
-        if (pv) emitPenClick(pv, e);
+        return;
       }
+      const pv = penViews.size ? penUnitAt(ev.x, ev.y) : null;
+      if (pv) emitPenClick(pv, e);
+      else emitTileClick(ev, e);
       return;
     }
     if (drag.pointerDown(ev)) { try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ } return; }
     if (mode === 'prep') { const lv = leaderAt(ev.x, ev.y); if (lv) { emitPenClick(lv, e); return; } }
     if (penViews.size && mode === 'prep') {
       const pv = penUnitAt(ev.x, ev.y);
-      if (pv) emitPenClick(pv, e);
+      if (pv) { emitPenClick(pv, e); return; }
     }
+    emitTileClick(ev, e);
   };
   const onPointerMove = (e) => {
     if (destroyed) return;
@@ -1398,6 +1412,11 @@ export async function createFieldView(host, options = {}) {
   // selects it and its underframe opens over the tile (clamped under the top bar on a phone), and the click pressed
   // 撤退 / 出售 (user playtest #4 item 1 on a phone). Cancelling touchend drops them.
   const onTouchEnd = (e) => { if (e.cancelable) e.preventDefault(); };
+  // The canvas is a click target too (a no-op listener). The browser's touch adjustment moves a tap onto a nearby
+  // click-responding element, so a tap on the back row right under the bond strip's discs opened the bond popup
+  // instead of selecting the unit. As a click target that holds the finger's point the canvas wins: a tap on the board
+  // stays on the tile under it.
+  const onTapTarget = () => {};
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
@@ -1405,6 +1424,7 @@ export async function createFieldView(host, options = {}) {
   canvas.addEventListener('pointerleave', onPointerLeave);
   canvas.addEventListener('contextmenu', onContext);
   canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+  canvas.addEventListener('click', onTapTarget);
 
   // ---- battle ---------------------------------------------------------------------------------------------
 
@@ -1462,12 +1482,29 @@ export async function createFieldView(host, options = {}) {
     return info;
   }
 
+  // a hand item on a scouted prep board (UnitInfo kind 'item'): the plate's icon and colour resolve client-side,
+  // exactly like the own prep bench (pieceInfo)
+  function scoutItemInfo(info) {
+    const rec = data.item(info.defId);
+    const tier = rec?.tier || info.tier || 1;
+    return { ...info,
+      icon: assets.itemIcon ? assets.itemIcon(rec ? { trapId: rec.trapId, iconId: rec.iconId } : info.defId) : null,
+      color: (info.golden || rec?.isGolden) ? 0xffc600 : TIER_COLORS[tier] || TIER_COLORS[1] };
+  }
+
   function battleView(id) {
     let v = views.get(id);
     if (v) return v;
     const info = infos.get(id);
     if (!info || gone.has(id)) return null;
-    v = info.kind === 'device' ? new DeviceView(ctx, info) : new UnitView(ctx, info, { prep: !!battleMeta?.prep && info.side === 'ally' });
+    v = info.kind === 'device' ? new DeviceView(ctx, info)
+      : info.kind === 'item' ? new ItemView(ctx, scoutItemInfo(info))
+      : new UnitView(ctx, info, { prep: !!battleMeta?.prep && info.side === 'ally' });
+    // a teammate's operator shows its equipped items like the own prep bench does (item pips; user playtest #2:
+    // at the unit, not only in the detail card) — prep surfaces only, the battle HUD stays as it is
+    if (v.setItems && battleMeta?.prep && Array.isArray(info.items) && info.items.length) {
+      v.setItems(info.items.map((it) => { const r = data.item(it); return assets.itemIcon ? assets.itemIcon(r ? { trapId: r.trapId, iconId: r.iconId } : it) : null; }));
+    }
     v.setWorld(info.x, info.y, 0);
     v._seen = false;
     v._born = performance.now();
@@ -1989,6 +2026,7 @@ export async function createFieldView(host, options = {}) {
       canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('contextmenu', onContext);
       canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('click', onTapTarget);
       app.ticker.remove(frame);
       app.ticker.remove(preRender);
       app.ticker.remove(postRender);
