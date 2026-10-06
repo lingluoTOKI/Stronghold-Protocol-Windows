@@ -2,7 +2,7 @@
 // Trap damage and chain reactions are explicit physical activations, never inferred from damage/kill events.
 import { num, talentBb, traitBb, skillRec, up } from './tier1.js';
 import { RHINE_BALANCE as B } from '../../../../shared/rhineResearch.js';
-import { absoluteRangeKeys } from '../../targeting.js';
+import { absoluteRangeKeys, enemyStealthed } from '../../targeting.js';
 import { bodyOnTile, bodyInKeys, bodyInRadius } from '../../body.js';
 import { COLS, CHAIN_RADIUS } from '../../constants.js';
 import { localOrder } from '../../dir.js';
@@ -48,19 +48,19 @@ export const liveResonators = (b, owner) => b.allyUnits.filter(t => t.kind === '
 const trapLimit = owner => B.dorothyTrapLimit[owner?.def?.golden || owner?.def?.raw?.isGolden ? 1 : 0];
 const touches = (enemy, r, c) => enemy.hitArea ? bodyOnTile(enemy, r, c)
   : Math.abs(enemy.x - c) <= 0.5 && Math.abs(enemy.y - r) <= 0.5;
-const groundOn = (b, r, c) => b.enemies.some(e => up(e) && !e.hidden && !e.isFlying && touches(e, r, c));
+const groundOn = (b, r, c) => b.enemies.some(e => up(e) && !e.hidden && !e.isFlying && !enemyStealthed(e) && touches(e, r, c));
 
 /** One activation per physical deployment, also if several S3 waves queue the same trap. */
 export function triggerResonator(b, t, hit = null, { chain = false, deploySeq = t.deploySeq } = {}) {
   if (!up(t) || t.deploySeq !== deploySeq || t.mem.dorothyTriggered === deploySeq) return false;
   const owner = t.ownerUnit;
   if (!owner || t.defId !== RESONATOR) return false;
-  if (!chain && (!hit || !up(hit) || hit.isFlying || !touches(hit, t.tileR, t.tileC))) return false;
+  if (!chain && (!hit || !up(hit) || hit.isFlying || enemyStealthed(hit) || !touches(hit, t.tileR, t.tileC))) return false;
   t.mem.dorothyTriggered = deploySeq;
   const sk = t.def.skill, bb = sk?.bb ?? {}, id = sk?.id ?? sk?.skillId;
   const keys = new Set(absoluteRangeKeys(sk?.rangeGrid ?? [[0, 0]], t.tileR, t.tileC, t.dir, 0));
   // Like the game's champagne trap: ground contact/explosions do not require a visible attack target.
-  const selectable = e => up(e) && !e.hidden && !e.isFlying;
+  const selectable = e => up(e) && !e.hidden && !e.isFlying && !enemyStealthed(e);
   const victims = id === D1 ? (hit && selectable(hit) ? [hit] : [])
     : b.enemies.filter(e => selectable(e) && (id === D2 ? bodyInRadius(e, t.x, t.y, 1.2) : bodyInKeys(e, keys)));
   const event = { token: t, owner, target: hit, victims, chain, critical: t.mem.dorothyDamageScale > 1, deploySeq };
@@ -94,7 +94,7 @@ export function triggerResonator(b, t, hit = null, { chain = false, deploySeq = 
 export function resonator() {
   return { fromTokens: true, trait: { noAttack: true }, skill: { kind: 'passive', onTick({ battle: b, unit: t }) {
     if (!up(t)) return;
-    const hit = b.enemies.filter(e => up(e) && !e.hidden && !e.isFlying && touches(e, t.tileR, t.tileC))
+    const hit = b.enemies.filter(e => up(e) && !e.hidden && !e.isFlying && !enemyStealthed(e) && touches(e, t.tileR, t.tileC))
       .sort((a, c) => a.spawnSeq - c.spawnSeq)[0];
     if (hit) triggerResonator(b, t, hit);
   } }, install(b, t) {
@@ -127,7 +127,7 @@ export function resonator() {
 
 /** Free ground cells in the owner's range, prioritising approaching ground enemies and rejecting occupied cells. */
 function trapTile(b, u) {
-  const enemies = b.enemies.filter(e => up(e) && !e.hidden && !e.isFlying);
+  const enemies = b.enemies.filter(e => up(e) && !e.hidden && !e.isFlying && !enemyStealthed(e));
   const candidates = [];
   for (const key of u.rangeKeys) {
     const r = Math.floor(key / COLS), c = key % COLS;
