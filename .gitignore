@@ -1,39 +1,64 @@
-# ==================================================================================================
-# 仓库根目录 .gitignore（Windows 便携分发包）
-# app\ 子目录另有一份更细的 app\.gitignore，两者叠加生效
-# ==================================================================================================
+# --- dependencies & generated client libs -------------------------------------------------------
+node_modules/
+# copied from node_modules by tools/vendor.mjs (postinstall); never commit third-party builds
+public/vendor/
 
-# --- 便携运行时与第三方二进制：体积远超 GitHub 单文件限制，改由 Release 附件分发 ------------------
-node/
-cloudflared/
-*.tgz
-*.zip
-*.7z
-
-# --- 打包/上传临时产物 -----------------------------------------------------------------------------
-_dump/
-_dist/
-_out/
-
-# --- 本地日志与缓存 -------------------------------------------------------------------------------
-*.log
-logs/
+# --- game assets: (c) Hypergryph / Yostar, fetched or extracted locally, NEVER committed ----------
+# tools/fetch-assets.mjs → public/assets/** (~250 MB) and public/fonts/** (+ fonts.css)
+public/assets/
+public/fonts/
+# tools/local-extract/extract.py → public/assets/local/** and this per-machine manifest
+# (optional: the client and the tests work without it)
+data/local-assets.json
+# download caches, upstream tables, ledgers, reports, setup state
 .cache/
 
-# --- 编辑器 / 操作系统 ----------------------------------------------------------------------------
+# --- Python (optional local-client extraction) ----------------------------------------------------
+.venv*/
+venv/
+__pycache__/
+*.py[cod]
+
+# --- tests & logs ----------------------------------------------------------------------------------
+test/e2e/out/
+logs/
+*.log
+
+# --- per-machine config (scripts/install-service-windows.ps1) ------------------------------------
+scripts/service.env.cmd
+.env
+.env.*
+
+# --- OS / editor clutter ---------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
 desktop.ini
 *.swp
 .idea/
 .vscode/
+.claude/
 
-# --- 本地补丁 / 备份 / 参考目录（不入库） ---
-merge-tmp/
+# --- 启动器 / Windows 便携包 (scripts/launcher.mjs) ----------------------------------------------
+# 每台机器自己的端口 / 局域网共享 / 上次连的地址，不进版本库
+scripts/launcher.config.json
+
+# --- 本地/部署辅助(不进 git; 上游无这些文件, merge 不受影响) ----------------
+node/
+cloudflared/
+*.tgz
+*.zip
+*.7z
 merge_backup/
+merge-reports/
+merge-tmp/
 rhine_ref/
 rhine_upstream/
 rollback_tmp/
-*.bak
-*.bak2
-*.bak3
+_gen_local_assets.mjs
+_probe_assets.mjs
+_verify_manifest.mjs
+_merge_chat.ps1
+启动游戏.bat
+本机当服务器.bat
+连接服务器.bat
+stronghold.service
