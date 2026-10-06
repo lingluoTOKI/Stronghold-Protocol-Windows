@@ -212,7 +212,7 @@ export function BulletinButton() {
       micro="SERVER BULLETIN" width="min(24rem, 90vw)" class="bulletin-modal-box">
       ${failed ? html`<div class="bulletin-modal__empty">暂无法连接公告服务</div>` : null}
       ${!failed && !data ? html`<div class="bulletin-modal__empty">加载中…</div>` : null}
-      <div class="bulletin-modal__when">最近更新：${when || '—'}</div>
+      <div class="bulletin-modal__when">最近更新：${(data && data.updatedAt) || '—'}</div>
       ${items.map((it, i) => html`<div class="bulletin-modal__item" key=${i}>
         <div class="bulletin-modal__row">
           ${it.version ? html`<span class="bulletin-modal__ver">v${it.version}</span>` : null}
