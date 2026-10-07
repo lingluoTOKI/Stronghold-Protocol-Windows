@@ -7,6 +7,7 @@
 // the player state).
 
 import { tileKey, boardOrder, freeSlot } from '../board.js';
+import { RHINE_DEVICES } from '../../../shared/rhineResearch.js';   // 本扩展：科研装置
 
 export class PlayerPieces {
   newPiece(kind, id, extra = {}) {
@@ -29,6 +30,11 @@ export class PlayerPieces {
       if (!p) continue;
       if (p.uid === uid) return { piece: p, area: 'temp', idx: i };
       if (p.items) for (const it of p.items) if (it.uid === uid) return { piece: it, area: 'equipped', holder: p };
+    }
+    // 本扩展：科研备牌区（固定槽位，与手牌 / 召唤位分开）
+    for (let i = 0; i < this.research.hand.length; i++) {
+      const p = this.research.hand[i];
+      if (p && p.uid === uid) return { piece: p, area: 'research', idx: i };
     }
     for (const [key, p] of this.board) {
       if (p.uid === uid) return { piece: p, area: 'board', key };
@@ -56,9 +62,20 @@ export class PlayerPieces {
   }
 
   /** Remove a located piece from its container (no side effects). */
+  /** 本扩展：把科研装置放回它固定的备牌槽（槽位由装置种类决定，进度跟着玩家走，不跟 token uid）。 */
+  _returnResearch(piece) {
+    const idx = RHINE_DEVICES.findIndex((d) => d.tokenId === piece?.id);
+    if (idx < 0 || !piece.research) return false;
+    const old = this.research.hand[idx];
+    if (old && old.uid !== piece.uid) return false;
+    this.research.hand[idx] = piece;
+    return true;
+  }
+
   _detach(loc) {
     if (!loc) return;
     if (loc.area === 'hand') this.hand[loc.idx] = null;
+    else if (loc.area === 'research') this.research.hand[loc.idx] = null;   // 本扩展：科研备牌区
     else if (loc.area === 'temp') { this.temp[loc.idx] = null; this._tempDue.delete(loc.piece.uid); }
     else if (loc.area === 'board') this.board.delete(loc.key);
     else if (loc.area === 'equipped') {
