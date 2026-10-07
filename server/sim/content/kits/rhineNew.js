@@ -174,7 +174,7 @@ export function dorothy(bb, chess, def) {
       const seq = u.deploySeq;
       b.after(0, () => {
         if (!up(u) || u.deploySeq !== seq) return;
-        setStock(b, u, capacity - liveResonators(b, u).length);
+        setStock(b, u, Math.min(capacity, Math.max(1, Math.floor(num(t0.cnt, capacity)))) - liveResonators(b, u).length);
         // Automatic on-deploy resonators are free, but occupy the same field cap as board pieces.
         for (let i = 0; i < Math.min(capacity, num(t0['attack@max_cnt'], 2)); i++) if (!arm(b, u, true, true)) break;
       }, { owner: u });
