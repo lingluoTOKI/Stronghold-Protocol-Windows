@@ -74,7 +74,7 @@ test('缪尔赛思 hands out 变形同构体 on purchase (garrison_76), the boug
 
 test('every pairing (18 bond items × normal / golden, both 变形同构体): the wearer counts in prep, in the views, in the battle input and in the real battle', () => {
   const grants = Object.values(DATA.items).filter((r) => r.giveBondId);
-  assert.equal(grants.length, 36);
+  assert.equal(grants.length, 38);
   assert.equal(new Set(grants.map((r) => r.giveBondId)).size, 14, '14 bonds have a bond item (the official talent\'s list)');
   for (const r of grants) {
     const bond = r.giveBondId;

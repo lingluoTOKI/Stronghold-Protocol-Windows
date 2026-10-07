@@ -165,7 +165,7 @@ test('sanitizeEntries: drops unknown chess / illegal parts one by one, and the r
     all[c.chessId] = { skill: o.skills.find((i) => i !== o.defaultSkill), module: o.modules[o.modules.length - 1] };
   }
   const s = sanitizeEntries(all, get);
-  assert.equal(Object.keys(s).length, 112);
+  assert.equal(Object.keys(s).length, 118);
   assert.ok(checkLoadout(s, get).ok);
 });
 

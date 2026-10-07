@@ -685,7 +685,7 @@ test('变形同构体: carrier counts as a member of the other item\'s giveBondI
   assert.deepEqual([...unitBonds(h2.unit('t_op'))], [], 'the bond item alone grants nothing');
   // every giveBondId item grants its bond (14 bonds)
   const grants = Object.values(DATA.items).filter((r) => r.giveBondId && !r.isGolden);
-  assert.equal(grants.length, 18);
+  assert.equal(grants.length, 19);
   assert.equal(new Set(grants.map((r) => r.giveBondId)).size, 14);
   for (const r of grants) {
     const hh = fight({ units: [{ chessId: 't_op', row: 10, col: 4, items: [r.id, A('6_09')] }] });

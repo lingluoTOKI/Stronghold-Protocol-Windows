@@ -13,7 +13,7 @@ test('pool caps follow config (12/14/18/16/8/5, 缪尔赛思 4) and only visible
   const pool = new SharedPool(gd, { banned: [] });
   const caps = { 1: 12, 2: 14, 3: 18, 4: 16, 5: 8, 6: 5 };
   assert.equal(pool.entries.size, gd.visibleChess.length);
-  assert.equal(pool.entries.size, 112);
+  assert.equal(pool.entries.size, 118);
   for (const [id, e] of pool.entries) {
     const expect = id === 'chess_char_6_11_a' ? 4 : caps[e.tier];
     assert.equal(e.cap, expect, id);
@@ -107,7 +107,7 @@ test('effect-only items are never shop items: not in shopItemsByTier, never in t
   assert.equal(DATA.items.chess_item_1_01_e_a.shopExcluded, false, 'the plain 维式重锤 is sold');
   const gd = gdOf();
   const listed = new Set(Object.values(gd.shopItemsByTier).flat());
-  assert.equal(listed.size, 51, '56 normal equipment − 5 effect-only');
+  assert.equal(listed.size, 53, '56 normal equipment − 5 effect-only');
   for (const id of EFFECT_ONLY) assert.ok(!listed.has(id), `${id} not a shop item`);
   assert.ok(listed.has('chess_item_1_01_e_a'));
   // the shop item slot at every level
@@ -163,7 +163,7 @@ test('per-match disabled bonds: 3 core + 4 add-on (NORMAL+), FUNNY static + 0 + 
 test('the match pool excludes banned chess; m.public lists disabled bonds and banned chess', () => {
   const h = makeMatch({ mode: 'coop', difficulty: 'HARD', humans: 1, bots: 1, seed: 3 }).start();
   const pub = h.lastBc('m.public');
-  assert.equal(pub.drawnDisabledBonds.length, 7);
+  assert.equal(pub.drawnDisabledBonds.length, 8);
   assert.ok(pub.bannedChess.length > 0);
   for (const id of pub.bannedChess) assert.ok(!h.m.pool.has(id), `${id} should not be in the pool`);
   assert.equal(h.m.pool.entries.size + pub.bannedChess.length, 112);

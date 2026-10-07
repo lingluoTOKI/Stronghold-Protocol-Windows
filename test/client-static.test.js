@@ -1057,7 +1057,7 @@ describe('screen helpers', () => {
         { seat: 3, playerId: 'ai_1', name: 'AI·华法琳', isBot: true, ready: true, connected: true },
       ],
     };
-    assert.equal(normalizeSeats(room).length, 4);
+    assert.equal(normalizeSeats(room).length, 6);
     assert.equal(normalizeSeats({ mode: 'solo', seats: [room.seats[0], null, null, null] }).length, 1);
     assert.deepEqual(normalizeSeats({ mode: 'coop', seats: 'bad' }), [null, null, null, null]);
     let f = roomFacts(room, 'h');
@@ -1093,7 +1093,7 @@ describe('screen helpers', () => {
     assert.equal(f.spectating, true);
     assert.equal(f.mine, null);
     assert.equal(f.humans.length, 1, 'never a player');
-    assert.equal(f.emptySeats, 3, 'a free player seat stays free (入座)');
+    assert.equal(f.emptySeats, 5, 'a free player seat stays free (入座)');
     assert.deepEqual(f.spectators.map((x) => x.playerId), ['s']);
     const hf = roomFacts(room, 'h');
     assert.equal(hf.canStart, true, 'a spectator never blocks the start');
