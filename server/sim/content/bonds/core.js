@@ -35,7 +35,7 @@
 // Two players in one field: everything is per player (own members, own deployments); the 谢拉格 wind and 炎佑 act on
 // every enemy of the field (debuffs on shared enemies help both, research 06 §8.6).
 // Hook priorities: 拉特兰 skillStart −10 (after kits' own ammo changes), 阿戈尔 death 11 (5-tier revive, before 不屈's
-// death 10; every `fatal` saver runs before any death hook), layerGain −100 (after 魔王-style modifiers).
+// death 10), layerGain −100 (after 魔王-style modifiers).
 
 import * as S from '../support/index.js';
 import { mitigate } from '../../damage.js';
@@ -335,8 +335,9 @@ function installLaterano(battle, pid, bb, members) {
 
 // "更靠左和靠上": left first (on the player's own board: mirrored players count from the field's right), then top first —
 // row 0 is the BOTTOM row (DESIGN §3), so the top of the board is the highest row index. The order is a board position,
-// independent of the members' directions (only "身前" follows each member's `dir`). The devour marks in this order (PRTS
-// "从最先部署（更靠左和靠上的）的【阿戈尔】干员开始"; the battle's initial deployment order, Battle.start).
+// independent of the members' directions (only "身前" follows each member's `dir`). The devour marks in this order and the
+// 5-tier revive's beneficiaries are the first members in it (PRTS "从最先部署（更靠左和靠上的）的【阿戈尔】干员开始"; the
+// battle's initial deployment order, Battle.start).
 const boardCol = (u) => (u.player && u.player.mirror ? -u.tileC : u.tileC);
 const egirOrder = (a, b) => boardCol(a) - boardCol(b) || b.tileR - a.tileR || a.id - b.id;
 
@@ -360,12 +361,16 @@ function egirStart(battle) {
 }
 
 /**
- * 联防: an operator forced out at the deployment (carry.down, Battle.start, before battleStart) still stands on its
- * deploy position for the devour (PRTS 盟约记录 最先部署). The forced exit is not a knock-out, so it takes no 5-tier slot.
+ * 联防: an operator down at battle start — forced out at the deployment (carry.down, Battle.start, before
+ * battleStart) OR already knocked out waiting to redeploy (上一场被击倒, removeReason 'killed' — owner's playtest
+ * 2026-10-05: such a member used to be excluded and took no part in the devour) — still stands on its deploy
+ * position. The devour and the 5-tier revive slots both count it there (PRTS 盟约记录 前3名 / 最先部署).
  */
 function egirDownAtStart(battle, u) {
-  return S.isOp(u) && !u.alive && u.removeReason === FORCED_EXIT && !!u.carry && u.carry.down === true
-    && battle.isDown(u);
+  // 联防开局时处于退场状态的成员都参与：被强制退场 (FORCED_EXIT) 或上一场被击倒等待再部署 (carry.down, removeReason
+  // 'killed') — owner's playtest 2026-10-05: 后者原先被排除、不参与吞噬。战斗中被打倒的干员 carry 为 null，不会误入。
+  return S.isOp(u) && !u.alive && !u.removed && battle.isDown(u)
+    && (u.removeReason === FORCED_EXIT || (!!u.carry && u.carry.down === true));
 }
 
 /**
@@ -374,10 +379,7 @@ function egirDownAtStart(battle, u) {
  * the operator on the tile in front of them (one step along each member's own direction `dir`), and through marked
  * members the tiles in front of
  * those (chain); never themselves, a unit already marked by them or a unit that marked them. The marker gains the base
- * ATK and block count of everything it marked — the ATK as a 最终加算 (`atkFinal`, PRTS 盟约记录 "该付与来源获得所有标记单位
- * 的基础攻击力（最终加算）和阻挡数"): added after its percentages, so its skill's ATK +% does not scale it (it was `atkFlat`
- * until 0.1.3: 1000 base ATK, +100 %, +2000 devoured gave 6000 instead of 4000; GitHub #165 point 2, PR #176, the owner's
- * decision of 2026-10-06, DESIGN §24.7). Then each mark makes its target lose damage_value HP as a
+ * ATK (atkFlat) and block count of everything it marked; then each mark makes its target lose damage_value HP as a
  * 物理流失 (PRTS 盟约记录: "造成5000点物理流失", 修正 "【吞噬】的物理流失来源为被付与目标自身；单位被【吞噬】击杀时，击杀来源始终为
  * 对应标记的付与来源"; PRTS 作战机制: a 物理流失 "会受到目标当前防御力…影响而相应衰减") — less the target's DEF as a physical hit
  * (its own source: no DEF ignore), then battle.loseHp: no shields, dodge or damage multipliers (DEF-free until 0.1.1); the
@@ -392,11 +394,7 @@ function egirDownAtStart(battle, u) {
  * credit (an open question, DESIGN §24.7).
  * 联防: the operators down since the end of their own combat (forced out by Battle.start) mark, are marked and resolve
  * their marks like standing ones, but nothing resolves on them (below; per players' reports, owner's decision 2026-10-04).
- * Whose operator stands in front does not matter (PRTS "依次吞噬身前一格干员", no own-side limit; the owner's decision of
- * 2026-10-05 after GitHub #140 comment 4): on a shared field (联防, boss) a teammate's operator — standing, or entering
- * 联防 down — is marked like an own one, gives the same base ATK / block count, and the chain goes on through it when it
- * is an 阿戈尔 (S.isMember: its own bonds). Its knock-out is its owner's (their bonds' revives, 不屈 …), credited to the
- * marker as usual. Each devoured operator adds its tier to 阿戈尔 once (IN_BATTLE gain, disabled in 联防 / boss fields).
+ * Each devoured operator adds its tier to 阿戈尔 once (IN_BATTLE gain, disabled in 联防 / boss fields).
  * Tokens / devices / empty tiles are never devoured.
  */
 function devour(battle, pid, bb, members) {
@@ -408,8 +406,6 @@ function devour(battle, pid, bb, members) {
   // report #3, GitHub #33 item 3), owner's decision 2026-10-04; until 0.1.2 the forced exit came first and the chain broke.
   const downAtStart = (u) => egirDownAtStart(battle, u);
   const order = members.filter((u) => S.onField(u) || downAtStart(u)).sort(egirOrder);
-  // the operator in front, whoever owns it (until 0.1.3 only the player's own): a living one, else one lying there since
-  // the 联防 start (carry.down, forced out) — a teammate's included
   const opAt = (u) => {
     const [r, c] = S.frontTile(u);
     const a = S.allyAt(battle, r, c);
@@ -430,7 +426,6 @@ function devour(battle, pid, bb, members) {
       if ((markedBy.get(t) ?? []).includes(m)) continue;
       seen.add(t);
       mine.push(t);
-      // through a marked 阿戈尔 (for the player's own operators: exactly its members; a teammate's by its own bonds)
       if (S.isMember(battle, t, 'egirShip')) queue.push(t);
     }
     markedBy.set(m, mine);
@@ -452,9 +447,8 @@ function devour(battle, pid, bb, members) {
   for (const [, t] of marks) if (!dep.has(t)) dep.set(t, items.deploymentOf(t));
   const knocked = (t) => !t.alive || items.deploymentOf(t) !== dep.get(t);
   for (const [m, t] of marks) {
-    // every mark resolves whatever became of its marker — knocked out by an earlier mark (and revived or not), or down
-    // since its own combat (downAtStart); a mark on a unit knocked out during the pass, or lying down since the 联防
-    // start, resolves nothing (`knocked`: it is off the field)
+    // (a member down since its own combat — downAtStart — resolves its marks as if it stood; a mark on it resolves nothing:
+    // `knocked` — it is off the field)
     if (knocked(t)) continue;
     S.fxOn(battle, 'devour', t, 'bond:egirShip', 'devour', { from: m.id });
     if (amount > 0) battle.loseHp(t, mitigate(amount, 'phys', t.s), { source: m, tags: ['bond:egir:devour'] });
