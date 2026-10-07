@@ -8,6 +8,7 @@ import { isObj, tileKey } from './shared.js';
 import { boardTileOf, fieldTile } from './camera.js';
 import { deployedRecord, fieldsStandIn, standInOf } from './standIn.js';
 import { t } from '../../../../shared/i18n.js';
+import { isRhineDevice } from '../../../shared/rhineResearch.js';
 
 
 // ---- placement (canPlace mirror) ------------------------------------------------------------------------
@@ -184,6 +185,10 @@ export function indexPieces(priv) {
   (Array.isArray(priv?.temp) ? priv.temp : []).forEach((p, idx) => {
     if (isObj(p) && Number.isInteger(p.uid)) map.set(p.uid, { piece: p, area: 'temp', idx });
   });
+  // 本扩展：科研备牌区（priv.research.hand）里的莱茵装置也编进 uid → 位置表
+  (Array.isArray(priv?.research?.hand) ? priv.research.hand : []).forEach((p, idx) => {
+    if (isObj(p) && Number.isInteger(p.uid)) map.set(p.uid, { piece: p, area: 'research', idx });
+  });
   return map;
 }
 
@@ -318,6 +323,22 @@ export function canPlace(ctx, uid, target) {
   const piece = src.piece;
   const isMagic = piece.kind === 'item' && ctx.getItem(piece.id)?.itemType === 'MAGIC';
 
+  // 本扩展（莱茵科研装置）：只能放科研备牌区；放回手牌落成研究位；上战场受科研容量限制。
+  const research = piece.kind === 'token' && isRhineDevice(piece.id);
+  if (target.area === 'research') {
+    if (!research) return no('BAD_TARGET', t('科研位只能放置科研装置'));
+    return src.area === 'research' ? no('ALREADY', t('装置已在科研位')) : { ok: true, action: 'move' };
+  }
+  if (research && target.area === 'hand') return { ok: true, action: 'move' };
+  if (research && target.area === 'board') {
+    const capacity = ctx.priv?.research?.capacity || 0;
+    if (!capacity) return no('BAD_TARGET', t('需要激活三人莱茵生命盟约'));
+    const deployed = [...ctx.boardAt.values()].filter((e) => isRhineDevice(e.piece.id)).length;
+    if (src.area !== 'board' && deployed >= capacity) {
+      return no('BOARD_FULL', t(`当前最多部署${capacity}台科研装置，请先收回其他装置`));
+    }
+  }
+
   if (target.area === 'hand') {
     const idx = target.idx;
     if (!Number.isInteger(idx) || idx < 0 || idx >= GEO.HAND_SIZE) return no('BAD_TILE', t('无法放置在该位置'));
@@ -394,7 +415,10 @@ function equipCheck(ctx, itemPiece, targetPiece) {
 
 /** Whether equipping `itemId` attaches it (true) or consumes it on equip (false: no slot is used / replaced). */
 export function itemAttaches(item) {
-  return !(typeof item?.kind === 'string' && item.kind.startsWith('consume_on_equip'));
+  // 本扩展：consume_on_equip_or_delayed（博士投影）在效果落地前保持装备状态，占位并像普通装备一样
+  // 替换已有装备；只有纯 consume_on_equip 才不附着。
+  return !(typeof item?.kind === 'string' && item.kind.startsWith('consume_on_equip')
+    && item.kind !== 'consume_on_equip_or_delayed');
 }
 
 /**
@@ -460,7 +484,10 @@ export function dropIntent(ctx, uid, target) {
       && itemAttaches(ctx.getItem(ctx.pieces.get(uid)?.piece?.id)) && !equipMerges(ctx, uid);
     return { t: 'g.equip', fields: { itemUid: uid, targetUid: occ.piece.uid }, confirmReplace: full };
   }
-  const to = target.area === 'hand' ? { area: 'hand', idx: target.idx } : { area: 'board', row: target.row, col: target.col };
+  // 本扩展：科研位（以及莱茵装置拖回手牌）一律落成 { area: 'research' }，由服务端按装置规则处理。
+  const research = isRhineDevice(ctx.pieces.get(uid)?.piece?.id);
+  const to = target.area === 'research' || (research && target.area === 'hand') ? { area: 'research' }
+    : target.area === 'hand' ? { area: 'hand', idx: target.idx } : { area: 'board', row: target.row, col: target.col };
   return { t: 'g.move', fields: { uid, to } };
 }
 
