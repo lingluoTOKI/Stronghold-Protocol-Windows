@@ -142,7 +142,7 @@ export const closeLoadout = () => loadoutStore.set({ open: false });
  * `msgType` / `field` = the C2S message, `prepare()` → the payload to send (may await data; null = the data is missing:
  * nothing is sent, state 'error'), `lockedText` = what a refused edit tells the player.
  */
-function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, field, prepare, lockedText, tag }) {
+function installPrefSync({ net, cache, timers, target, notify, key, stateKey, msgType, field, prepare, lockedText, tag }) {
   const T = timers || { setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms), clearTimeout: (id) => globalThis.clearTimeout(id) };
   // (`lockedText` is a msgid: the toast is translated when it shows — docs/I18N.md)
   const tell = notify || ((text) => toast(t(text), 'warn'));
@@ -251,10 +251,11 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
  *   timers?: { setTimeout: Function, clearTimeout: Function }, target?: ReturnType<typeof createStore> }} deps
  * @returns {{ flush: () => Promise<void>, dispose: () => void }}
  */
-export function installLoadoutSync({ net, getChessReady, lookupChess, timers, target = loadoutStore, notify } = {}) {
+export function installLoadoutSync({ net, cache, getChessReady, lookupChess, timers, target = loadoutStore, notify } = {}) {
   const ready = getChessReady || (() => data.load('chess'));
   const lookup = lookupChess || ((id) => data.lookup('chess', id));
   return installPrefSync({
+    cache,
     net, timers, target, notify, key: 'entries', stateKey: 'sync', msgType: 'room.loadout', field: 'entries', tag: 'loadout',
     lockedText: N_('本局的干员调配已锁定，修改将在下一局生效'),
     async prepare() {
@@ -278,6 +279,7 @@ export function installLoadoutSync({ net, getChessReady, lookupChess, timers, ta
  */
 export function installOwnershipSync({ net, timers, target = loadoutStore, notify } = {}) {
   return installPrefSync({
+    cache,
     net, timers, target, notify, key: 'notOwned', stateKey: 'ownSync', msgType: 'room.ownership', field: 'notOwned', tag: 'ownership',
     lockedText: N_('干员持有是局外设置，修改将在下一局生效'),
     prepare: async () => cleanIds(target.get().notOwned),
@@ -298,6 +300,7 @@ export function installDiySync({ net, timers, target = loadoutStore, notify } = 
     target.set({ diyKitted: list });
   });
   const sync = installPrefSync({
+    cache,
     net, timers, target, notify, key: 'diy', stateKey: 'diySync', msgType: 'room.diy', field: 'picks', tag: 'diy',
     lockedText: N_('自选编队是局外设置，修改将在下一局生效'),
     prepare: async () => cleanPicks(target.get().diy),

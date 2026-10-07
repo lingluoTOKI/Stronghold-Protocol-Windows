@@ -368,9 +368,9 @@ async function boot() {
   }));
 
   wireNet();
-  installLoadoutSync({ net });
-  installOwnershipSync({ net });
-  installDiySync({ net });
+  installLoadoutSync({ net, cache: data });
+  installOwnershipSync({ net, cache: data });
+  installDiySync({ net, cache: data });
   net.attachBrowserHooks();
   // Audio: unlock on first gesture, BGM follows the route / match phase (js/audio.js).
   installAudio({ getManifest: () => data.get('assets'), subscribe: store.subscribe, getState: store.get, selectRoute, settings: settingsStore.get() });
