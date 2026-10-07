@@ -16,8 +16,8 @@
 // next match, not an error for the player; anything else is logged. `sync` / `ownSync` / `diySync` ∈ 'idle' |
 // 'pending' | 'sending' | 'synced' | 'locked' | 'error' are mirrored into the store for the screen's status line.
 
-import { createStore, loadPref, savePref } from '../store.js';
-import { data } from '../data.js';
+import { createStore, loadPref, savePref, store } from '../store.js';
+import { data, PROFILE_CHANGE } from '../data.js';
 import { LOADOUT_PREF, parseStored, toStored, sanitizeEntries } from './loadoutModel.js';
 import { OWNERSHIP_PREF, parseStoredOwnership, toStoredOwnership, cleanIds, sanitizeNotOwned } from './ownershipModel.js';
 import { DIY_PREF, parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks } from './diyModel.js';
@@ -27,8 +27,10 @@ import { t, N_ } from '../../../shared/i18n.js';
 export const SYNC_DEBOUNCE_MS = 500;
 export const RETRY_MS = 1500;
 
-function readStored() {
-  try { return parseStored(loadPref(LOADOUT_PREF, null)); } catch { return {}; }
+export const loadoutPreferenceKey = (profileId = data.profileId) => profileId === 'vanilla' ? `${LOADOUT_PREF}.vanilla` : LOADOUT_PREF;
+
+function readStored(profileId = data.profileId) {
+  try { return parseStored(loadPref(loadoutPreferenceKey(profileId), null)); } catch { return {}; }
 }
 function readStoredOwnership() {
   try { return parseStoredOwnership(loadPref(OWNERSHIP_PREF, null)); } catch { return []; }
@@ -43,6 +45,7 @@ export const loadoutStore = createStore({
   notOwned: readStoredOwnership(), // 干员持有: base chess ids marked 未持有 (sorted; [] = every operator owned)
   diy: readStoredDiy(), // 自选编队: { [slotBaseId]: { charId, skillIndex?, uniEquipId? } } ({} = every slot empty)
   diyKitted: null,     // the operators a DIY slot may field (welcome.diyKitted; null before the first welcome)
+  profileId: data.profileId,
   open: false,
   from: null,          // 'lobby' | 'room' | 'briefing'
   tab: 'loadout',      // 'loadout' (干员调配) | 'ownership' (干员持有) | 'diy' (自选编队)
@@ -56,7 +59,7 @@ export const loadoutStore = createStore({
 /** Replace the stored entries (persisted at once; the sync picks the change up). */
 export function setEntries(entries) {
   const next = entries && typeof entries === 'object' ? entries : {};
-  savePref(LOADOUT_PREF, toStored(next));
+  savePref(loadoutPreferenceKey(data.profileId), toStored(next));
   loadoutStore.set({ entries: next });
 }
 
@@ -123,6 +126,8 @@ export function applyDiyImport(picks, data, kitted) {
  * @param {'loadout'|'ownership'|'diy'|null} [tab] the tab to show (default: the last one)
  */
 export function openLoadout(from = 'lobby', sel = null, tab = null) {
+  // 本扩展：房间 / 档案准备完成前，overlay 不能编辑或下发新房间的选择。
+  if (from !== 'lobby' && (!store.get().ui.dataReady || !data.isReady('chess', 'bonds', 'config'))) return false;
   data.load('chess');
   data.load('bonds');
   data.load('assets');
@@ -147,6 +152,7 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
   let lastSent = null;    // JSON of the last payload the server accepted (on this session)
   let edited = false;     // an edit is waiting to be sent (a lock refusal is then worth telling the player)
   let disposed = false;
+  let profileId = cache.profileId;
 
   const setState = (sync) => { if (target.get()[stateKey] !== sync) target.set({ [stateKey]: sync }); };
 
@@ -163,6 +169,8 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
   async function flush() {
     if (disposed) return;
     if (net.status !== 'online') { setState('idle'); return; } // the next welcome resends
+    const snapshot = cache.snapshot();
+    const generation = snapshot.generation;
     try {
       const payload = await prepare();
       if (disposed) return;
@@ -210,6 +218,19 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
   });
   // a match leaving INFO_CHECK locks the loadout; a new match (the room back in LOBBY / a new INFO_CHECK) accepts it again
   const offRoom = net.on('room.state', (msg) => { if (msg && !msg.inMatch && target.get()[stateKey] === 'locked') { lastSent = null; schedule(); } });
+  const offProfile = cache.subscribe((name) => {
+    if (name !== PROFILE_CHANGE) return;
+    seq++;
+    pendingJson = null;
+    lastSent = null;
+    if (target === loadoutStore) {
+      savePref(loadoutPreferenceKey(profileId), toStored(target.get().entries));
+      target.set({ entries: readStored(cache.profileId), profileId: cache.profileId, open: false, sel: null,
+        filters: { tier: null, prof: null, bond: null, query: '', changedOnly: false } });
+    }
+    profileId = cache.profileId;
+    schedule(0);
+  });
 
   return {
     flush,
@@ -219,6 +240,7 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
       offWelcome?.();
       offStore?.();
       offRoom?.();
+      offProfile?.();
     },
   };
 }
