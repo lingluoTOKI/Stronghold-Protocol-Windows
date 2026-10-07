@@ -1054,5 +1054,8 @@
   "选择「{name}」的朝向": "Choose {name}'s facing",
   "选择朝向": "Choose a facing",
   "朝向：{dir}": "Facing: {dir}",
-  "开发版 · 不稳定，请勿用于公开服务器": "Development build · unstable, not for public servers"
+  "开发版 · 不稳定，请勿用于公开服务器": "Development build · unstable, not for public servers",
+  "科研位只能放置科研装置": "Only a research device can go in a research slot",
+  "装置已在科研位": "That device is already in a research slot",
+  "需要激活三人莱茵生命盟约": "Requires the three-member Rhine Lab bond to be active"
 }
