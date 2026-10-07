@@ -33,10 +33,12 @@ export function healthReport({ startedAt, network, registry, lobby }) {
  * The request listener for `http.createServer`.
  * @param {{ serveStatic: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse,
  *             rawPath: string, query: string) => Promise<void>,
- *           health: Parameters<typeof healthReport>[0], log: object }} deps
+ *           health: Parameters<typeof healthReport>[0], log: object,
+ *           proxy?: ReturnType<import('./proxy.js').createProxy> | null,
+ *           announcements?: (() => object) | null }} deps
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log }) {
+export function createRequestHandler({ serveStatic, health, log, proxy = null, announcements = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
@@ -47,8 +49,31 @@ export function createRequestHandler({ serveStatic, health, log }) {
       sendError(req, res, 405, '不支持的请求方法 · Method not allowed');
       return;
     }
+    // 本扩展：反向代理模式 —— /api/* 一律转发给中心服务器（在线人数、房间数、公告都以那边为准）。
+    // 注意放在 /healthz 之前、方法闸之后：只转发 GET / HEAD，healthz 始终由本机回答。
+    if (proxy && parts.rawPath.startsWith('/api/')) {
+      proxy.proxyHttp(req, res);
+      return;
+    }
     if (parts.rawPath === '/healthz') {
       sendJson(req, res, 200, healthReport(health));
+      return;
+    }
+    // 本扩展：实时在线人数与房间数（主界面每 5s 轮询 /api/online）。
+    // 代理模式下这两条会先被上面的 /api/* 分支转发走，所以报的是中心服务器的数字。
+    if (parts.rawPath === '/api/online') {
+      sendJson(req, res, 200, { online: Math.max(health.network.connectionCount, 0) });
+      return;
+    }
+    if (parts.rawPath === '/api/status') {
+      sendJson(req, res, 200, {
+        online: Math.max(health.network.connectionCount, 0), activeRooms: health.lobby.stats().matches,
+      });
+      return;
+    }
+    // 本扩展：服务器公告栏（本机 announcements.json，mtime 热更新；缺失即空公告）。
+    if (announcements && parts.rawPath === '/api/announcements') {
+      sendJson(req, res, 200, { ok: true, ...announcements() });
       return;
     }
     await serveStatic(req, res, parts.rawPath, parts.query);

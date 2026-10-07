@@ -21,6 +21,7 @@
 // The server only auto-listens when this file is the process entry point.
 
 import http from 'node:http';
+import path from 'node:path';
 import { getData, loadData } from './data.js';
 import { ROOT, listenAddress, serveDirs, makeLogger, parseTrustProxy } from './http/config.js';
 import { WS_MAX_PAYLOAD, createSessionStack, attachWebSocket } from './http/websocket.js';
@@ -29,11 +30,14 @@ import { createPackRegistry } from './packs.js';
 import { MIME, COMPRESSIBLE, acceptsGzip, parseRange } from './http/files.js';
 import { BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag } from './http/buildTag.js';
 import { createRequestHandler } from './http/routes.js';
+import { createProxy, parseProxyOrigin } from './http/proxy.js';
+import { createAnnouncements } from './http/announcements.js';
 import { answerClientError } from './http/common.js';
 import { lanUrls, isProcessEntry, runMain } from './http/boot.js';
 
 // The public API of this module (tests and tools import it from here); the code lives in ./http/.
 export {
+  parseProxyOrigin,
   ROOT, WS_MAX_PAYLOAD, DATA_SHIM_JS, MIME, COMPRESSIBLE, BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag,
   acceptsGzip, parseRange, createStaticHandler, lanUrls, parseTrustProxy,
 };
@@ -48,6 +52,7 @@ export {
  *   ratePerSec?: number, rateBurst?: number, maxConnections?: number, maxRooms?: number,
  *   maxConnectionsPerAddr?: number, maxRoomsPerAddr?: number, maxMatchesPerAddr?: number, resyncMinGapMs?: number,
  *   heavyPerSec?: number, heavyBurst?: number, trustProxy?: 'auto' | boolean, soloReconnectWindowMs?: number,
+ *   proxyTo?: string,
  * }} [opts]
  * @returns {Promise<{ port: number, host: string, url: string, server: http.Server, wss: import('ws').WebSocketServer,
  *                     lobby: import('./lobby.js').Lobby, network: import('./net.js').Network,
@@ -66,14 +71,20 @@ export async function startServer(opts = {}) {
   const packs = createPackRegistry({ publicDir, dataDir, packsDir }, { log });
   packs.refresh(true);
   const serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, packsDir, packs, log });
+  // 本扩展：反向代理模式（opts.proxyTo 或 SP_PROXY_TO=https://game.example.com）—— 本进程用本机磁盘上的
+  // 客户端与素材，只把 /ws 与 /api/* 转发给中心服务器；/healthz 与静态资源始终由本机回答。
+  const proxyOrigin = parseProxyOrigin(opts.proxyTo ?? process.env.SP_PROXY_TO);
+  const proxy = proxyOrigin ? createProxy({ origin: proxyOrigin, log, maxPayload: WS_MAX_PAYLOAD }) : null;
+  // 本扩展：服务器公告栏（服务端根目录的 announcements.json，mtime 热更新）。
+  const announcements = createAnnouncements(path.join(ROOT, 'announcements.json'));
   const startedAt = Date.now();
   // The tag is per process (see buildTag): read the browser runtime once, here, not on every /healthz.
   resetBuildTag();
   buildTag();
 
-  const server = http.createServer(createRequestHandler({ serveStatic, health: { startedAt, network, registry, lobby }, log }));
+  const server = http.createServer(createRequestHandler({ serveStatic, health: { startedAt, network, registry, lobby }, log, proxy, announcements }));
   server.on('clientError', answerClientError);
-  const wss = attachWebSocket(server, { network, log });
+  const wss = attachWebSocket(server, { network, log, proxy });
 
   try {
     await new Promise((resolve, reject) => {
@@ -104,6 +115,7 @@ export async function startServer(opts = {}) {
         server.closeIdleConnections?.();
         setTimeout(() => { server.closeAllConnections?.(); }, 500).unref();
       });
+      try { proxy?.close(); } catch { /* ignore */ }
       try { wss.close(); } catch { /* ignore */ }
     })();
     return closing;
