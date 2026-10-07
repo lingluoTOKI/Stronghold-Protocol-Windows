@@ -54,7 +54,18 @@ const NODE_PIN = Object.freeze({
 });
 
 /** 这几份不进版本库（npm / tools/setup.mjs 生成），但必须进包，否则游戏缺素材或缺前端库。 */
-const ASSET_DIRS = ['public/assets', 'public/fonts', 'public/vendor'];
+export const ASSET_DIRS = ['public/assets', 'public/fonts', 'public/vendor'];
+
+/**
+ * 同样是「不进版本库、但缺了游戏就跑不起来」的**单个文件**。
+ *
+ * `data/local-assets.json` 是客户端 `GAME_FILES` 里 `local` 那一项的来源（请求 `/data/local-assets.json`）：
+ * 它是「本机美术」的索引，内容全是 `/assets/local/...` 这种 **Web 路径**（没有任何本机绝对路径），
+ * 而它索引的 `public/assets/local` 本来就在包里。少了它，房间页的数据档案永远到不了 ready ——
+ * 表现就是**能进房间、但「准备就绪」一直点不动**（`room.js` 的 `controlsReady` 需要 `ui.dataReady`；
+ * `dataProfile.js` 会把缺文件记成 `模拟数据载入失败：local`）。
+ */
+export const ASSET_FILES = ['data/local-assets.json'];
 
 /** 版本库里有、但便携包默认不要的（--with-tests 可加回）。 */
 const SKIP_TRACKED = ['test/'];
@@ -519,6 +530,20 @@ async function main() {
     // eslint-disable-next-line no-await-in-loop
     const s = await copyDir(path.join(ROOT, d), path.join(appDir, d));
     assetFiles += s.files; assetBytes += s.bytes;
+  }
+  // 单个的文件（见 ASSET_FILES）：不是目录，所以单独拷；缺了就直接报错，别打出一个「进房间点不动准备」的包
+  for (const f of ASSET_FILES) {
+    const src = path.join(ROOT, f);
+    if (!fs.existsSync(src)) {
+      throw new Error(`缺少 ${f} —— 客户端 GAME_FILES 需要它，缺了房间数据档案永远到不了 ready（准备按钮点不动）`);
+    }
+    const dst = path.join(appDir, f);
+    // eslint-disable-next-line no-await-in-loop
+    await fsp.mkdir(path.dirname(dst), { recursive: true });
+    // eslint-disable-next-line no-await-in-loop
+    await fsp.copyFile(src, dst);
+    // eslint-disable-next-line no-await-in-loop
+    assetFiles += 1; assetBytes += (await fsp.stat(dst)).size;
   }
   console.log(`    完成：${assetFiles} 个文件 / ${MB(assetBytes)}`);
 
