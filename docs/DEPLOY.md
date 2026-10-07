@@ -198,6 +198,45 @@ server {
 
 https / wss 说明：页面通过 https 打开时客户端自动连接 `wss://同一域名/ws`；http 时用 `ws://`。服务器本身只提供 http，证书由代理 / 隧道负责。代理与服务器在同一台机器或内网时，`TRUST_PROXY=auto` 会信任它的 `X-Forwarded-For` / `X-Real-IP`；代理在公网另一台机器上时设 `TRUST_PROXY=1`（同时确保游戏端口只对代理开放）。
 
+### 可选：把 `/data` 与 `/vendor` 也分流到 OSS
+
+素材已经走 OSS（`public/js/assets.js` 的 `rewriteAssetUrl`），但开局要拉的东西不止素材：`/data/*.json`
+（gzip 后约 0.8 MB）和 `/vendor/*`（约 2.8 MB）仍然从这台机器过。窄带宽的轻量服务器上，这部分就要几十秒，
+而 WebSocket 对战和它抢同一条出口（实测出口只有 17–105 KB/s）。
+
+让代理把这两个前缀 **302** 到 OSS，客户端一行都不用改：
+
+```nginx
+    # 放在 `location /` 之前。用 302 而不是 301：301 会被浏览器永久记住，将来想改回本地很麻烦。
+    location ~ ^/(data|vendor)/ {
+        return 302 https://weishuxieyi-game-res.oss-cn-shanghai.aliyuncs.com$request_uri;
+    }
+```
+
+**加之前必须先确认 OSS 上已有这些文件**，否则整站会从「慢」变成「打不开」（404）：
+
+```bash
+curl -o /dev/null -s -w '%{http_code}\n' -e https://你的域名/ \
+  https://weishuxieyi-game-res.oss-cn-shanghai.aliyuncs.com/data/assets.json    # 期望 200
+```
+
+上传用 `ossutil`（仓库自带 `ossutil-v1.7.19-windows-amd64/`，先 `ossutil config` 填 AccessKey）：
+
+```bash
+OSS=oss://weishuxieyi-game-res
+# 数据每次发版都会变，绝不能长缓存，否则玩家一年都拿旧数据
+ossutil cp -r data/           $OSS/data/   --meta Cache-Control:no-cache
+# 前端库内容稳定，可以长缓存
+ossutil cp -r public/vendor/  $OSS/vendor/ --meta Cache-Control:max-age=31536000
+```
+
+**每次改过 `data/` 或升级依赖后，都要重跑上面的 `ossutil cp`**，否则玩家拿到的还是 OSS 上的旧文件。
+
+**不要**把 `/js/` 和 `/css/` 也指过去。它们每次发版都变，OSS 上的那份一旦落后，页面会加载到旧模块，
+而 `/healthz` 报的 build 标记是新的 —— `public/js/ui/buildGuard.js` 会判定「页面过期」并自动刷新，
+刷新后仍旧模块，于是**反复刷新停不下来**。这两个留在本地，靠 gzip 传输即可。
+
+
 ## 3. Docker
 
 ```bash

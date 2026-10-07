@@ -67,3 +67,6 @@ stronghold.service
 ossutil*/
 ossutil64.exe
 ossutilconfig
+
+# --- 本地跑测试时的临时目录（本机 %TEMP% 不可写时用 .testtmp 顶上） ----------------------
+.testtmp/
