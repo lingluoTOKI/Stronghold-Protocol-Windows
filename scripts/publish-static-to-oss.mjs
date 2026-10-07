@@ -1,17 +1,13 @@
 #!/usr/bin/env node
-// scripts/publish-static-to-oss.mjs — 把「由 nginx 302 到 OSS」的那些静态目录同步到 OSS。
+// scripts/publish-static-to-oss.mjs — 把「由 nginx 302 到 OSS」的静态目录同步到 OSS。
 //
 //   node scripts/publish-static-to-oss.mjs [--ossutil <path>] [--bucket <name>] [--dry-run] [--check]
 //
-// 背景（docs/DEPLOY.md「把静态资源分流到 OSS」）：线上 nginx 把 /data、/vendor、/js、/css 四个前缀
-// 302 到阿里云 OSS，客户端因此不再从服务器的窄出口带宽取这些东西。代价是**每次发版都必须重跑本脚本**：
+// 背景（docs/DEPLOY.md「把静态资源分流到 OSS」）：线上 nginx 把 /data 与 /vendor 两个前缀 302 到阿里云
+// OSS，客户端因此不再从服务器的窄出口带宽取这两块。代价是**每次改过它们都要重跑本脚本**：
+// /data 里的对局数据随发版改变，OSS 上那份一旦落后，玩家拿到的就是旧数据。
 //
-//   * /js 与 /css 每次发版都变。OSS 上那份一旦落后，玩家会**静默地一直跑旧代码** —— 不是刷新循环
-//     （新页面首次 /healthz 检查就会把当前 build 标记认作「我这一版」，不会反复刷新），而是谁都
-//     不会发现：build 标记来自服务器的磁盘，代码却来自 OSS，两者对不上时没有任何一方会报错。
-//   * /data 与 /vendor 变得少，但改过就需要同步。
-//
-// 为什么逐个文件显式指定目标 key，而不是 `ossutil cp -r <dir> oss://bucket/`：后者的行为是把源目录的
+// 为什么逐文件显式指定目标 key，而不是 `ossutil cp -r <dir> oss://bucket/`：后者的行为是把源目录的
 // **内容**倒进目标前缀，不是把目录本身放进去 —— 少写一级前缀就会把文件撒到 bucket 根目录（踩过）。
 //
 // Ossutil 只负责搬运，凭据留在它自己的配置里（`ossutil config`），本脚本不接触、也不打印密钥。
@@ -26,18 +22,22 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 /**
  * 需要同步的目录：本地路径 → OSS 键前缀、缓存策略。
  *
- * Cache-Control 的取舍：/vendor 是第三方库，内容稳定，长缓存；/data、/js、/css 都会随发版改变，
- * 必须 `no-cache`（浏览器仍会带 If-None-Match 回源校验，内容没变就是一次 304），否则改完之后
- * 玩家要等缓存过期才拿得到新版本。
+ * `/js`、`/css`、`/shared`、`/sim` **故意不在这里**。ES 模块的相对说明符是按「导入方模块自己的 URL」
+ * 解析的，而 `public/js/` 里的模块大量 import `../../shared/*.js`、`/sim/*.js`（`audio.js`、
+ * `net.js`、`render/*`、`ui/*` 都有）。一旦 `/js/` 被 302 到 OSS，这些相对路径就解析成
+ * `https://<bucket>.oss-…/shared/…` —— bucket 上根本没有，模块图当场断裂，页面报「游戏脚本加载失败」。
+ * 要迁 `/js` 就必须把 `/shared`、`/sim`（以及 `/vendor`）一并放上 OSS 并一起 302，
+ * 让整个模块图落在同一个源上；少一个就是一个必然踩中的 404。见 docs/DEPLOY.md。
+ *
+ * Cache-Control 的取舍：/vendor 是第三方库，内容稳定，长缓存；/data 随发版改变，用 `no-cache`
+ *（浏览器仍会带 If-None-Match 回源校验，内容没变就是一次 304），否则改完之后玩家要等缓存过期。
  */
 const TREES = Object.freeze([
   { dir: 'data', prefix: 'data', cache: 'no-cache' },
   { dir: 'public/vendor', prefix: 'vendor', cache: 'max-age=31536000' },
-  { dir: 'public/js', prefix: 'js', cache: 'no-cache' },
-  { dir: 'public/css', prefix: 'css', cache: 'no-cache' },
 ]);
 
-const HELP = `node scripts/publish-static-to-oss.mjs — 把 /data /vendor /js /css 同步到 OSS
+const HELP = `node scripts/publish-static-to-oss.mjs — 把 /data 与 /vendor 同步到 OSS
 
   --ossutil <path>   ossutil 可执行文件（默认在 PATH 里找 ossutil / ossutil64，以及仓库内的
                      ossutil-v1.7.19-windows-amd64/ossutil64.exe）
@@ -46,7 +46,7 @@ const HELP = `node scripts/publish-static-to-oss.mjs — 把 /data /vendor /js /
   --dry-run          只打印将要执行的上传，不真的传
   -h, --help         显示这段说明
 
-发版流程里**必须**包含这一步，否则玩家跑的还是 OSS 上的旧前端代码。见 docs/DEPLOY.md。
+只同步 /data 与 /vendor：/js、/css 不能单独迁到 OSS，理由见本文件 TREES 上方的注释与 docs/DEPLOY.md。
 `;
 
 function parseArgs(argv) {
