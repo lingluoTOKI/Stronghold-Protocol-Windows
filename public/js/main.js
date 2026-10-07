@@ -33,12 +33,13 @@
 import './ui/compat.js';
 import { render } from '../vendor/preact.module.js';
 import { useErrorBoundary } from '../vendor/hooks.module.js';
-import { html, UiHosts, Button, MicroLabel, closeAllDialogs } from './ui/components.js';
+import { html, UiHosts, Button, MicroLabel, Spinner, closeAllDialogs } from './ui/components.js';
 import { ConnectionBanner } from './ui/connBanner.js';
 import { ToastHost, toast, toastError, describeError } from './ui/toasts.js';
 import { net, identity, NetError } from './net.js';
 import { store, useStore, emptyMatch, selectRoute, sessionResetNotice, isSpectating } from './store.js';
-import { data } from './data.js';
+import { data, CORE_DATA_FILES } from './data.js';
+import { createDataProfilePreparation, profileFromState } from './ui/dataProfile.js';
 import { GAME_FILES } from './ui/gameComponents.js';
 import { TitleScreen, sanitizeName } from './screens/title.js';
 import { LobbyScreen, rememberRoom, parseRoomParam } from './screens/lobby.js';
@@ -58,6 +59,7 @@ const RESTORE_GRACE_MS = 1500;
 const JOIN_DELAY_MS = 350;
 const TICKER_KEEP = 20;
 const EMOTE_KEEP = 20;
+const CHAT_KEEP = 20; // 聊天本地保留条数（自加）
 
 const SCREENS = { title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen };
 
@@ -85,6 +87,11 @@ let matchAt = 0;
 let restoreTimer = null;
 let joinTimer = null;
 let joinInFlight = false;
+let pushOrder = 0;
+let publicOrder = 0;
+let roomOrder = 0;
+const prepareDataProfile = createDataProfilePreparation({ cache: data, target: store,
+  files: [...new Set([...CORE_DATA_FILES, ...GAME_FILES])] });
 
 function clearPendingJoin() {
   store.patch('ui', { pendingJoin: null });
@@ -134,6 +141,8 @@ function maybeFinishRestore() {
  */
 function backToLobby() {
   clearTimeout(restoreTimer);
+  publicOrder = 0;
+  roomOrder = ++pushOrder;
   const s = store.get();
   if (s.room || s.match.public) closeAllDialogs();
   store.set({ room: null, match: emptyMatch(), ticker: [], emotes: [] });
@@ -147,6 +156,9 @@ function onWelcome(msg) {
   const name = typeof msg.name === 'string' && msg.name ? msg.name : prev.me.name;
   store.set({ me: { playerId: msg.playerId ?? null, name, token: typeof msg.token === 'string' ? msg.token : null } });
   welcomeAt = Date.now();
+  // Only pushes from this connection can prove that m.public preceded the restored room.state.
+  publicOrder = 0;
+  roomOrder = ++pushOrder;
 
   if (prevId != null && prevId !== msg.playerId) {
     // A brand-new server session (the server restarted — crashed / killed, so no room.closed arrived — or this session
@@ -172,6 +184,8 @@ function onWelcome(msg) {
 
 function onRoomState(msg) {
   const room = payload(msg);
+  const publicArrivedFirst = publicOrder > roomOrder;
+  roomOrder = ++pushOrder;
   roomStateAt = Date.now();
   const myId = store.get().me.playerId;
   const seats = Array.isArray(room.seats) ? room.seats : [];
@@ -183,7 +197,9 @@ function onRoomState(msg) {
   }
   const prevRoom = store.get().room;
   // A (new) match starts: forget the previous match's state so stale results never show.
-  if (room.inMatch && !(prevRoom && prevRoom.inMatch && prevRoom.code === room.code)) store.set({ match: emptyMatch() });
+  if (room.inMatch && !(prevRoom && prevRoom.inMatch && prevRoom.code === room.code) && !publicArrivedFirst) store.set({ match: emptyMatch() });
+  const currentPublic = room.inMatch ? store.get().match.public : null;
+  void prepareDataProfile(currentPublic?.rhineEnabled ?? room.rhineEnabled);
   store.set({ room });
   if (room.mode === 'coop' && typeof room.code === 'string') rememberRoom(room.code);
   maybeFinishRestore();
@@ -216,7 +232,13 @@ function wireNet() {
     const known = Object.hasOwn(CLOSE_REASON, String(msg.reason)) ? CLOSE_REASON[msg.reason] : null;
     toast(known ? t(known) : typeof msg.reason === 'string' && msg.reason.length < 60 ? t('同盟已关闭：{reason}', { reason: msg.reason }) : t('同盟已关闭'), 'warn');
   });
-  net.on('m.public', (msg) => { matchAt = Date.now(); store.patch('match', { public: payload(msg) }); maybeFinishRestore(); });
+  net.on('m.public', (msg) => {
+    matchAt = Date.now();
+    publicOrder = ++pushOrder;
+    void prepareDataProfile(msg.rhineEnabled);
+    store.patch('match', { public: payload(msg) });
+    maybeFinishRestore();
+  });
   net.on('m.private', (msg) => { matchAt = Date.now(); store.patch('match', { private: payload(msg) }); });
   net.on('m.field', (msg) => store.patch('match', { field: payload(msg) }));
   net.on('m.result', (msg) => store.patch('match', { result: payload(msg) }));
@@ -239,12 +261,16 @@ function wireNet() {
   net.on('m.emote', (msg) => {
     store.set((s) => ({ emotes: [...s.emotes.slice(-(EMOTE_KEEP - 1)), { seq: ++seq, playerId: msg.playerId, id: msg.id, at: Date.now() }] }));
   });
+  net.on('m.chat', (msg) => {
+    if (typeof msg.text !== 'string') return;
+    store.set((s) => ({ chat: [...s.chat.slice(-(CHAT_KEEP - 1)), { seq: ++seq, playerId: msg.playerId, name: msg.name, text: msg.text, at: Date.now() }] }));
+  });
 
   // Entering (title → lobby) while already online also needs the deep-link join.
   store.subscribe((s, prev) => {
     if (s.session.entered && !prev.session.entered) schedulePendingJoin();
     // in a room (co-op or solo, also a resumed one) a match is near: its data starts downloading
-    if (s.room && !prev.room) warmGameData();
+    if (s.room && (!prev.room || s.room.rhineEnabled !== prev.room.rhineEnabled)) warmGameData();
   });
 }
 
@@ -256,9 +282,7 @@ function wireNet() {
  * data store shares each file's promise).
  */
 function warmGameData() {
-  const go = () => { data.loadAll(GAME_FILES).catch(() => {}); };
-  if (typeof globalThis.requestIdleCallback === 'function') globalThis.requestIdleCallback(go, { timeout: 2500 });
-  else setTimeout(go, 600);
+  return prepareDataProfile(profileFromState(store.get()));
 }
 
 // ---- UI chrome (the connection banner lives in ui/connBanner.js) -----------------------------------
@@ -276,12 +300,17 @@ function ScreenCrashed({ error, reset }) {
 
 function App() {
   const route = useStore(selectRoute);
+  const dataReady = useStore((s) => s.ui.dataReady);
+  const dataError = useStore((s) => s.ui.dataError);
   useLang(); // a language switch re-renders the whole tree in place
   const [error, resetError] = useErrorBoundary((err) => console.error('[ui] screen crashed', err));
   const Screen = SCREENS[route] || LobbyScreen;
   return html`<div class="app-root">
     <div class="app-bg" aria-hidden="true"></div>
-    ${error ? html`<${ScreenCrashed} error=${error} reset=${resetError} />` : html`<${Screen} key=${route} />`}
+    ${error ? html`<${ScreenCrashed} error=${error} reset=${resetError} />`
+      : route === 'game' && !dataReady ? html`<div class="screen gload"><${Spinner} size="lg" label="LOADING DATA" />
+          <p class="t-lo" role="status">${dataError || '正在载入本局模拟数据…'}</p></div>`
+      : html`<${Screen} key=${route} />`}
     <${ConnectionBanner} />
     <${ToastHost} />
     <${UiHosts} />

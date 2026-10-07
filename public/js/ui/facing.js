@@ -14,6 +14,7 @@
 
 import { GEO } from '../../../shared/constants.js';
 import { attackRangeGrid } from '../../../shared/loadoutRecord.js';
+import { researchRange } from '../../../shared/rhineRange.js';
 import { N_ } from '../../../shared/i18n.js';
 
 export const DIRS = Object.freeze(['UP', 'RIGHT', 'DOWN', 'LEFT']);
@@ -142,6 +143,8 @@ export const pieceDir = (piece) => normDir(isObj(piece) ? piece.dir : null);
  */
 export function previewGrid(lookups, piece) {
   if (!isObj(piece) || !lookups) return null;
+  const research = researchRange(piece);
+  if (research) return research.grid;
   let rec = null;
   if (piece.kind === 'chess') {
     rec = lookups.getChess?.(piece.id);
@@ -233,6 +236,7 @@ export function underframeActions(ctx, uid) {
 export function retreatSlot(ctx, uid) {
   const e = ctx?.pieces?.get(uid);
   if (!e || e.area !== 'board') return null;
+  if (e.piece.research || String(e.piece.id).startsWith('token_rhine_')) return { area: 'research' };
   for (let i = 0; i < GEO.HAND_SIZE; i++) if (!ctx.handAt?.has(i)) return { area: 'hand', idx: i };
   if (e.piece.kind === 'token') return { area: 'hand', idx: 0 };
   for (const [i, h] of ctx.handAt || []) {
