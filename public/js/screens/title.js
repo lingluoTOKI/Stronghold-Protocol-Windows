@@ -219,7 +219,7 @@ export function BulletinButton() {
       onClick=${() => { const n = !open; setOpen(n); if (n) markSeen(); }} aria-expanded=${open}>
     <//>
     <${Modal} open=${open} onClose=${() => setOpen(false)} title="服务器更新公告"
-      micro="SERVER BULLETIN" width="min(24rem, 90vw)" class="bulletin-modal-box">
+      micro="SERVER BULLETIN" class="bulletin-modal-box">
       ${failed ? html`<div class="bulletin-modal__empty">暂无法连接公告服务</div>` : null}
       ${!failed && !data ? html`<div class="bulletin-modal__empty">加载中…</div>` : null}
       <div class="bulletin-modal__when">最近更新：${(data && data.updatedAt) || '—'}</div>
