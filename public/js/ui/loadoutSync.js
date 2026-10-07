@@ -24,6 +24,10 @@ import { DIY_PREF, parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks } f
 import { toast } from './toasts.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
+// 本扩展：双档案数据仓。合并时部分函数的 cache 参数接线丢失（P0 遗留），
+// 这里给模块级兜底 —— 函数自带 cache 参数时参数优先（遮蔽本声明）。
+const cache = data;   // 双档案兜底
+
 export const SYNC_DEBOUNCE_MS = 500;
 export const RETRY_MS = 1500;
 
