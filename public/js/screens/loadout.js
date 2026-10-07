@@ -216,6 +216,7 @@ export function ModuleInfo({ m, golden, opt }) {
   return html`<div class="lo-minfo">
     <div class="lo-minfo__title"><${Img} src=${moduleIconOf(m, rec)} class="lo-minfo__icon" /><span class="lo-minfo__type num">${rec.typeName || ''}</span><b>${rec.name || rec.uniEquipId}</b>
       ${opt.isDefault ? html`<span class="lo-badge lo-badge--def">${t('默认')}</span>` : null}</div>
+    ${rec.scopeNote ? html`<p class="lo-minfo__lead">${rec.scopeNote}</p>` : null}
     <div class="lo-minfo__row">
       <span class="lo-minfo__k">${t('属性')}</span>
       <span class="lo-minfo__v lo-attrs">${rows.length ? rows.map((r) => html`<span key=${r.key} class=${cx('lo-attr', r.positive ? 'is-up' : 'is-down')}>${r.label}<b class="num">${r.text}</b></span>`) : html`<span class="t-dim">${t('无属性加成')}</span>`}</span>
@@ -433,7 +434,8 @@ export function DataMissing({ files }) {
 
 /** The overlay screen. */
 function LoadoutScreen({ st }) {
-  const ready = useData('chess', 'bonds', 'assets', 'local', 'backups');
+  const settled = useData('chess', 'bonds', 'assets', 'local', 'backups');
+  const ready = settled && data.isReady('chess', 'bonds');
   const phase = useStore((s) => s.match?.public?.phase || null);
   const inMatch = useStore((s) => !!s.room?.inMatch);
   // co-op briefing (INFO_CHECK, 25 s): the overlay covers the briefing's own countdown, so it shows the time left — the
@@ -442,7 +444,7 @@ function LoadoutScreen({ st }) {
   const m = data.get('assets');
   const getChess = (id) => data.lookup('chess', id);
   const getBond = (id) => data.lookup('bonds', id);
-  const roster = useMemo(() => rosterOf(data.list('chess')), [ready, data.locale()]); // (names follow a language switch)
+  const roster = useMemo(() => rosterOf(data.list('chess')), [ready, data.generation, data.locale()]);
   const bonds = useMemo(() => {
     const used = new Set(roster.flatMap((c) => c.bonds || []));
     return (data.list('bonds') || []).filter((b) => b && used.has(b.bondId))
@@ -721,7 +723,7 @@ export function badgeCount(entries, getChess) {
  * Entry button (lobby / room / briefing).
  * @param {{ from: 'lobby'|'room'|'briefing', size?: string, variant?: string, class?: string, label?: string }} props
  */
-export function LoadoutButton({ from, size = 'md', variant = 'secondary', class: cls, label = t('干员调配') }) {
+export function LoadoutButton({ from, size = 'md', variant = 'secondary', class: cls, label = t('干员调配'), disabled = false }) {
   useData('local'); // the official preset icon (re-render once the local-art manifest arrives)
   const entries = useStore((s) => s.entries, Object.is, loadoutStore);
   const notOwned = useStore((s) => s.notOwned, Object.is, loadoutStore);
@@ -732,7 +734,7 @@ export function LoadoutButton({ from, size = 'md', variant = 'secondary', class:
   // 0.2.0 自选编队: how many DIY slots the player filled
   const nDiy = diyCount(diy);
   return html`<button type="button" class=${cx('btn', `btn--${variant}`, `btn--${size}`, 'lo-entry', cls)} data-testid="loadout-open"
-      onClick=${() => openLoadout(from)} title=${t('调整干员携带的技能与模组 · 干员持有')}>
+      disabled=${disabled} onClick=${() => !disabled && openLoadout(from)} title=${t('调整干员携带的技能与模组 · 干员持有')}>
     <${Img} src=${localAsset('ui/outer', 'operator_preset')} class="lo-entry__icon" fallback=${html`<${Icon} name="edit" class="btn__icon" />`} />
     <span class="btn__label">${label}</span>
     ${n ? html`<span class="lo-entry__n num" aria-label=${t('{n} 名干员已调整', { n })}>${n}</span>` : null}
