@@ -377,7 +377,7 @@ export function bundleReadme({ version, withNode = true }) {
 
 **联网时**页面会去 Google Fonts 取中文字体（Noto Sans SC）；**断网**时自动退回系统自带的黑体，
 和没有代理时上 Google 的效果一致，所以**不联网也能玩**。玩家头像、立绘、Spine 小人、技能图标、
-音效与 BGM 由阿里云 OSS 分发，联网时加载快得多；OSS 取不到时游戏会自动改用本机服务器自带的素材。
+音效与 BGM 全部由本机服务器自带提供，不需要访问任何外部服务。
 
 ## 关于本项目（务必先读）
 

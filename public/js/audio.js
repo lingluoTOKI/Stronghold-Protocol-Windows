@@ -48,7 +48,6 @@
 
 import { PHASE } from '../../shared/constants.js';
 import { mediaUrl } from './media.js';
-import { rewriteAssetUrl, disableOss, ossEnabled } from './assets.js';
 
 const MAX_VOICES = 8;
 const UNIT_COOLDOWN_MS = 160;
@@ -613,50 +612,40 @@ export class AudioManager {
   /** Fetch + decode (cached, LRU). Resolves null on failure. */
   _buffer(url) {
     if (!this.ctx || typeof url !== 'string' || !url) return Promise.resolve(null);
-    // Static audio lives on OSS (assets.js rewriteAssetUrl): rewrite the manifest's /assets/ path before the fetch,
-    // keep the original as the cache key so callers (already rewritten URLs) and unrewritten ones share one buffer.
-    const raw = url;
-    const s = rewriteAssetUrl(raw);
-    const hit = this.buffers.get(s);
+    const hit = this.buffers.get(url);
     if (hit) {
-      this.buffers.delete(s);
-      this.buffers.set(s, hit);
+      this.buffers.delete(url);
+      this.buffers.set(url, hit);
       return hit;
     }
-    // Fetch + decode one URL. Throws on a transport / HTTP failure (the caller decides whether to fall back).
-    const grab = async (target) => {
-      // Extension-less URL first so download managers leave the BGM alone; a host without /media/ still works.
-      const media = mediaUrl(target);
-      let res = await fetch(media);
-      if (media !== target && !isAudioResponse(res)) {
-        // Drop the unusable response (404, or a 200 that is really index.html) before trying the original URL.
-        try { await res.body?.cancel?.(); } catch { /* the fallback request matters more than draining this one */ }
-        res = await fetch(target);
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const ab = await res.arrayBuffer();
-      return await new Promise((resolve) => {
-        try {
-          const r = this.ctx.decodeAudioData(ab, resolve, () => resolve(null));
-          if (r && typeof r.then === 'function') r.then(resolve, () => resolve(null));
-        } catch { resolve(null); }
-      });
-    };
     const p = (async () => {
       try {
-        return await grab(s);
+        // Extension-less URL first so download managers leave the BGM alone; a host without /media/ still works.
+        const media = mediaUrl(url);
+        let res = await fetch(media);
+        if (media !== url && !isAudioResponse(res)) {
+          // Drop the unusable response (404, or a 200 that is really index.html) before trying the original URL.
+          try { await res.body?.cancel?.(); } catch { /* the fallback request matters more than draining this one */ }
+          res = await fetch(url);
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const ab = await res.arrayBuffer();
+        return await new Promise((resolve) => {
+          try {
+            const r = this.ctx.decodeAudioData(ab, resolve, () => resolve(null));
+            if (r && typeof r.then === 'function') r.then(resolve, () => resolve(null));
+          } catch { resolve(null); }
+        });
       } catch (err) {
-        // OSS refused (403 / CORS) or is unreachable: take the server's own copy — later URLs go local too
-        if (s === raw || !ossEnabled()) { this._warn(s, err); return null; }
-        disableOss();
-        try { return await grab(raw); } catch (err2) { this._warn(raw, err2); return null; }
+        this._warn(url, err);
+        return null;
       }
     })();
-    this.buffers.set(s, p);
+    this.buffers.set(url, p);
     p.then((buf) => {
       if (!buf) return;
       try {
-        this.bufBytes.set(s, (buf.length || 0) * (buf.numberOfChannels || 1) * 4);
+        this.bufBytes.set(url, (buf.length || 0) * (buf.numberOfChannels || 1) * 4);
         this._trimBuffers();
       } catch { /* ignore */ }
     }, () => {});

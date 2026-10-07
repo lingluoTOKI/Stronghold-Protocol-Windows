@@ -63,10 +63,5 @@ stronghold.service
 # （它们指向 scripts/launcher.mjs，供直接在仓库里运行）。便携包根目录的那一份由
 # scripts/make-windows-bundle.mjs 自己生成，因此打包时会跳过这三个（见 SKIP_ROOT_FILES）。
 
-# --- OSS 上传工具（本地工具，不进 git） -------------------------------------------------
-ossutil*/
-ossutil64.exe
-ossutilconfig
-
 # --- 本地跑测试时的临时目录（本机 %TEMP% 不可写时用 .testtmp 顶上） ----------------------
 .testtmp/
