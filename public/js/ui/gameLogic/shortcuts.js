@@ -10,8 +10,8 @@ import { isObj } from './shared.js';
 export const HOTKEY_ACTIONS = Object.freeze(['refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'buy', 'chat', 'speed', 'ready']);
 
 /** Default key of each action (a KeyboardEvent.code): the keys of 0.1.4, so nothing changes for a player who never rebinds. */
-// 本扩展：sell 用 S、X 留给战斗加速，另加 buy（购买）与 chat（聊天）。
-export const DEFAULT_HOTKEYS = Object.freeze({ refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyS', buy: 'KeyB', chat: 'KeyE', speed: 'KeyX', ready: 'Space' });
+// 本扩展新增 buy（购买）/ chat（聊天）/ speed（战斗加速）；上游的 0.1.4 默认键位保持不变。
+export const DEFAULT_HOTKEYS = Object.freeze({ refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', buy: 'KeyB', chat: 'KeyE', speed: 'KeyV', ready: 'Space' });
 
 // The keys a shortcut may use → the `key` value each types on a US layout (lower case): letters, digits, Space, the
 // punctuation keys, and six named keys whose `key` equals their `code`. Everything else stays with the interface: Esc

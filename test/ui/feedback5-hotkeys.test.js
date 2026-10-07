@@ -30,9 +30,9 @@ const rebound = { ...DEFAULT_HOTKEYS, retreat: 'KeyW' };
 
 describe('the key map: defaults and labels', () => {
   test('the defaults are the keys of 0.1.4 (R / F / D / Q / X / Space), in the settings order', () => {
-    assert.deepEqual([...HOTKEY_ACTIONS], ['refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'ready']);
-    assert.deepEqual({ ...DEFAULT_HOTKEYS }, { refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' });
-    assert.deepEqual(HOTKEY_ACTIONS.map((a) => hotkeyLabel(DEFAULT_HOTKEYS[a])), ['R', 'F', 'D', 'Q', 'X', 'Space']);
+    assert.deepEqual([...HOTKEY_ACTIONS], ['refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'buy', 'chat', 'speed', 'ready']);
+    assert.deepEqual({ ...DEFAULT_HOTKEYS }, { refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', buy: 'KeyB', chat: 'KeyE', speed: 'KeyV', ready: 'Space' });
+    assert.deepEqual(HOTKEY_ACTIONS.map((a) => hotkeyLabel(DEFAULT_HOTKEYS[a])), ['R', 'F', 'D', 'Q', 'X', 'B', 'E', 'V', 'Space']);
     assert.ok(Object.isFrozen(DEFAULT_HOTKEYS) && Object.isFrozen(HOTKEY_ACTIONS));
     assert.equal(DEFAULT_SETTINGS.keys, DEFAULT_HOTKEYS, 'the settings default is the same map');
     assert.deepEqual(sanitizeSettings(null).keys, { ...DEFAULT_HOTKEYS });
