@@ -400,7 +400,87 @@ export function createDataStore(opts = {}) {
 }
 
 /** Browser data store singleton. */
-export const data = createDataStore();
+export const SHARED_DATA_FILES = Object.freeze(['assets', 'local', 'emotes']);
+export const CORE_DATA_FILES = Object.freeze(['bands', 'bonds', 'bosses', 'chess', 'choices', 'config', 'effects',
+  'enemies', 'factions', 'garrisons', 'items', 'stages', 'tokens', 'tuning', 'waves']);
+export const PROFILE_CHANGE = '$profile';
+export const dataProfileId = (enabled) => enabled === false || enabled === 'vanilla' ? 'vanilla' : 'rhine';
+
+/**
+ * Stable facade over isolated caches. Selecting a profile immediately hides the old records. An old request may
+ * finish into its own cache, but cannot announce itself to the current profile's subscribers. A snapshot keeps a
+ * single profile throughout asynchronous preparation (the caller checks generation before using its result).
+ */
+export function createProfiledDataStore(opts = {}) {
+  const shared = createDataStore({ ...opts, base: opts.base ?? '/data/' });
+  const profiles = {
+    rhine: createDataStore({ ...opts, base: opts.base ?? '/data/' }),
+    vanilla: createDataStore({ ...opts, base: opts.vanillaBase ?? '/data/vanilla/' }),
+  };
+  let profileId = dataProfileId(opts.profile);
+  let generation = 0;
+  const listeners = new Set();
+  const notify = (name) => {
+    for (const fn of [...listeners]) {
+      try { fn(name); } catch (err) { console.error('[data] listener failed', err); }
+    }
+  };
+  const storeFor = (name, id = profileId) => SHARED_DATA_FILES.includes(name) ? shared : profiles[id];
+  const readyIn = (names, id) => names.flat().every((name) => {
+    const status = storeFor(name, id).status(name);
+    return status === 'ready' || (SHARED_DATA_FILES.includes(name) && status === 'missing');
+  });
+  shared.subscribe(notify);
+  for (const [id, target] of Object.entries(profiles)) target.subscribe((name) => { if (id === profileId) notify(name); });
+
+  return {
+    get profileId() { return profileId; },
+    get generation() { return generation; },
+    selectProfile(enabled) {
+      const next = dataProfileId(enabled);
+      if (next === profileId) return false;
+      profileId = next;
+      generation++;
+      notify(PROFILE_CHANGE);
+      return true;
+    },
+    load: (name) => storeFor(name).load(name),
+    loadAll: (...names) => Promise.all(names.flat().map((name) => storeFor(name).load(name))),
+    get: (name) => storeFor(name).get(name),
+    status: (name) => storeFor(name).status(name),
+    lookup: (name, id) => storeFor(name).lookup(name, id),
+    list: (name) => storeFor(name).list(name),
+    invalidate: (name) => storeFor(name).invalidate(name),
+    isReady: (...names) => readyIn(names, profileId),
+    snapshot() {
+      const id = profileId, capturedGeneration = generation;
+      return {
+        profileId: id,
+        generation: capturedGeneration,
+        load: (name) => storeFor(name, id).load(name),
+        loadAll: (...names) => Promise.all(names.flat().map((name) => storeFor(name, id).load(name))),
+        get: (name) => storeFor(name, id).get(name),
+        status: (name) => storeFor(name, id).status(name),
+        lookup: (name, key) => storeFor(name, id).lookup(name, key),
+        getRaw: (name) => storeFor(name, id).getRaw(name),
+        lookupRaw: (name, key) => storeFor(name, id).lookupRaw(name, key),
+        list: (name) => storeFor(name, id).list(name),
+        isReady: (...names) => readyIn(names, id),
+      };
+    },
+    // 上游 0.2.0 的 i18n（docs/I18N.md）：locale 是 data.js 的模块级状态，三个 store 共用同一个，
+    // 所以转发给 shared 就够；get / list / lookup 本来就是按当前档案转发到对应 store 的。
+    getRaw: (name) => storeFor(name).getRaw(name),
+    lookupRaw: (name, id) => storeFor(name).lookupRaw(name, id),
+    locale: () => shared.locale(),
+    localeChain: () => shared.localeChain(),
+    setLocale: (...args) => shared.setLocale(...args),
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  };
+}
+
+/** Browser data facade singleton (rhine / vanilla profiles). */
+export const data = createProfiledDataStore();
 
 /** @param {...string} names @returns {Promise<any[]>} */
 export const loadData = (...names) => data.loadAll(...names);
