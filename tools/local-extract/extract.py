@@ -157,7 +157,7 @@ DERIVED = [
 
 # The board textures every player downloads when a match shows the 3D board (public/js/render/board3d/load.js
 # PACK_IMAGES; D / common_D / BG also feed the 2D board art, render/boardArt.js): (output subdir, name, mode). A WebP
-# copy is written next to the PNG and the manifest lists the copy instead (~ 6.7 MB -> 2.0 MB per cold start); the PNG
+# copy is written next to the PNG and the manifest lists the copy instead (≈ 6.7 MB → 2.0 MB per cold start); the PNG
 # stays for tools/crop-board-atlas.mjs and setup's check. 'lossy' = colour maps at quality 95 with the alpha lossless
 # and the RGB under transparent texels kept (`exact`: the board material is opaque and samples it); 'lossless' =
 # normal and data maps, whose channels hold independent values that lossy WebP's chroma subsampling would mix (a
@@ -201,6 +201,14 @@ def job_parts(job):
     rel, sub, kinds = job[:3]
     keep = re.compile(job[3]) if len(job) > 3 and job[3] else None
     return rel, sub, kinds, keep
+
+
+def wants_sub(only, sub):
+    """Whether output subdir `sub` runs under --only: no prefixes, or one prefix is `sub`, a parent of it or below it."""
+    if not only:
+        return True
+    return any(sub == p.rstrip('/') or sub.startswith(p.rstrip('/') + '/') or p.rstrip('/').startswith(sub + '/')
+               for p in only)
 
 
 def select_jobs(only):
@@ -574,6 +582,7 @@ def export_bundle(ab_root, job, out_root, manifest, log):
         manifest.setdefault(sub, {})[key] = {'path': f'/assets/local/{sub}/{fname}', 'kind': key.capitalize(), 'count': len(payload)}
         n += 1
     n += run_derived(out_root, sub, manifest, log)
+    log(f'{rel}: {n} files -> {sub}')
     k = run_webp(out_root, sub, manifest, log)
     if k:
         log(f'  {k} WebP copies -> {sub}')
