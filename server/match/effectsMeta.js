@@ -41,7 +41,7 @@ import { boardOrder, parseKey, tileKey } from './board.js';
 import { pieceBonds as bondsOfPiece } from './bondsMeta.js';
 import { registerAllMeta } from '../sim/content/index.js';
 import { registerBuiltins } from './builtinMeta.js';
-import { withGameData } from '../sim/content/support/dataScope.js';
+import { msg, dn } from '../../shared/i18n.js';
 
 export const HOOKS = Object.freeze([
   'onRoundStart', 'onIncome', 'onPrepStart', 'onPrepEnd', 'onGain', 'onSold', 'onRefresh', 'onPrice', 'onBuy',
@@ -170,7 +170,7 @@ export class EffectDispatcher {
     if (!fn) return;
     const ctx = makeCtx(this.m, ps, source, hook, ev);
     for (let i = 0; i < repeat; i++) {
-      try { withGameData(this.m.data, () => fn.call(handler, ctx, ev)); } catch (e) { this._report(key, hook, e); }
+      try { fn.call(handler, ctx, ev); } catch (e) { this._report(key, hook, e); }
     }
   }
 
@@ -272,7 +272,7 @@ export class EffectDispatcher {
   _garrisonHooks(h, g) {
     if (typeof h.garrisonHooks === 'function') {
       try {
-        const list = withGameData(this.m.data, () => h.garrisonHooks(g));
+        const list = h.garrisonHooks(g);
         if (Array.isArray(list) && list.length) return list;
       } catch (e) { this._report(`garrison:${g.effectKey}`, 'garrisonHooks', e); }
     }
@@ -280,7 +280,7 @@ export class EffectDispatcher {
   }
 
   _garrisons(ps, hook, ev) {
-    const gd = this.m.gd;
+    const gd = ps.gd || this.m.gd;
     const run = (piece, where) => {
       const rec = gd.chess(piece.id);
       if (!rec || !Array.isArray(rec.garrisonIds)) return;
@@ -314,7 +314,7 @@ export class EffectDispatcher {
    * SERVER_GAIN. SERVER_PRICE cannot be triggered. Returns the number of garrison handlers run.
    */
   triggerGarrisons(ps, piece, eventType, { asPiece = null, triggeredBy = null } = {}) {
-    const gd = this.m.gd;
+    const gd = ps.gd || this.m.gd;
     const hook = eventType === 'SERVER_PRICE' ? null : GARRISON_HOOK[eventType];
     const rec = piece && piece.kind === 'chess' ? gd.chess(piece.id) : null;
     if (!hook || !rec || !Array.isArray(rec.garrisonIds) || this.depth >= MAX_DEPTH) return 0;
@@ -369,7 +369,7 @@ export class EffectDispatcher {
     this.depth++;
     try {
       const ctx = makeCtx(this.m, ps, { ...source, key }, hook, ev);
-      try { withGameData(this.m.data, () => fn.call(h, ctx, ev)); } catch (e) { this._report(key, hook, e); }
+      try { fn.call(h, ctx, ev); } catch (e) { this._report(key, hook, e); }
     } finally {
       this.depth--;
     }
@@ -426,7 +426,9 @@ function grantSpeaker(gd, source) {
  * @param {object|null} [ev] the event being dispatched (onPrice: ctx.modifyPrice / ctx.setPrice edit ev.price)
  */
 export function makeCtx(m, ps, source, hook, ev = null) {
-  const gd = m.gd;
+  // the player's view of the data: its slotted 自选 slots are its operators (0.2.0, player/diy.js) — chessRecord,
+  // pieceBonds, a strategy's / 特质's bond and tier reads see the operator; the match's GameData for everyone else
+  const gd = ps.gd || m.gd;
   const view = (p) => (p ? ps.pieceView(p) : null);
   const ctx = {
     hook,
@@ -459,12 +461,12 @@ export function makeCtx(m, ps, source, hook, ev = null) {
     board: () => boardOrder(ps.board).map(({ r, c, piece }) => ps.pieceView(piece, [r, c])),
     hand: () => ps.hand.map(view),
     temp: () => ps.temp.map(view),
-    /** View of an owned piece + `area` ('board'|'hand'|'temp'|'research'|'equipped'), `holderUid`, and `row`/`col` on the board. */
+    /** View of an owned piece + `area` ('board'|'hand'|'temp'|'equipped'), `holderUid`, and `row`/`col` on the board. */
     piece: (uid) => {
       const l = ps.find(uid);
       if (!l) return null;
       const v = { ...(l.area === 'board' ? ps.pieceView(l.piece, parseKey(l.key)) : view(l.piece)), area: l.area, holderUid: l.holder ? l.holder.uid : null };
-      if (l.area === 'hand' || l.area === 'temp' || l.area === 'research') v.idx = l.idx;
+      if (l.area === 'hand' || l.area === 'temp') v.idx = l.idx;
       return v;
     },
     /**
@@ -491,8 +493,8 @@ export function makeCtx(m, ps, source, hook, ev = null) {
     counter: (k) => (Number.isFinite(ps.counters[k]) ? ps.counters[k] : 0),
     setCounter: (k, v) => { if (typeof k === 'string' && Number.isFinite(v)) ps.counters[k] = v; return ps.counters[k] ?? 0; },
     incCounter: (k, n = 1) => { if (typeof k !== 'string' || !Number.isFinite(n)) return 0; ps.counters[k] = (Number.isFinite(ps.counters[k]) ? ps.counters[k] : 0) + n; return ps.counters[k]; },
-    /** Per-piece counter of the current round (0 in a new round / for a new piece; an elite merged this round keeps the
-     *  highest of its copies' — PlayerState.pieceRoundCount). */
+    /** Per-piece counter of the current round (0 in a new round / for a new piece, an elite merged this round included —
+     *  PlayerState.pieceRoundCount). */
     pieceCounter: (uid, k) => { const l = ps.find(uid); return l ? ps.pieceRoundCount(l.piece, k) : 0; },
     incPieceCounter: (uid, k, n = 1) => { const l = ps.find(uid); return l ? ps.bumpPieceRoundCount(l.piece, k, n) : 0; },
 
@@ -516,8 +518,10 @@ export function makeCtx(m, ps, source, hook, ev = null) {
       if (opts.golden) id = gd.goldenIdOf(chessId) || chessId;
       if (!gd.chess(id)) return null;
       const base = gd.baseIdOf(id);
-      // "some effects fail when the cap is hit" (research 06 §7): by default a chess of the pool needs a free copy
-      if (opts.requirePool !== false && m.pool.has(base) && m.pool.left(base) < 1) return null;
+      // "some effects fail when the cap is hit" (research 06 §7): by default a chess of the pool needs a free copy (a
+      // 自选 piece: one of the player's own stock — player/diy.js poolOf)
+      const pool = typeof ps.poolOf === 'function' ? ps.poolOf(base) : m.pool;
+      if (opts.requirePool !== false && pool.has(base) && pool.left(base) < 1) return null;
       const p = ps.acquireChess(id, { source: opts.source || source.key || 'effect', toTemp: !!opts.toTemp, fromPool: opts.fromPool !== false });
       // 「歌蕾蒂娅：获得斯卡蒂」 — every silent grantChess (a 特质, 余 SERVER_MOST_BOND, a band, an item, a choice).
       // opts.toast === false skips it. A caller that already says the same thing should pass that.
@@ -526,7 +530,7 @@ export function makeCtx(m, ps, source, hook, ev = null) {
         const name = got && got.name;
         if (name) {
           const who = grantSpeaker(gd, source);
-          m.toast(ps, 'info', who ? `${who}：获得${name}` : `获得${name}`);
+          m.toast(ps, 'info', who ? msg('{who}：获得{name}', { who: dn(who), name: dn(name) }) : msg('获得{name}', { name: dn(name) }));
         }
       }
       return p ? view(p) : null;
@@ -540,20 +544,30 @@ export function makeCtx(m, ps, source, hook, ev = null) {
       });
       return p ? view(p) : null;
     },
-    /** Random chess id from the shared pool (copy-weighted). opts: { maxTier, tier, bond, filter(id) } */
+    /**
+     * Random chess id from the shared pool (copy-weighted) — and the player's own 自选 stock (player/diy.js
+     * diyStockEntries, 0.2.0: 「自选干员放入后模拟中的补给池随机范围也将被相应扩大」). opts: { maxTier, tier, bond, filter(id) };
+     * bonds are read through the player's data view (a slotted slot: its operator's).
+     */
     rollChess: (opts = {}) => {
       const f = (id) => {
         if (opts.bond) { const c = gd.chess(id); if (!c || !Array.isArray(c.bonds) || !c.bonds.includes(opts.bond)) return false; }
         return typeof opts.filter === 'function' ? !!opts.filter(id) : true;
       };
-      return m.pool.roll(m.rngMeta, { maxTier: Number.isInteger(opts.maxTier) ? opts.maxTier : 6, tier: Number.isInteger(opts.tier) ? opts.tier : null, filter: f });
+      const extra = typeof ps.diyStockEntries === 'function' ? ps.diyStockEntries() : null;
+      return m.pool.roll(m.rngMeta, { maxTier: Number.isInteger(opts.maxTier) ? opts.maxTier : 6, tier: Number.isInteger(opts.tier) ? opts.tier : null, filter: f, extra });
     },
     rollItem: (opts = {}) => m.rollItemId(opts),
     /**
      * Roll a choices.json pool: equip pools → { kind: 'item', id }; chess pools (items / weighted / shopEligible with
      * tier, minTier, bond, golden) → { kind: 'chess', id, golden } (a pool chess needs a free copy). null when empty.
      */
-    rollPool: (poolId, opts = {}) => m.rollPool(poolId, { shopLevel: ps.shop.level, ...opts }),
+    rollPool: (poolId, opts = {}) => m.rollPool(poolId, {
+      shopLevel: ps.shop.level,
+      // a shared-pool draw also takes the player's 自选 stock, its bonds read through the player's view (rollChess)
+      extra: typeof ps.diyStockEntries === 'function' ? ps.diyStockEntries() : null, chessOf: (id) => gd.chess(id),
+      ...opts,
+    }),
     /**
      * Run another owned chess's 特质 of `eventType` now (SERVER_GAIN / SERVER_PREP_START / SERVER_PREP_FIN /
      * SERVER_CHESS_SOLD / SERVER_REFRESH_SHOP). opts.asUid: run them as if they belonged to that piece. Returns the
@@ -586,7 +600,7 @@ export function makeCtx(m, ps, source, hook, ev = null) {
     },
     destroyPiece: (uid) => {
       const l = ps.find(uid);
-      if (!l || l.piece.research) return false;
+      if (!l) return false;
       ps._detach(l);
       if (l.piece.kind === 'chess') {
         ps.removeTokensOf(l.piece.uid);
@@ -636,10 +650,18 @@ export function makeCtx(m, ps, source, hook, ev = null) {
     addBounty: (card) => m.addBounty(ps, card),
 
     // ---- messaging
-    toast: (text, kind = 'info') => m.toast(ps, kind, String(text)),
-    ticker: (text) => m.tickerText(String(text)),
-    /** CHAR_GIFT broadcast to this player: "{0}博士给你赠送了{1}". */
-    giftTicker: (fromName, chessId) => { const c = gd.chess(chessId); m.tickerFor('CHAR_GIFT', [String(fromName), c ? c.name : String(chessId)], { to: ps.playerId }); },
+    // a string or a shared/i18n.js msg(msgid, params)
+    toast: (text, kind = 'info') => m.toast(ps, kind, text && typeof text === 'object' ? text : String(text)),
+    ticker: (text) => m.tickerText(text && typeof text === 'object' ? text : String(text)),
+    /**
+     * CHAR_GIFT broadcast to this player: "{0}博士给你赠送了{1}" — named as this player sees the gift (a chess it fields as
+     * its 补位 stand-in by the stand-in's name: 0.2.0, the owner's recall of the official mode, 2026-10-06).
+     */
+    giftTicker: (fromName, chessId) => {
+      const c = gd.chess(chessId);
+      const shown = c && typeof ps.fieldRecord === 'function' ? ps.fieldRecord(c) || c : c;
+      m.tickerFor('CHAR_GIFT', [String(fromName), shown ? shown.name : String(chessId)], { to: ps.playerId });
+    },
 
     // ---- team
     teammates: () => m.alivePlayers().filter((p) => p !== ps).map((p) => makeCtx(m, p, source, hook, null)),

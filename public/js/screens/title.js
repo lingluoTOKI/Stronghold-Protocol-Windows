@@ -1,4 +1,6 @@
-// Title screen: season-style backdrop, big title 卫戍协议：盟约, remembered nickname, 开始.
+// Title screen: season-style backdrop, big title 卫戍协议：盟约, remembered nickname, 开始, the language menu
+// (中文 | English | every pack in public/i18n/, ui/lang.js; a title in an alphabetic script — English — is the big one and
+// the small wordmark above it hides).
 //
 // Pressing 开始 validates the nickname (1..NAME_MAX_LEN chars, no control characters), stores it,
 // marks this tab as "entered" (so reloads skip the title) and hands the name to net.js, which
@@ -8,15 +10,18 @@
 // entry/loading illustration names) it is layered under the CSS art; otherwise the screen is
 // pure CSS/SVG (radar, ridgelines, glow), so it never issues a request that can 404.
 
-import { useMemo, useState, useEffect, useRef } from '../../vendor/hooks.module.js';
-import { NAME_MAX_LEN, APP_VERSION } from '../../../shared/constants.js';
-import { html, Button, Icon, MicroLabel, TextField, PingPill, Modal } from '../ui/components.js';
+import { useMemo, useState } from '../../vendor/hooks.module.js';
+import { NAME_MAX_LEN, APP_VERSION, DEV_BUILD } from '../../../shared/constants.js';
+import { html, Button, Icon, MicroLabel, TextField, PingPill } from '../ui/components.js';
 import { GuideButton } from '../ui/guide.js';
 import { toast } from '../ui/toasts.js';
 import { net, identity } from '../net.js';
 import { store, useStore, shallowEqual } from '../store.js';
 import { data, useData } from '../data.js';
 import { FullscreenButton, detectFeatures } from '../ui/device.js';
+import { LangToggle, useLang } from '../ui/lang.js';
+import { t, N_ } from '../../../shared/i18n.js';
+import { scriptOf } from '../../../shared/i18nPacks.js';
 import { GIcon } from '../ui/gameComponents.js';
 import { SettingsModal } from '../ui/settings.js';
 
@@ -176,70 +181,15 @@ function Ridges() {
 }
 
 const STATUS_TEXT = {
-  idle: '准备连接', connecting: '正在连接服务器', connected: '已连接服务器', handshaking: '正在验证身份',
-  online: '已连接服务器', reconnecting: '连接中断，正在重连', closed: '连接已关闭',
+  idle: N_('准备连接'), connecting: N_('正在连接服务器'), connected: N_('已连接服务器'), handshaking: N_('正在验证身份'),
+  online: N_('已连接服务器'), reconnecting: N_('连接中断，正在重连'), closed: N_('连接已关闭'),
 };
-
-export function BulletinButton() {
-  const [open, setOpen] = useState(false);
-  const [data, setData] = useState(null);
-  const [failed, setFailed] = useState(false);
-  const [hasNew, setHasNew] = useState(false);
-  const SEEN_KEY = 'sp.bulletinSeen';
-  useEffect(() => {
-    let dead = false;
-    const load = () => {
-      fetch('/api/announcements', { cache: 'no-store' })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => {
-          if (dead || !d || !Array.isArray(d.items)) return;
-          setData(d);
-          const seen = localStorage.getItem(SEEN_KEY);
-          setHasNew(!!d.updatedAt && seen !== d.updatedAt);
-        })
-        .catch(() => { if (!dead) setFailed(true); });
-    };
-    load();
-    const iv = setInterval(load, 60000);
-    return () => { dead = true; clearInterval(iv); };
-  }, []);
-  const markSeen = () => { if (data && data.updatedAt) { localStorage.setItem(SEEN_KEY, data.updatedAt); setHasNew(false); } };
-  // 公告按时间从近到远显示（最新的排在最上面）。
-  //
-  // 排序放在这里，而不是依赖 announcements.json 的书写顺序：那份文件被「把最新一条插到最前面」和
-  // 「追加到末尾」两种方式交替维护过，顺序已经不可信（最旧的一条曾排在最新的前面）。`time` 是
-  // `YYYY-MM-DD`，按字符串比较即等于按日期比较；同一天的多条保持它们在文件里的相对次序
-  //（Array#sort 自 ES2019 起是稳定的）。test/announcements.test.js 守住 JSON 的降序约定。
-  const items = (data && Array.isArray(data.items) ? data.items : [])
-    .slice()
-    .sort((a, b) => String((b && b.time) || '').localeCompare(String((a && a.time) || '')));
-  return html`<span class="bulletin-btn">
-    <${Button} variant="ghost" size="sm" icon="mail" class=${`bulletin-btn__icon${hasNew ? ' has-new' : ''}`}
-      title="服务器更新公告" aria-label="服务器更新公告"
-      onClick=${() => { const n = !open; setOpen(n); if (n) markSeen(); }} aria-expanded=${open}>
-    <//>
-    <${Modal} open=${open} onClose=${() => setOpen(false)} title="服务器更新公告"
-      micro="SERVER BULLETIN" class="bulletin-modal-box">
-      ${failed ? html`<div class="bulletin-modal__empty">暂无法连接公告服务</div>` : null}
-      ${!failed && !data ? html`<div class="bulletin-modal__empty">加载中…</div>` : null}
-      <div class="bulletin-modal__when">最近更新：${(data && data.updatedAt) || '—'}</div>
-      ${items.map((it, i) => html`<div class="bulletin-modal__item" key=${i}>
-        <div class="bulletin-modal__row">
-          ${it.version ? html`<span class="bulletin-modal__ver">v${it.version}</span>` : null}
-          ${it.time ? html`<span class="bulletin-modal__time">${it.time}</span>` : null}
-          <span class="bulletin-modal__title">${it.title || ''}</span>
-        </div>
-        ${it.content ? html`<div class="bulletin-modal__content">${it.content}</div>` : null}
-      </div>`)}
-      ${!failed && data && !items.length ? html`<div class="bulletin-modal__empty">暂无公告</div>` : null}
-    <//>
-  </span>`;
-}
 
 /** Title screen component. */
 export function TitleScreen() {
   const conn = useStore((s) => s.connection, shallowEqual);
   const pendingJoin = useStore((s) => s.ui.pendingJoin);
+  useLang(); // re-render on a language switch
   const [name, setName] = useState(() => store.get().me.name || identity.loadName() || '');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const assetsSettled = useData('assets');
@@ -258,7 +208,7 @@ export function TitleScreen() {
 
   const valid = isValidName(name);
   const start = () => {
-    if (!valid) { toast('请输入博士代号', 'warn'); return; }
+    if (!valid) { toast(t('请输入博士代号'), 'warn'); return; }
     enterSession(name);
   };
 
@@ -267,6 +217,9 @@ export function TitleScreen() {
 
   // touch screens: no autofocus (it would pop the on-screen keyboard over a landscape phone's whole view)
   const touchUi = useMemo(() => detectFeatures().coarse, []);
+  // a title in an alphabetic script (English, French …) is the big one in the display face and the wordmark above it
+  // hides; a CJK / kana / Hangul title keeps the Chinese layout (shared/i18nPacks.js scriptOf — a pack needs no flag)
+  const alphabetic = scriptOf(t('卫戍协议')) === 'alphabetic';
   return html`<div class="screen title-screen">
     <div class=${`title-bg${bgLoaded ? ' has-art' : ''}${ridgesLoaded ? ' has-ridges' : ''}`} aria-hidden="true">
       ${backdrop ? html`<img class="title-bg__art" src=${backdrop} alt="" draggable=${false}
@@ -291,33 +244,36 @@ export function TitleScreen() {
       <div><${MicroLabel} tone="mint">RHODES ISLAND // SIMULATION SERVICE<//><br /><${MicroLabel}>TACTICAL CO-OP NODE · 02<//></div>
     </div>
     <div class="title-corner title-corner--tr">
-      <${MicroLabel} tone="hi">TARGET POINT<//><br /><${MicroLabel}>STRONGHOLD PROTOCOL<//>
+      <div>
+        <${LangToggle} class="title-lang" />
+        <${MicroLabel} tone="hi">TARGET POINT<//><br /><${MicroLabel}>STRONGHOLD PROTOCOL<//>
+      </div>
     </div>
 
     <main class="title-main">
       <${Emblem} />
-      <div class="title-en">
+      ${alphabetic ? null : html`<div class="title-en">
         <span class="title-en__a">STRONGHOLD PROTOCOL</span>
         <span class="title-en__b">ALLIANCE</span>
-      </div>
-      <h1 class="title-cn">卫戍协议<span class="title-cn__colon">：</span><em>盟约</em></h1>
-      <p class="title-tag">调配资金与干员，与同伴协同布防，抵御多波次进攻，直至击败敌方领袖。</p>
+      </div>`}
+      <h1 class=${`title-cn${alphabetic ? ' title-cn--latin' : ''}`}>${t('卫戍协议')}<span class="title-cn__colon">${alphabetic ? ': ' : '：'}</span><em>${t('盟约')}</em></h1>
+      <p class="title-tag">${t('调配资金与干员，与同伴协同布防，抵御多波次进攻，直至击败敌方领袖。')}</p>
 
       <div class="title-login">
         ${pendingJoin ? html`<div class="title-invite">
           <${Icon} name="key" />
-          <span>收到同盟邀请</span><b class="num">${pendingJoin}</b><span class="t-lo">· 输入代号后将自动加入</span>
+          <span>${t('收到同盟邀请')}</span><b class="num">${pendingJoin}</b><span class="t-lo">${t('· 输入代号后将自动加入')}</span>
         </div>` : null}
-        <${TextField} label="博士代号" micro="CALLSIGN" size="lg" icon="user" value=${name} maxLength=${NAME_MAX_LEN}
-          placeholder="输入你的代号（最多 ${NAME_MAX_LEN} 字）" autoFocus=${!touchUi}
+        <${TextField} label=${t('博士代号')} micro="CALLSIGN" size="lg" icon="user" value=${name} maxLength=${NAME_MAX_LEN}
+          placeholder=${t('输入你的代号（最多 {NAME_MAX_LEN} 字）', { NAME_MAX_LEN })} autoFocus=${!touchUi}
           onInput=${setName} onEnter=${start} />
-        <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" disabled=${!valid} onClick=${start}>开始<//>
+        <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" disabled=${!valid} onClick=${start}>${t('开始')}<//>
         <div class="title-conn">
           <span class=${`status-dot ${dotClass}`}></span>
-          <span>${STATUS_TEXT[conn.status] || conn.status}</span>
+          <span>${STATUS_TEXT[conn.status] ? t(STATUS_TEXT[conn.status]) : conn.status}</span>
           ${conn.status === 'online' ? html`<${PingPill} ms=${conn.ping} />` : null}
-          <${GuideButton} class="title-guide" />
-          <button type="button" class="title-settings fsbtn tapx" aria-label="设置" title="设置"
+          <${GuideButton} class="title-guide" label=${t('玩法说明')} />
+          <button type="button" class="title-settings fsbtn tapx" aria-label=${t('设置')} title=${t('设置')}
             onClick=${() => setSettingsOpen(true)}><${GIcon} name="gear" /></button>
           <${FullscreenButton} class="title-fs" />
         </div>
@@ -327,8 +283,9 @@ export function TitleScreen() {
     <${SettingsModal} open=${settingsOpen} onClose=${() => setSettingsOpen(false)} />
 
     <footer class="title-foot">
-      <span>非官方同人复刻 · 游戏素材版权归 上海鹰角网络 / Yostar 所有</span>
+      <span>${t('非官方同人复刻 · 游戏素材版权归 上海鹰角网络 / Yostar 所有')}</span>
       <${MicroLabel}>v${APP_VERSION} · WEB SIMULATION<//>
+      ${DEV_BUILD ? html`<span class="title-dev" role="note">${t('开发版 · 不稳定，请勿用于公开服务器')}</span>` : null}
     </footer>
   </div>`;
 }

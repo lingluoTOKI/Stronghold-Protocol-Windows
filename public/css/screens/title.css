@@ -192,6 +192,8 @@
   animation: rise-in 600ms 140ms var(--ease-out) backwards;
 }
 .title-cn__colon { color: #f4f6f5; }
+/* a title in an alphabetic script (English …; screens/title.js): the display face, smaller so "Stronghold Protocol: Alliance" fits one line */
+.title-cn--latin { font-family: var(--font-display); font-size: .6rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
 .title-cn em { font-style: normal; color: var(--mint-500); text-shadow: 0 0 .26rem rgba(23, 249, 183, .45); }
 .title-tag {
   margin-top: .12rem;
@@ -241,6 +243,12 @@
 .title-invite .icon { width: .2rem; height: .2rem; }
 .title-invite b { font-size: .2rem; letter-spacing: .2em; color: #ffd08a; }
 .title-conn { display: flex; align-items: center; justify-content: center; gap: .1rem; min-height: .32rem; font-size: .14rem; color: var(--text-lo); }
+/* language menu (中文 | English | …, ui/lang.js) in the top-right corner; more than four languages make it a list */
+.title-lang { display: inline-flex; margin-bottom: .1rem; }
+.title-lang button { min-width: .74rem; height: .3rem; font-size: .14rem; cursor: pointer; }
+.lang-select select { height: .38rem; min-width: 1.6rem; padding: 0 .12rem; background: #0a0d0c; border: 0; color: var(--text-hi); font-size: .16rem; cursor: pointer; }
+.title-lang.lang-select select { height: .3rem; font-size: .14rem; }
+html[data-script="alphabetic"] .title-login .btn--xl { letter-spacing: .3em; }
 .title-conn .ping { height: .26rem; font-size: .15rem; }
 
 .title-foot {
@@ -255,48 +263,13 @@
   font-size: .13rem;
   color: var(--text-dim);
 }
-
-
-
-/* ---- server bulletin (mail icon + red dot, next to 玩法说明; opens a centered Modal) ----- */
-.bulletin-btn { position: relative; display: inline-flex; align-items: center; }
-.bulletin-btn__icon { position: relative; }
-.bulletin-btn__icon.has-new,
-.bulletin-btn__icon.has-new .icon { color: #ff5c5c; }
-.bulletin-btn__icon.has-new .icon { filter: drop-shadow(0 0 .06rem rgba(255,92,92,.55)); }
-/* 尺寸按 iPhone / 窄屏适配（与 draft.css 的 .minfo-dlg 同一套做法）。
- *
- * 宽度原先写成 Modal 的 width="min(24rem, 90vw)" 内联样式，内联优先级高于样式表，于是
- * 横屏 iPhone 上 90vw（844 宽 → 760px）会超出安全区内容宽（844 − .6rem − 2×刘海≈44 = 732px），
- * 居中的弹窗两端各溢出一截，正好压在刘海和圆角下面。现在宽度只在样式表里定义，并多一个
- * 「视口宽 − 边距 − 左右安全区」的上限：桌面仍是原来的 90vw（min 里第三项更大，不生效），
- * 手机横屏则由它兜底。Modal 的 width 属性保持未传（它就是为内联样式准备的，这里不用）。
- *
- * 高度必须用 svh：iOS Safari 的 100vh 是「工具栏收起时」的高度，比真正可见的区域高一截，只写 vh
- * 会把公告底部（最后几条）顶到屏幕外；svh 才是工具栏展开时的真实高度（Safari 15.4+ / Chrome 108+，
- * 老浏览器落到上一行的 vh）。再扣掉上下安全区（刘海、home indicator）。长正文由 .modal__body 滚动。 */
-.modal__box.bulletin-modal-box {
-  width: min(24rem, 90vw, calc(100vw - .6rem - var(--sa-l, 0px) - var(--sa-r, 0px)));
-  max-height: calc(100vh - .6rem - var(--sa-t, 0px) - var(--sa-b, 0px));
-  max-height: calc(100svh - .6rem - var(--sa-t, 0px) - var(--sa-b, 0px));
-}
-/* 长公告滚到底时不把滚动链传给后面的页面（iOS 上会连页面一起橡皮筋） */
-.bulletin-modal-box .modal__body { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-
-/* 字号一律加像素下限：theme.css 的 rem 基准在窄屏被 clamp 到 40px 下限（桌面是 100px），
-   纯 rem 的 .2rem 在 iPhone 上只有 8px、.26rem 只有 10.4px，根本读不了。数值参照 .minfo-dlg。 */
-.bulletin-modal__when { color: #6d8f80; font-size: max(.2rem, 11px); letter-spacing: .05em; margin-bottom: max(.18rem, 8px); }
-.bulletin-modal__item + .bulletin-modal__item { border-top: 1px dashed #24322c; margin-top: max(.18rem, 8px); padding-top: max(.18rem, 8px); }
-.bulletin-modal__row { display: flex; flex-wrap: wrap; gap: max(.1rem, 4px) max(.14rem, 6px); align-items: baseline; }
-.bulletin-modal__ver { color: #17f9b7; font-weight: 700; font-size: max(.22rem, 12px); }
-.bulletin-modal__time { color: #6d8f80; font-size: max(.2rem, 11px); }
-.bulletin-modal__title { color: #e8f5ee; font-weight: 600; font-size: max(.26rem, 14px); }
-.bulletin-modal__content { margin: max(.1rem, 5px) 0 0; color: #b7ccc1; font-size: max(.2rem, 12px); line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; word-break: break-word; }
-.bulletin-modal__empty { color: #6d8f80; font-size: max(.22rem, 12px); text-align: center; padding: max(.3rem, 16px) 0; }
-
-/* 窄屏（< 768 CSS px，即 rem 基准被 clamp 到 40px 的那一档）与横屏矮屏（≤ 460px 高）：
-   内边距换成像素兜底，免得手机横屏时留白只有十几像素。宽度上面那条 min() 已经兜住，不重复。 */
-@media (max-width: 767px), (max-height: 460px) {
-  .bulletin-modal-box .modal__head { padding: max(.18rem, 10px) max(.24rem, 12px) max(.04rem, 2px); }
-  .bulletin-modal-box .modal__body { padding: max(.12rem, 6px) max(.24rem, 12px) max(.2rem, 10px); }
+/* a development build (shared/constants.js DEV_BUILD): an unmissable tag in the footer */
+.title-dev {
+  padding: .03rem .1rem;
+  border: 1px solid #ff9f43;
+  border-radius: .04rem;
+  color: #ffb066;
+  background: rgba(255, 159, 67, .14);
+  font-weight: 700;
+  letter-spacing: .02em;
 }

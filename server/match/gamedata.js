@@ -4,16 +4,16 @@
 // unknown ids. Tunables come from data/config.json with the documented defaults (research 00-INDEX §2–§8) when a
 // key is missing, so a partial data set (tests, data being regenerated) still yields a working match.
 //
-// Enemy numbers follow the official PRTS per-round enemyScale table of data/config.json. The leader pool uses
-// bloodPoint, with a fixed ×2 modifier for matches that started with six occupied seats. data/tuning.json only
-// overrides result titles:
+// No custom balance (DESIGN §14 corrections, research 08 §6): enemy numbers are the official ones — the PRTS
+// per-round enemyScale table of data/config.json, the leader pool = bloodPoint per player alive at the fight's start
+// (bossPoolShareOf). data/tuning.json only overrides result titles:
 //   titles[titleId]                                                { stat?, rule? } merged over config.titles
 // (the former enemyHpMul / enemyAtkMul / enemySpeedMul / bossHpMul / flyPlaceholders knobs were removed; a tuning file
 // that still carries them is ignored).
 
 import { getConfig, getMode } from '../data.js';
 import { isShopItem } from '../sim/simdata.js';
-import { OPENING_BANS, openingBanCounts } from '../../shared/openingBans.js';
+import { standInRecord } from '../../shared/standIn.js';
 
 const own = (map, id) => (map && typeof map === 'object' && typeof id === 'string' && Object.hasOwn(map, id) && map[id] && typeof map[id] === 'object' ? map[id] : null);
 const numOr = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -47,13 +47,41 @@ export const DEFAULTS = Object.freeze({
   dp: { init: 10, perSec: 1, max: 99 },
   unite: { maxHelpers: 2, templates: { 1: 'act1autochess_escaped_single', 2: 'act1autochess_escaped_multi' } },
   timers: { infoCheck: 25, bandDraft: 50, bandTurn: 30, battleCheck: 3, spFirst: 30, spTurn: 16 },
-  bans: OPENING_BANS,
+  bans: { FUNNY: { core: 0, addon: 1 }, NORMAL: { core: 3, addon: 4 }, HARD: { core: 3, addon: 4 }, ABYSS: { core: 3, addon: 4 } },
   bandDraft: { skipsPerPlayer: 1, timeoutBandId: 'band_bldsk' },
   leftoverFundsKeptByBands: ['band_cannot'],
 });
 
 /** Game seconds per real second of a battle (forced 2×): combat limits in data are real seconds (combatTimeLimit). */
 export const COMBAT_TIME_SCALE = 2;
+
+/**
+ * Multiplier of bloodPoint[difficulty] for the shared leader pool (DESIGN §20.10, §25.13.4), from config bossHpScale —
+ * each key from the mode's entry first, then the global one; the defaults are the current rule:
+ *   solo   `solo` (1: the table value — one player's share);
+ *   co-op  `perPlayer` true (the owner's decision of 2026-10-06, adopting PR #209 by @qingjingshenghuo): `coop` (1) × the
+ *          players alive when the fight starts — bots and AI 托管 seats count, eliminated and departed seats do not —
+ *          at most `aliveFull` (4); a count left out means a full team;
+ *          `perPlayer` false: the fixed pool of 0.1.x (「保持固定血量」, restorable with `solo` 0.25): `coop` whatever the
+ *          count, × min(alive, aliveFull) / aliveFull with `aliveScaling`.
+ * @param {object|null|undefined} modeScale config.modes[modeId].bossHpScale
+ * @param {object|null|undefined} cfgScale config.bossHpScale
+ * @param {boolean} isSolo
+ * @param {number} [aliveCount] alive players at the Final Assault / Hidden Core start (co-op)
+ * @returns {number}
+ */
+export function bossPoolShareOf(modeScale, cfgScale, isSolo, aliveCount) {
+  const ms = modeScale && typeof modeScale === 'object' ? modeScale : {};
+  const cs = cfgScale && typeof cfgScale === 'object' ? cfgScale : {};
+  const pick = (k, d) => (Number.isFinite(ms[k]) && ms[k] > 0 ? ms[k] : Number.isFinite(cs[k]) && cs[k] > 0 ? cs[k] : d);
+  const flag = (k, d) => (typeof ms[k] === 'boolean' ? ms[k] : typeof cs[k] === 'boolean' ? cs[k] : d);
+  if (isSolo) return pick('solo', 1);
+  const full = Math.max(1, Math.floor(pick('aliveFull', 4)));
+  const n = Number(aliveCount);
+  const alive = Number.isFinite(n) && n >= 1 ? Math.min(full, Math.floor(n)) : full;
+  if (flag('perPlayer', true)) return pick('coop', 1) * alive;
+  return pick('coop', 1) * (flag('aliveScaling', false) ? alive / full : 1);
+}
 
 /** Strip the _a/_b suffix of an item id (the registry key of an item family). */
 export const itemKey = (id) => (typeof id === 'string' ? id.replace(/_[ab]$/, '') : '');
@@ -62,14 +90,12 @@ export class GameData {
   /**
    * @param {Readonly<Record<string, any>>} data server/data.js getData() (may be partial)
    * @param {string} modeId e.g. 'mode_multi_hard'
-   * @param {number} [startingPlayerCount=1] fixed occupied starting seats, including AI
    */
-  constructor(data, modeId, startingPlayerCount = 1) {
+  constructor(data, modeId) {
     this.raw = data && typeof data === 'object' ? data : {};
     this.config = getConfig(this.raw) || {};
     this.modeId = modeId;
     this.mode = getMode(modeId, this.raw) || {};
-    this.startingPlayerCount = startingPlayerCount;
     this.economy = this.config.economy && typeof this.config.economy === 'object' ? this.config.economy : {};
     const chess = this.raw.chess && typeof this.raw.chess === 'object' ? this.raw.chess : {};
     this._chess = chess;
@@ -98,6 +124,8 @@ export class GameData {
     this.inactiveEnemies = new Set(Array.isArray(this.mode.inactiveEnemyKeys) ? this.mode.inactiveEnemyKeys : []);
     /** data/tuning.json (titles only, see the header) */
     this.tuning = this.raw.tuning && typeof this.raw.tuning === 'object' ? this.raw.tuning : {};
+    /** standIn memo: chess id → composed 补位 record | null */
+    this._standIns = new Map();
   }
 
   /**
@@ -110,15 +138,12 @@ export class GameData {
   }
 
   /**
-   * Official shared leader HP pool (DESIGN §20.10): ONE pool for every boss field of the match (official tip "最终攻势中，
+   * Shared leader HP pool (DESIGN §20.10, §25.13.4): ONE pool for every boss field of the match (official tip "最终攻势中，
    * 所有人将一起对敌方领袖造成伤害"; the mirrored copies of a pair field share it — notice 5114 "两侧的敌方领袖共享生命值
-   * （敌方领袖的总生命值不变）", which is about those copies, not about the number of players). Co-op = bloodPoint
-   * [difficulty]; with config bossHpScale.aliveScaling (default false) × alive / aliveFull (4) — 巴哈姆特 12294 "聯機隊友
-   * (撤退/死掉)變少，最後boss血條也會變少" is one community note without a proportion, kept off until confirmed (it would
-   * shorten fights after eliminations, the opposite of the playtest report); `aliveCount` omitted ⇒ a full team. Solo = bloodPoint ×
-   * bossHpScale.solo (0.25 = one player of four, [ASSUMED]). Six-seat co-op matches use twice the equivalent four-seat
-   * pool, based on their occupied starting seats even after eliminations. Leaders are never scaled by enemyScale
-   * ("领袖单位于服务器的生命值加成不受上述加成影响").
+   * （敌方领袖的总生命值不变）", which is about those copies). Size = bloodPoint[difficulty] × bossPoolShare: the table value
+   * per player alive when the fight starts (the owner's decision of 2026-10-06, PR #209; it replaces the fixed pool of
+   * 「保持固定血量」, which config bossHpScale restores — bossPoolShareOf); `aliveCount` omitted ⇒ a full team. Leaders are
+   * never scaled by enemyScale ("领袖单位于服务器的生命值加成不受上述加成影响").
    * @param {string} bossId
    * @param {number} [aliveCount] alive players at the Final Assault / Hidden Core start (co-op)
    * @returns {number}
@@ -133,22 +158,11 @@ export class GameData {
   }
 
   /**
-   * Multiplier of bloodPoint for the leader pool (see bossPoolHp): solo = bossHpScale.solo (0.25); co-op = coop (1) ×
-   * min(alive, aliveFull) / aliveFull when bossHpScale.aliveScaling (mode entry first, then the global one). Six-seat
-   * co-op starts multiply this once by 2; field copies and client replays receive the resulting shared pool directly.
+   * Multiplier of bloodPoint for the leader pool (see bossPoolHp; the rule and the config keys: bossPoolShareOf).
    * @param {number} [aliveCount]
    */
   bossPoolShare(aliveCount) {
-    const ms = this.mode.bossHpScale && typeof this.mode.bossHpScale === 'object' ? this.mode.bossHpScale : {};
-    const cs = this.config.bossHpScale && typeof this.config.bossHpScale === 'object' ? this.config.bossHpScale : {};
-    const pick = (k, d) => (Number.isFinite(ms[k]) && ms[k] > 0 ? ms[k] : Number.isFinite(cs[k]) && cs[k] > 0 ? cs[k] : d);
-    if (this.isSolo) return pick('solo', 0.25);
-    const scaling = typeof ms.aliveScaling === 'boolean' ? ms.aliveScaling : cs.aliveScaling === true;
-    const full = Math.max(1, Math.floor(pick('aliveFull', 4)));
-    const n = Number(aliveCount);
-    const alive = scaling && Number.isFinite(n) && n >= 1 ? Math.min(full, Math.floor(n)) : full;
-    const sixPlayerHp = this.startingPlayerCount === 6 ? 2 : 1;
-    return pick('coop', 1) * (alive / full) * sixPlayerHp;
+    return bossPoolShareOf(this.mode.bossHpScale, this.config.bossHpScale, this.isSolo, aliveCount);
   }
 
   /** config.titles with the tuning overrides (stat / rule per title id) merged in. */
@@ -180,6 +194,26 @@ export class GameData {
   token(id) { return own(this.raw.tokens, id); }
   get choices() { return this.raw.choices && typeof this.raw.choices === 'object' ? this.raw.choices : {}; }
   get factions() { return this.raw.factions && typeof this.raw.factions === 'object' ? this.raw.factions : {}; }
+
+  /**
+   * The 补位 record of chess `id` (normal or elite; DATA.md §18): shared/standIn.js standInRecord over data/backups.json
+   * — the chess's identity (ids, tier, bonds, 特质, price, merge) with its official stand-in's body (stats, range, skills
+   * with the backup skill as the default, talents, module, art, `standInFor`). Null for a PRESET / 自选 chess, an unknown
+   * id or data without backups.json. Memoized (frozen records).
+   * @param {string} id
+   * @returns {object|null}
+   */
+  standIn(id) {
+    if (typeof id !== 'string') return null;
+    if (this._standIns.has(id)) return this._standIns.get(id);
+    const c = this.chess(id);
+    const backups = this.raw.backups && typeof this.raw.backups === 'object' ? this.raw.backups : null;
+    let rec;
+    try { rec = c && backups ? standInRecord(c, backups) : null; } catch { rec = null; }
+    if (rec) Object.freeze(rec);
+    this._standIns.set(id, rec);
+    return rec;
+  }
 
   /** Normal (base) chess id of a chess id (golden → base). */
   baseIdOf(id) {
@@ -428,7 +462,10 @@ export class GameData {
     };
   }
   bans(difficulty) {
-    return openingBanCounts(difficulty, this.startingPlayerCount, this.config.bans);
+    const b = this.config.bans && this.config.bans[difficulty];
+    const d = DEFAULTS.bans[difficulty] || { core: 0, addon: 0 };
+    if (!b || typeof b !== 'object') return { ...d };
+    return { core: Number.isInteger(b.core) && b.core >= 0 ? b.core : d.core, addon: Number.isInteger(b.addon) && b.addon >= 0 ? b.addon : d.addon };
   }
   get bandDraft() {
     const b = this.config.bandDraft && typeof this.config.bandDraft === 'object' ? this.config.bandDraft : {};
