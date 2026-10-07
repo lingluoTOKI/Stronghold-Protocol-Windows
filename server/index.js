@@ -38,7 +38,8 @@ import { createHash } from 'node:crypto';
 import { promisify } from 'node:util';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { WebSocketServer } from 'ws';
+import https from 'node:https';
+import { WebSocket, WebSocketServer } from 'ws';
 import { Network, SessionRegistry, NET_DEFAULTS } from './net.js';
 import { Lobby } from './lobby.js';
 import { getData, loadData, getDataProfile } from './data.js';
@@ -619,6 +620,24 @@ function makeLogger(quiet) {
 }
 
 /**
+ * `opts.proxyTo` / `SP_PROXY_TO` → 一个 URL，或 null（未设置 / 无效）。
+ *
+ * 接受 `host[:port]`（按 https 处理）或完整的 `http(s)://` origin；末尾斜杠会去掉。
+ */
+export function parseProxyOrigin(raw) {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!s) return null;
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    u.pathname = '/';
+    u.search = '';
+    u.hash = '';
+    return u;
+  } catch { return null; }
+}
+
+/**
  * Build and start the HTTP + WebSocket server.
  * @param {{
  *   port?: number, host?: string, quiet?: boolean, log?: object,
@@ -628,6 +647,7 @@ function makeLogger(quiet) {
  *   ratePerSec?: number, rateBurst?: number, maxConnections?: number, maxRooms?: number,
  *   maxConnectionsPerAddr?: number, maxRoomsPerAddr?: number, maxMatchesPerAddr?: number, resyncMinGapMs?: number,
  *   heavyPerSec?: number, heavyBurst?: number, trustProxy?: 'auto' | boolean, soloReconnectWindowMs?: number,
+ *   proxyTo?: string,
  * }} [opts]
  * @returns {Promise<{ port: number, host: string, url: string, server: http.Server, wss: WebSocketServer,
  *                     lobby: Lobby, network: Network, registry: SessionRegistry, close: () => Promise<void> }>}
@@ -640,6 +660,16 @@ export async function startServer(opts = {}) {
   const publicDir = opts.publicDir || path.join(ROOT, 'public');
   const dataDir = opts.dataDir || path.join(ROOT, 'data');
   const sharedDir = opts.sharedDir || path.join(ROOT, 'shared');
+
+  // 反向代理模式（opts.proxyTo 或 SP_PROXY_TO=https://game.example.com）：本进程用**本机磁盘**上的客户端与
+  // 素材提供服务 —— /assets /js /css /data /vendor 一个字节都不出网 —— 只把 /ws 与 /api/* 转发给中心服务器。
+  // 便携包与安卓包靠它就能直接进线上房间，而不必再把几百 MB 素材下一遍；客户端因此**一行都不用改**。
+  //
+  // 为什么用环境变量 / 启动器配置，而不是 `?server=` 这类 URL 参数：会话凭证与昵称存在 localStorage /
+  // sessionStorage 里，而这两者是**按源隔离**的。页面只要能被 URL 参数指向任意主机，就等于把凭证交给链接里
+  // 写的那台机器（scripts/launcher.mjs 头部记着同一条理由）。这里的上游地址只来自启动器自己的配置或环境。
+  const proxyTo = parseProxyOrigin(opts.proxyTo ?? process.env.SP_PROXY_TO);
+  const upstreams = new Set();   // 代理出去的 WebSocket，关服时要一起收掉
 
   // The process-wide singleton serves the default data dir; a custom dir (tests) gets its own copy.
   const data = opts.dataDir ? loadData(dataDir, { log }) : getData({ dir: dataDir, log });
@@ -674,6 +704,79 @@ export async function startServer(opts = {}) {
     });
   });
 
+  /**
+   * 把一条 HTTP 请求原样转发给上游（代理模式下只用于 /api/*）。
+   *
+   * 上游的状态码与响应头照搬。对浏览器而言这条请求**仍然是同源的**（页面在 localhost），所以不需要 CORS，
+   * 也不需要客户端改任何代码 —— 这正是选"本机代理"而不是"页面直连远端"的理由。
+   * `/healthz` 故意**不**转发：它报的是客户端自己这一份代码的 build 标记，buildGuard 要拿它比对。
+   */
+  function proxyHttp(req, res) {
+    const lib = proxyTo.protocol === 'https:' ? https : http;
+    const upstream = lib.request({
+      protocol: proxyTo.protocol,
+      hostname: proxyTo.hostname,
+      port: proxyTo.port || undefined,
+      method: req.method,
+      path: req.url || '/',
+      headers: { ...req.headers, host: proxyTo.host },
+    }, (up) => {
+      res.writeHead(up.statusCode || 502, up.headers);
+      up.pipe(res);
+    });
+    upstream.on('error', (e) => {
+      log.warn(`[proxy] ${proxyTo.origin} 不可达：${e?.message || e}`);
+      if (!res.headersSent) sendError(req, res, 502, '上游服务器不可达 · Upstream unreachable');
+      else res.destroy();
+    });
+    req.pipe(upstream);
+  }
+
+  /**
+   * 把一条 WebSocket 连接双向转发给上游。
+   *
+   * 关闭码与原因**原样透传**：客户端靠 4001（会话被顶）/ 4002（hello 超时）决定要不要自动重连，
+   * 把它们换成 1006 会让重连策略走错分支。上游还没连上时先缓存几条客户端消息（页面加载后立刻发 hello，
+   * 而到远端握手要一个 RTT），连上即补发。
+   */
+  function proxyWs(req, socket, head) {
+    const target = `${proxyTo.protocol === 'https:' ? 'wss:' : 'ws:'}//${proxyTo.host}${req.url || '/ws'}`;
+    wss.handleUpgrade(req, socket, head, (client) => {
+      let upstream;
+      try {
+        upstream = new WebSocket(target, { perMessageDeflate: false, maxPayload: WS_MAX_PAYLOAD });
+      } catch (e) {
+        log.warn(`[proxy] 无法连接 ${target}：${e?.message || e}`);
+        try { client.close(1011, 'proxy connect failed'); } catch { /* ignore */ }
+        return;
+      }
+      upstreams.add(upstream);
+      const pending = [];
+      const drop = () => { upstreams.delete(upstream); };
+      const forward = (data, isBinary) => {
+        if (upstream.readyState === WebSocket.OPEN) { try { upstream.send(data, { binary: isBinary }); } catch { /* ignore */ } }
+        else if (upstream.readyState === WebSocket.CONNECTING) pending.push([data, isBinary]);
+      };
+      upstream.on('open', () => { for (const [d, b] of pending.splice(0)) { try { upstream.send(d, { binary: b }); } catch { /* ignore */ } } });
+      upstream.on('message', (data, isBinary) => {
+        if (client.readyState === WebSocket.OPEN) { try { client.send(data, { binary: isBinary }); } catch { /* ignore */ } }
+      });
+      upstream.on('close', (code, reason) => {
+        drop();
+        const c = Number.isInteger(code) && code >= 1000 && code <= 4999 ? code : 1011;
+        try { client.close(c, reason && reason.length ? reason : undefined); } catch { try { client.terminate(); } catch { /* ignore */ } }
+      });
+      upstream.on('error', (e) => {
+        drop();
+        log.warn(`[proxy] ${target} 出错：${e?.message || e}`);
+        try { client.close(1011, 'upstream error'); } catch { try { client.terminate(); } catch { /* ignore */ } }
+      });
+      client.on('message', forward);
+      client.on('close', () => { drop(); try { upstream.close(); } catch { /* ignore */ } });
+      client.on('error', () => { drop(); try { upstream.terminate(); } catch { /* ignore */ } });
+    });
+  }
+
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
@@ -682,6 +785,11 @@ export async function startServer(opts = {}) {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.setHeader('Allow', 'GET, HEAD');
       sendError(req, res, 405, '不支持的请求方法 · Method not allowed');
+      return;
+    }
+    // 代理模式：/api/* 一律转发给中心服务器（在线人数、房间数、公告都以那边为准）。
+    if (proxyTo && parts.rawPath.startsWith('/api/')) {
+      proxyHttp(req, res);
       return;
     }
     if (parts.rawPath === '/healthz') {
@@ -729,6 +837,8 @@ export async function startServer(opts = {}) {
       try { socket.end(`HTTP/1.1 ${status} ${text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`); } catch { socket.destroy(); }
     };
     if (!parts || parts.rawPath !== '/ws') { reject(404, 'Not Found'); return; }
+    // 代理模式：/ws 交给中心服务器；本机的 lobby、限流与准入都不参与（远端自己会限）。
+    if (proxyTo) { proxyWs(req, socket, head); return; }
     const refused = network.admission(req);
     if (refused === 'per-address') { reject(429, 'Too Many Requests'); return; }
     if (refused) { reject(503, 'Service Unavailable'); return; }
@@ -764,6 +874,9 @@ export async function startServer(opts = {}) {
     closing = (async () => {
       try { lobby.shutdown('shutdown'); } catch (e) { log.error('[shutdown] lobby', e); }
       network.close();
+      // 代理出去的连接也要收掉，否则远端会以为这些会话还活着
+      for (const up of upstreams) { try { up.close(1001, 'server shutting down'); } catch { /* ignore */ } }
+      upstreams.clear();
       await new Promise((resolve) => {
         server.close(() => resolve());
         server.closeIdleConnections?.();

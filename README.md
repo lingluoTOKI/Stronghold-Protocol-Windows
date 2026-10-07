@@ -67,9 +67,11 @@ English summary: [below](#english).
 Windows 上还可以用 `node scripts/make-windows-bundle.mjs --zip` 打一份**零安装便携包**：内置官方 Windows x64 便携版 Node、生产依赖与全部素材，目标机器什么都不用装，解压双击 `启动游戏.bat` 就是一个**开始界面**：
 
 * **本机当服务器**：在这台电脑开服，浏览器自动打开，局域网地址可以直接发给朋友；
+* **联机（本机客户端）**：本机素材 + 远程服务器 —— 本机起一个反向代理，页面、代码与素材全部从本机磁盘读，
+  只把 `/ws` 与 `/api/*` 转发给对方的服务器（`联机.bat`），所以进对局最快、也几乎不耗流量；
 * **连接服务器**：用浏览器直接打开别人的服务器，本机不跑任何服务、也不用下素材。
 
-两种模式的差别、地址怎么写、命令行参数与常见问题见 **[docs/WINDOWS.md](docs/WINDOWS.md)**。
+三种模式的差别、地址怎么写、命令行参数与常见问题见 **[docs/WINDOWS.md](docs/WINDOWS.md)**。
 
 1. **安装 Node.js 22 或 24（LTS）**
    - Windows：在 PowerShell 里运行 `winget install OpenJS.NodeJS.LTS`，或到 <https://nodejs.org/zh-cn/download> 下载安装包。

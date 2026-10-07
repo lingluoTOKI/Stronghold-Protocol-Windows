@@ -59,9 +59,9 @@ _probe_assets.mjs
 _verify_manifest.mjs
 _merge_chat.ps1
 stronghold.service
-# 注：仓库根的原地启动器 启动游戏.bat / 本机当服务器.bat / 连接服务器.bat 是**要进版本库**的
+# 注：仓库根的原地启动器 启动游戏.bat / 本机当服务器.bat / 联机.bat / 连接服务器.bat 是**要进版本库**的
 # （它们指向 scripts/launcher.mjs，供直接在仓库里运行）。便携包根目录的那一份由
-# scripts/make-windows-bundle.mjs 自己生成，因此打包时会跳过这三个（见 SKIP_ROOT_FILES）。
+# scripts/make-windows-bundle.mjs 自己生成，因此打包时会跳过这四个（见 SKIP_ROOT_FILES）。
 
 # --- 本地跑测试时的临时目录（本机 %TEMP% 不可写时用 .testtmp 顶上） ----------------------
 .testtmp/

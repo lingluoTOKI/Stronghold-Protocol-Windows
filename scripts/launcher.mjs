@@ -235,6 +235,62 @@ async function connect(cfg, rawAddr, { open = true, yes = false } = {}) {
   return 0;
 }
 
+/**
+ * 模式 2：联机（本机客户端）——本机素材 + 远程服务器的联机。
+ *
+ * 本机起一个**反向代理**：静态部分（public / data / shared / 素材）全部由本机磁盘提供，只有 `/ws` 与
+ * `/api/*` 转发给远程服务器。于是加载最快（素材一次网络都不走）、几乎不耗流量，而且**客户端代码一行都没改**
+ * —— 页面以为自己在跟一个普通服务器说话。
+ *
+ * 与「连接服务器」的区别：那条是打开对方的网页，页面与素材都要从对方下载。
+ * 上游地址只来自这里的输入与启动器配置，**不走 URL 参数**，理由见 server/index.js 里 proxyTo 那段注释。
+ */
+async function runProxy(cfg, rawAddr, { open = true, yes = false } = {}) {
+  const input = rawAddr || await ask('要联机的服务器地址（例如 game.example.com）', cfg.lastName);
+  if (!input) return 1;
+  const parsed = parseServer(input);
+  if (!parsed) { console.log(`${err} 地址无效：${input}`); return 1; }
+
+  // 先探活：免得本机服务都起来了才发现地址写错
+  const candidates = [originOf(parsed), `${parsed.secure ? 'http' : 'https'}://${parsed.host}/`];
+  let chosen = null; let info = null;
+  for (const base of candidates) {
+    // eslint-disable-next-line no-await-in-loop
+    const got = await serverInfo(base);
+    if (got) { chosen = base; info = got; break; }
+    console.log(c.dim(`  ${base} 无响应…`));
+  }
+  if (!chosen) {
+    console.log(`${err} 连不上这台服务器：${input}`);
+    console.log(c.dim('  确认地址写对了、对方服务器在跑。'));
+    return 1;
+  }
+  saveConfig({ ...cfg, lastName: input });
+
+  console.log(`\n  ${ok} ${c.bold('联机（本机客户端）')}`);
+  console.log(`  ${c.dim('本机素材')} · ${c.cyan(chosen)} ${c.dim(`(来自 ${info.endpoint})`)}`);
+  console.log(`  ${c.dim(`只把 /ws 与 /api/* 转发过去；页面与素材全部走本机磁盘，端口 ${cfg.port}，只监听 127.0.0.1。`)}`);
+  if (!parseServer(chosen)?.secure) {
+    console.log(`  ${warn} 未加密的 http 连接：局域网自建没问题，公网服务器建议用 https。`);
+  }
+  if (!yes) {
+    const ans = await ask('开始？[Y/n]', 'Y');
+    if (/^(n|no|否)$/i.test(ans)) return 0;
+  }
+
+  const args = [path.join(ROOT, 'scripts', 'launch.mjs'), '--no-setup',
+    '--port', String(cfg.port), '--host', '127.0.0.1'];
+  if (!open) args.push('--no-open');
+  const child = spawn(nodeExe(), args, {
+    cwd: ROOT, stdio: 'inherit',
+    // 代理只服务本机：绑 127.0.0.1，不走 cfg.host（那是「本机当服务器」要不要给局域网用的开关）
+    env: { ...process.env, PORT: String(cfg.port), HOST: '127.0.0.1', SP_PROXY_TO: chosen },
+  });
+  const code = await new Promise((resolve) => child.on('exit', (cc) => resolve(cc ?? 0)));
+  console.log(`\n${ok} 已停止（退出码 ${code}）。`);
+  return code;
+}
+
 /** 模式 4：查看状态。 */
 async function showStatus(cfg) {
   const localBase = `http://127.0.0.1:${cfg.port}/`;
@@ -286,19 +342,21 @@ async function menu(cfg) {
     console.log(`  ${c.bold('卫戍协议：盟约 · Stronghold Protocol')}  ${c.dim('启动器')}`);
     console.log(`  ${c.dim(`端口 ${cfg.port} · 局域网共享 ${cfg.host === '0.0.0.0' ? '开' : '关'}`)}`);
     console.log('');
-    console.log(`   ${c.cyan('[1]')} 本机当服务器  ${c.dim('在这台电脑开服，浏览器自动打开，可把局域网地址发给朋友')}`);
-    console.log(`   ${c.cyan('[2]')} 连接服务器    ${c.dim('用浏览器直接打开别人的服务器（页面与素材从对方下载）')}`);
-    console.log(`   ${c.cyan('[3]')} 设置          ${c.dim('端口 / 局域网共享')}`);
-    console.log(`   ${c.cyan('[4]')} 查看状态`);
+    console.log(`   ${c.cyan('[1]')} 本机当服务器      ${c.dim('在这台电脑开服，浏览器自动打开，可把局域网地址发给朋友')}`);
+    console.log(`   ${c.cyan('[2]')} 联机（本机客户端）${c.dim('用本机素材连别人的服务器：加载最快，素材一次网络都不走')}`);
+    console.log(`   ${c.cyan('[3]')} 连接服务器        ${c.dim('用浏览器直接打开别人的服务器（页面与素材从对方下载）')}`);
+    console.log(`   ${c.cyan('[4]')} 设置              ${c.dim('端口 / 局域网共享')}`);
+    console.log(`   ${c.cyan('[5]')} 查看状态`);
     console.log(`   ${c.cyan('[0]')} 退出`);
     console.log(line());
     const a = (await ask('选择：')).toLowerCase();
     if (a === '1' || a === 'local') await runLocal(cfg);
-    else if (a === '2' || a === 'connect') await connect(cfg);
-    else if (a === '3' || a === 'settings') await settings(cfg);
-    else if (a === '4' || a === 'status') { await showStatus(cfg); await pause(); }
+    else if (a === '2' || a === 'proxy') await runProxy(cfg);
+    else if (a === '3' || a === 'connect') await connect(cfg);
+    else if (a === '4' || a === 'settings') await settings(cfg);
+    else if (a === '5' || a === 'status') { await showStatus(cfg); await pause(); }
     else if (a === '0' || a === 'q' || a === 'exit') return 0;
-    else if (a) console.log(`${warn} 请输入 0-4`);
+    else if (a) console.log(`${warn} 请输入 0-5`);
   }
 }
 
@@ -322,10 +380,12 @@ const HELP = `scripts/launcher.mjs — 开箱即用启动界面
 
   node scripts/launcher.mjs                         交互菜单（开始界面）
   node scripts/launcher.mjs --mode local            本机当服务器（起服务器 + 开浏览器）
+  node scripts/launcher.mjs --mode proxy --server game.example.com
+                                                     联机：本机素材 + 远程服务器（只转发 /ws 与 /api/*）
   node scripts/launcher.mjs --mode connect --server game.example.com
                                                     连接服务器：用浏览器直接打开对方的服务器
   node scripts/launcher.mjs --mode status           本机与上次连接的服务器状态
-  node scripts/launcher.mjs --mode settings         设置（也可以用菜单 [3]）
+  node scripts/launcher.mjs --mode settings         设置（也可以用菜单 [4]）
   --port N  覆盖端口   --no-open 不开浏览器   --yes 跳过确认   --no-color
 
   详见 README 与 docs/WINDOWS.md。`;
@@ -341,6 +401,7 @@ async function main() {
   console.log(line());
 
   if (o.mode === 'local') return runLocal(cfg, { open: o.open });
+  if (o.mode === 'proxy') return runProxy(cfg, o.server, { open: o.open, yes: o.yes });
   if (o.mode === 'connect') return connect(cfg, o.server, { open: o.open, yes: o.yes });
   if (o.mode === 'status') { const code = await showStatus(cfg); if (!process.stdin.isTTY) return code; await pause(); return code; }
   if (o.mode === 'settings') { await settings(cfg); return 0; }
