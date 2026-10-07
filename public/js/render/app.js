@@ -35,8 +35,6 @@
 //        pieceDragStart { uid, piece, from } · pieceDrop { uid, piece, from, target } · pieceDragEnd {uid, dropped}
 //        pieceClick { uid, piece, button, detail, clientX, clientY } (battle units: { unitId, uid, unit, … })
 //        pieceDetail (right-click / long-press) · pieceHover { uid } | { uid: null } (battle: + unitId, unit)
-//        tileClick { row, col, x, y } — the ground itself was tapped and nothing stands there (GitHub issue #184:
-//        a special terrain tile's own tip; the screen resolves it with gameLogic.terrainInfo)
 //        tileHover { row, col, area, idx } | null (while dragging: the drop target — the tile under the pointer)
 //   view.pieceScreenRect(uid) → { left, top, right, bottom, width, height, x, y } (client px: the drawn body) | null
 // Picking (user playtest #4 item 1: the ground is drawn as tiles — a press on a tile is a press on the unit standing
@@ -128,8 +126,8 @@ import { loadThree, loadBoardPack, webgl2Available, boardArtListed } from './boa
 import { BoardScene } from './board3d/scene.js';
 import { unionAreas } from './board3d/layout.js';
 import { layoutPen, penSignature } from './pen.js';
-import { IDENTITY, bossPrepField, tilesToDisp, leaderStand } from './prepfield.js';
-import { pickOnTile, pickBattle, hitTiles } from './pick.js';
+import { IDENTITY, bossPrepField, tilesToDisp, circleToDisp, leaderStand } from './prepfield.js';
+import { pickOnTile, pickBattle, hitRectAt, hitTiles } from './pick.js';
 import { promotionsOf } from './promote.js';
 import { ensurePixi } from './app/pixi.js';
 import { pieceDirOf, pickUnitOf } from './app/pick.js';
@@ -260,6 +258,9 @@ export async function createFieldView(host, options = {}) {
   const gone = new Set();
   const woundUp = new WeakSet(); // atk event tuples whose attack wind-up already started
   const interp = new SnapshotBuffer({ delay: 0.1, rate: 2 });
+  // Local deterministic feed state (client-side combat): when on, every snapshot carries the battle speed and the
+  // interpolation rate is synced from it on the same frame (no React-effect lag at a 1x/2x/4x switch).
+  let localFeedOn = false;
   const sample = new Map();
   const meleePending = new Map(); // target id → { src, t }
   const consumedIds = new Set();  // battle ids used up by their own effect (fx `consumed`): no death particles
@@ -635,7 +636,7 @@ export async function createFieldView(host, options = {}) {
     }
     if (kind === 'token') {
       const rec = data.token(piece.id);
-      return { kind: 'token', side: 'ally', defId: piece.id, spine: rec?.assets?.spine || piece.id, avatar: rec?.assets?.avatar || piece.id, tier: piece.tier || 1, golden: false, dir };
+      return { kind: 'token', side: 'ally', defId: piece.id, spine: rec?.assets?.spine || piece.id, avatar: rec?.assets?.avatar || piece.id, tier: piece.tier || 1, golden: false, dir, researchStage: piece.research ? piece.stage : undefined };
     }
     const chess = data.chess(piece.id);
     // 0.2.0 补位: a piece of a chess the player does not own (m.private.standIns) is its stand-in's model, in the hand,
@@ -763,6 +764,7 @@ export async function createFieldView(host, options = {}) {
         }
       }
       v._home = w;
+      if (info.researchStage != null) v.setResearchStage?.(info.researchStage);
       v.dimmed = false;
       if (info.kind === 'item' && v.setIcon) v.setIcon(info.icon); // an icon the manifest named late (onAssets)
       if (v.setCount) v.setCount(e.piece.kind === 'token' ? e.piece.count : 0);
@@ -1018,10 +1020,16 @@ export async function createFieldView(host, options = {}) {
    */
   function drawHighlight(list, style, group) {
     const key = hlKey(style, group);
+    if (style?.circle) style = { ...style, circle: circleToDisp(mode === 'prep' ? prepXf : IDENTITY, style.circle) };
     const range = RANGE_GROUPS.has(key) || style === 'range';
     let t = tilesToDisp(IDENTITY, list);
-    if (range) t = t.filter(([r]) => r !== GEO.HAND_ROW && r !== GEO.TEMP_ROW);
+    if (range && !style?.researchRange) t = t.filter(([r]) => r !== GEO.HAND_ROW && r !== GEO.TEMP_ROW);
     if (mode === 'prep' && prepXf !== IDENTITY) t = tilesToDisp(prepXf, t);
+    if (style?.researchRange) {
+      const bounds = mode === 'prep' && prepXf !== IDENTITY ? GEO.BOSS_RECT
+        : mode === 'battle' && battleMeta?.rect ? battleMeta.rect : GEO.NORMAL_RECT;
+      t = t.filter(([r, c]) => r >= bounds.r0 && r <= bounds.r1 && c >= bounds.c0 && c <= bounds.c1);
+    }
     tiles.setHighlights(t, style, key, { stripes: range && key !== 'rangeStand' && !board3d });
   }
   function clearHl(group) {
@@ -1139,11 +1147,8 @@ export async function createFieldView(host, options = {}) {
   /**
    * The ground itself was tapped: nothing stands there, so the TILE explains itself — a special terrain tile (活性源石,
    * 沼泽, 排气格栅, 深水区, 红/蓝门, 传送) opens its own card (GitHub issue #184; screens/game.js `tileClick` →
-   * gameLogic.terrainInfo, which says nothing about an ordinary floor / road / wall tile).
-   * The tile is picked as a BOARD tile (`pickBoardTile`, i.e. through `prepXf.toBoard`): on a Final Assault / Hidden Core
-   * PREP the board draws the boss field's own rows (stage 2–5 as board 9–12), and the screen maps board → stage once more
-   * with `gameLogic.fieldTile` — reporting the DRAWN tile here would be converted twice and explain the wrong tile
-   * (review on #185).
+   * gameLogic.terrainInfo). The tile is picked as a BOARD tile (`pickBoardTile`), and the screen maps board → stage once
+   * more with `gameLogic.fieldTile` on a boss-prep board.
    */
   function emitTileClick(ev, e) {
     const t = pickBoardTile(ev.x, ev.y);
@@ -1201,10 +1206,9 @@ export async function createFieldView(host, options = {}) {
   // 撤退 / 出售 (user playtest #4 item 1 on a phone). Cancelling touchend drops them.
   const onTouchEnd = (e) => { if (e.cancelable) e.preventDefault(); };
   // The canvas is a click target too (a no-op listener). The browser's touch adjustment moves a tap onto a nearby
-  // element that responds to clicks (click / mousedown listeners, buttons, links; pointer listeners do not count) when the
-  // finger's contact area reaches one, so a tap on the back row right under the bond strip's discs (row 12 at 844×390 once
-  // the 收起 toggle of PR #149 moved the discs one button to the right) opened the bond popup instead of selecting the
-  // unit. As a click target that holds the finger's point the canvas wins: a tap on the board stays on the tile under it.
+  // click-responding element, so a tap on the back row right under the bond strip's discs opened the bond popup
+  // instead of selecting the unit. As a click target that holds the finger's point the canvas wins: a tap on the board
+  // stays on the tile under it.
   const onTapTarget = () => {};
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
@@ -1304,7 +1308,10 @@ export async function createFieldView(host, options = {}) {
   function pushSnapshot(snap) {
     if (destroyed || mode !== 'battle') return false;
     if (battleMeta?.fieldId && snap && snap.fieldId && snap.fieldId !== battleMeta.fieldId) return false;
-    return interp.push(snap, performance.now() / 1000);
+    const ok = interp.push(snap, performance.now() / 1000);
+    // local deterministic feed: apply the known battle speed on the same frame a snapshot arrives (zero switch lag)
+    if (ok && localFeedOn && snap && Number(snap.speed) > 0) interp.setLocalRate(Number(snap.speed));
+    return ok;
   }
 
   function pushEvents(ev) {
@@ -1703,9 +1710,12 @@ export async function createFieldView(host, options = {}) {
     setLocalFeed(o) {
       const on = !!(o && o.on);
       const speed = Number(o && o.speed) > 0 ? Number(o.speed) : 2;
+      localFeedOn = on;
       interp.delay = on ? 0.034 : 0.1;
       interp.defaultRate = on ? Math.min(20, speed) : 2;
       interp.maxRate = on ? Math.max(8, speed * 1.5) : 8;
+      // apply the rate at once (local feed knows it) instead of waiting for the arrival EMA to converge
+      if (on) interp.setLocalRate(speed); else interp.clearLocalRate();
       return true;
     },
     highlightTiles(tilesList, style) {

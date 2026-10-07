@@ -42,6 +42,10 @@ export function renderInfo(u) {
     // unit (resolveDetail `unitItems` → the read-only 装备 section and the 变形同构体 pairing chips); the owner's own
     // unit takes its items from the piece instead, so only other players' boards ever read this field
     items: Array.isArray(u.items) ? u.items.filter((x) => typeof x === 'string') : undefined,
+    // 本扩展（莱茵科研装置）：当前突破阶段与是否正在生效。重连 / 观战时，装置的阶段要在它下一次
+    // 效果事件之前就画出来，所以由快照直接带过来。
+    researchStage: Number.isInteger(u.researchStage) && u.researchStage >= 0 && u.researchStage <= 2 ? u.researchStage : undefined,
+    researchActive: typeof u.researchActive === 'boolean' ? u.researchActive : undefined,
     // 0.2.0 补位: the replaced operator's charId of a chess fighting as its stand-in (UnitInfo.standInFor; spine / avatar /
     // name are already the stand-in's) — the detail card and the view's data lookups (attack interval, splash FX) follow it
     standInFor: typeof u.standInFor === 'string' && u.standInFor ? u.standInFor : undefined,

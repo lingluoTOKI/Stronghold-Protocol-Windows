@@ -11,7 +11,7 @@ const BOARD3D_RETRY_MS = [1200, 4000, 12000];
 const BOARD3D_STABLE_MS = 10000;
 
 /** Highlight groups that show a unit's range: never drawn on bench / temp pads (they are not part of any battle). */
-const RANGE_GROUPS = new Set(['facing', 'range', 'rangeStand', 'select', 'sel', 'selRange']);
+const RANGE_GROUPS = new Set(['facing', 'range', 'rangeStand', 'select', 'sel', 'selRange', 'researchPreview']);
 
 /**
  * The round leader's hit tiles, lit beside an operator's range preview in the Final Assault / Hidden Core prep (see the
