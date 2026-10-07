@@ -47,6 +47,7 @@ import { installDeviceSupport } from './ui/device.js';
 import { LoadoutHost } from './screens/loadout.js';
 import { installLoadoutSync } from './ui/loadoutSync.js';
 import { startBuildGuard } from './ui/buildGuard.js';
+import { probeOss } from './assets.js';
 
 const RESTORE_GRACE_MS = 1500;
 const JOIN_DELAY_MS = 350;
@@ -362,6 +363,10 @@ async function boot() {
   // Audio: unlock on first gesture, BGM follows the route / match phase (js/audio.js).
   installAudio({ getManifest: () => data.get('assets'), subscribe: store.subscribe, getState: store.get, selectRoute, settings: settingsStore.get() });
   data.load('assets').catch(() => {});
+  // Ask OSS once whether it will serve us. A client it refuses (offline, LAN address, un-whitelisted tunnel host)
+  // would otherwise fire one failed request per asset before assets.js notices; this settles the question up front.
+  // Deliberately not awaited: the probe has its own timeout, and the per-load fallback covers the race.
+  probeOss().catch(() => {});
   // Warm the data cache in the background (missing files are tolerated).
   data.loadAll('config').catch(() => {});
   // Optional local-client art manifest (emotes, tutorial pages, official UI sprites; DESIGN §13).

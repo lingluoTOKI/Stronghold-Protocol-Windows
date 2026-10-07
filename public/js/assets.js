@@ -49,12 +49,65 @@ const get = (o, k) => (isObj(o) && Object.hasOwn(o, k) ? o[k] : undefined);
 // Static assets (`/assets/…`) are served from Aliyun OSS (`weishuxieyi-game-res`, Shanghai) to relieve the
 // 1 Mbps burst-limited public bandwidth of the game server; the WebSocket / API / page code stays on the server.
 // Only paths under `/assets/` are rewritten — every other URL (API, ws, html/css/js) is left untouched.
+//
+// Fallback (`rewriteAssetUrl`). The bucket answers only to the origins its 防盗链 / CORS rules list, and a
+// player may be offline, on a LAN address, or behind a tunnel host that was never whitelisted: any of those
+// turns every asset request into a 403 or a transport error. So OSS is a *preference*, not a requirement —
+// the moment one load fails, `disableOss()` sends every later `/assets/…` URL back to the server's own copy
+// and the game keeps playing (through the server's bandwidth again, which is the thing OSS was there to save).
 export const OSS_BASE = 'https://weishuxieyi-game-res.oss-cn-shanghai.aliyuncs.com';
+
+/** A small object that is always in the bucket; `probeOss` asks for it to decide reachability once, at boot. */
+export const OSS_PROBE_PATH = '/assets/ui/hudPanel/white_sprite.png';
+
+/** Whether static assets are fetched from OSS. Cleared for good by the first failed OSS load. */
+let ossOn = true;
+/** @type {Promise<boolean>|null} */
+let ossProbe = null;
+
+/** Serve `/assets/…` from the server's own copy instead of OSS. Idempotent (see the fallback note above). */
+export function disableOss() { ossOn = false; }
+
+/** Put OSS back in charge — for a caller that wants to retry it, and for tests. */
+export function enableOss() { ossOn = true; }
+
+/** Whether assets are currently fetched from OSS. */
+export function ossEnabled() { return ossOn; }
 
 /** Rewrite a static asset path to the OSS host; any other URL returns unchanged. */
 export function rewriteAssetUrl(url) {
-  if (typeof url === 'string' && url.startsWith('/assets/')) return OSS_BASE + url;
+  if (typeof url === 'string' && url.startsWith('/assets/')) return ossOn ? OSS_BASE + url : url;
   return url;
+}
+
+/**
+ * Ask OSS once, early, whether it will serve us — so an offline or un-whitelisted client does not fire one failed
+ * request per asset before the fallback catches on. Never rejects; resolves to whether OSS is on.
+ *
+ * Only a transport failure (DNS, refused connection, timeout) or a 403 turns OSS off. A 404 means the bucket
+ * answered and merely the probe path is wrong, and flipping every player to the server over one missing file
+ * would be a worse failure than the one being guarded against.
+ *
+ * @param {{ timeoutMs?: number, path?: string, fetch?: Function, fresh?: boolean }} [opts] `fetch`/`fresh` for tests.
+ */
+export function probeOss(opts = {}) {
+  if (ossProbe && !opts.fresh) return ossProbe;
+  const timeoutMs = opts.timeoutMs ?? 2500;
+  const url = OSS_BASE + (opts.path || OSS_PROBE_PATH);
+  const doFetch = opts.fetch || (typeof fetch === 'function' ? fetch : null);
+  ossProbe = (async () => {
+    if (!doFetch) return ossOn; // no fetch here (Node tests): leave the mapping exactly as configured
+    let timer = null;
+    try {
+      const ac = !opts.fetch && typeof AbortController === 'function' ? new AbortController() : null;
+      if (ac) timer = setTimeout(() => ac.abort(), timeoutMs);
+      const res = await doFetch(url, ac ? { cache: 'no-store', signal: ac.signal } : { cache: 'no-store' });
+      if (res && res.status === 403) disableOss();
+    } catch { disableOss(); }
+    finally { if (timer) clearTimeout(timer); }
+    return ossOn;
+  })();
+  return ossProbe;
 }
 
 // ---- pure URL helpers (manifest first) ---------------------------------------------------------------------
@@ -800,22 +853,36 @@ export function createAssets(options) {
   const spineEntries = new Map(); // skel URL → manifest entry (for the atlas / page URLs on unload)
   const spine = new RefLru({
     load: (key, entry, o) => {
-      // Rewrite the entry's URLs to OSS before handing them to PIXI (the entry object itself stays relative, so
+      // Rewrite the entry's URLs before handing them to PIXI (the entry object itself stays relative, so
       // `validSpine` still accepts it); unload and forgetPendingSpine use the same rewritten URLs as cache keys.
+      // The rewrite happens per attempt, so a retry after an OSS failure addresses the server's own /assets/ copy.
       const oss = (u) => rewriteAssetUrl(u);
-      const e = {
-        ...entry,
-        skel: oss(entry.skel),
-        atlas: typeof entry.atlas === 'string' ? oss(entry.atlas) : entry.atlas,
-        textures: Array.isArray(entry.textures) ? entry.textures.map(oss) : entry.textures,
+      const load = opts.loadSpine || loadSpineData;
+      // The pages another cached skeleton uses stay (forgetPendingSpine `keep`).
+      const keepOthers = () => {
+        const keep = new Set();
+        for (const [k, other] of spineEntries) if (k !== key && spine.map.has(k)) for (const u of spinePages(other)) keep.add(u);
+        return keep;
       };
-      spineEntries.set(key, e);
-      if (!(o && o.fresh)) return (opts.loadSpine || loadSpineData)(e);
-      // a fresh load (a restart, or after a failure): not joined to a request that may never settle — but the pages
-      // another cached skeleton uses stay (forgetPendingSpine `keep`)
-      const keep = new Set();
-      for (const [k, other] of spineEntries) if (k !== key && spine.map.has(k)) for (const u of spinePages(other)) keep.add(u);
-      return (opts.loadSpine || loadSpineData)(e, { fresh: true, keep });
+      const attempt = (fresh) => {
+        const e = {
+          ...entry,
+          skel: oss(entry.skel),
+          atlas: typeof entry.atlas === 'string' ? oss(entry.atlas) : entry.atlas,
+          textures: Array.isArray(entry.textures) ? entry.textures.map(oss) : entry.textures,
+        };
+        spineEntries.set(key, e);
+        // a fresh load (a restart, or after a failure): not joined to a request that may never settle
+        return fresh ? load(e, { fresh: true, keep: keepOthers() }) : load(e);
+      };
+      const p = attempt(!!(o && o.fresh));
+      if (o && o.fresh) return p; // an explicit fresh load is already a retry from scratch
+      return p.catch((err) => {
+        // the skeleton came from OSS and never arrived (403 / CORS / offline): retry the server's own copy
+        if (!ossEnabled()) throw err;
+        disableOss();
+        return attempt(true);
+      });
     },
     unload: (key, value, rec) => {
       // a late value of an entry that was dropped while loading, with the key already loading/cached again: the
@@ -855,10 +922,14 @@ export function createAssets(options) {
     if (e && options?.retry && e.done && !e.value) { images.delete(s); e = null; }
     if (!e) {
       e = { value: null, done: false, promise: null };
-      e.promise = Promise.resolve().then(() => loadImage(s)).then(
-        (img) => { e.value = img; e.done = true; return img; },
-        () => { e.done = true; return null; },
-      );
+      const got = (img) => { e.value = img; e.done = true; return img; };
+      const gave = () => { e.done = true; return null; };
+      e.promise = Promise.resolve().then(() => loadImage(s)).then(got, () => {
+        // OSS refused (403 / CORS) or never answered: take the server's own copy — now, and for every later URL
+        if (s === raw || !ossEnabled()) return gave();
+        disableOss();
+        return Promise.resolve().then(() => loadImage(raw)).then(got, gave);
+      });
       images.set(s, e);
     }
     return e.promise;
@@ -928,7 +999,13 @@ export function createAssets(options) {
     /** Cached image element promise (null on failure); `{ retry: true }` retries a completed failure only. */
     image,
     /** Already-loaded image element or null (sync). */
-    imageNow(u) { const e = images.get(rewriteAssetUrl(str(u) || '')); return e && e.done ? e.value : null; },
+    imageNow(u) {
+      // The entry may be cached under the OSS URL (loaded before a fallback) or under the local one: accept both.
+      const raw = str(u) || '';
+      const e = images.get(rewriteAssetUrl(raw))
+        || (raw.startsWith('/assets/') ? images.get(OSS_BASE + raw) : undefined);
+      return e && e.done ? e.value : null;
+    },
     /**
      * Preload URLs; `onProgress(done, total, url)` after each. Resolves to { ok, failed } counts (never rejects).
      */
