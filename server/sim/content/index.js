@@ -53,6 +53,9 @@ const rhine = DOMAINS[DOMAIN_NAMES.indexOf('rhine')];
  * (kits/index.js; each kit file is loaded guarded too)
  */
 export const KITS = KIT_REGISTRY.KITS ?? Object.freeze({});
+/** 本扩展：莱茵档案用的注册表（伊芙利特/森蚺/多萝西用我们重写的 kit）。 */
+export const KITS_RHINE = KIT_REGISTRY.KITS_RHINE ?? KITS;
+
 
 /** Domain modules in install order: tokens, devices, enemies, bosses, bonds, garrisons, items, bands, choices. */
 export const MODULES = Object.freeze(DOMAIN_NAMES.map((n, i) => [n, DOMAINS[i]]));
@@ -82,6 +85,9 @@ const isOtherBody = (def) => isStandInDef(def) || isDiyDef(def);
  * names the replaced operator's kit (a DIY slot has none). Any other def: baseId (`…_a`, data/SIM.md), the exact id, or
  * the suffix-less id of DESIGN §5.6's example.
  */
+/** 本扩展：按本局档案选 kit 注册表 —— rhine 用 KITS_RHINE，其余用 KITS。 */
+export const kitsFor = (battle) => (battle?.data?.dataProfile === 'rhine' ? KITS_RHINE : KITS);
+
 export function kitOf(def, reg) {
   if (!def || !reg) return undefined;
   if (isOtherBody(def)) return Object.prototype.hasOwnProperty.call(reg, def.charId) ? reg[def.charId] : undefined;
@@ -117,7 +123,7 @@ export function setupUnitKit(battle, unit, mode = 'full') {
   if (unit.kind !== 'op') return {};
   const injected = battle.opts && battle.opts.kits;
   if (mode === 'full' || injected) {
-    const f = kitOf(def, injected) ?? (mode === 'full' ? kitOf(def, KITS) : undefined);
+    const f = kitOf(def, injected) ?? (mode === 'full' ? kitOf(def, kitsFor(battle)) : undefined);
     if (typeof f === 'function') {
       try {
         const k = f(bb, raw, def);
