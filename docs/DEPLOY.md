@@ -198,43 +198,67 @@ server {
 
 https / wss 说明：页面通过 https 打开时客户端自动连接 `wss://同一域名/ws`；http 时用 `ws://`。服务器本身只提供 http，证书由代理 / 隧道负责。代理与服务器在同一台机器或内网时，`TRUST_PROXY=auto` 会信任它的 `X-Forwarded-For` / `X-Real-IP`；代理在公网另一台机器上时设 `TRUST_PROXY=1`（同时确保游戏端口只对代理开放）。
 
-### 可选：把 `/data` 与 `/vendor` 也分流到 OSS
+### 可选：把 `/data` `/vendor` `/js` `/css` 也分流到 OSS
 
-素材已经走 OSS（`public/js/assets.js` 的 `rewriteAssetUrl`），但开局要拉的东西不止素材：`/data/*.json`
-（gzip 后约 0.8 MB）和 `/vendor/*`（约 2.8 MB）仍然从这台机器过。窄带宽的轻量服务器上，这部分就要几十秒，
-而 WebSocket 对战和它抢同一条出口（实测出口只有 17–105 KB/s）。
+素材已经走 OSS（`public/js/assets.js` 的 `rewriteAssetUrl`），但开局要拉的东西远不止素材。实测这台轻量
+服务器对外的出口只有 **17–105 KB/s**，而这些仍然从它过，gzip 后合计约 1.5 MB，也就是几十秒；WebSocket
+对战还和它们抢同一条出口。
 
-让代理把这两个前缀 **302** 到 OSS，客户端一行都不用改：
+| 前缀 | 内容 | gzip 后 | 备注 |
+|---|---|---|---|
+| `/data/` | 对局数据 `*.json` | ~0.8 MB | 每次改数值都会变 |
+| `/vendor/` | pixi / three / preact 等 | ~0.7 MB | 升级依赖才变 |
+| `/js/` | 客户端源码 | ~0.4 MB | **每次发版都变** |
+| `/css/` | 样式 | ~50 KB | 每次发版都变 |
+
+让代理把这四个前缀 **302** 到 OSS，客户端一行都不用改：
 
 ```nginx
     # 放在 `location /` 之前。用 302 而不是 301：301 会被浏览器永久记住，将来想改回本地很麻烦。
-    location ~ ^/(data|vendor)/ {
+    location ~ ^/(data|vendor|js|css)/ {
         return 302 https://weishuxieyi-game-res.oss-cn-shanghai.aliyuncs.com$request_uri;
     }
 ```
 
-**加之前必须先确认 OSS 上已有这些文件**，否则整站会从「慢」变成「打不开」（404）：
+**加之前必须先确认 OSS 上已经有这些文件**，否则整站会从「慢」变成「打不开」（404）。
+用仓库里的脚本自查，它会逐个比对 OSS 上的 ETag 与本地 md5：
 
 ```bash
-curl -o /dev/null -s -w '%{http_code}\n' -e https://你的域名/ \
-  https://weishuxieyi-game-res.oss-cn-shanghai.aliyuncs.com/data/assets.json    # 期望 200
+node tools/setup.mjs                       # 素材 / 前端库先准备好
+node scripts/publish-static-to-oss.mjs --check   # 只比对，不上传；不一致会列出文件名
+node scripts/publish-static-to-oss.mjs           # 同步（首次迁移、以及每次发版）
 ```
 
-上传用 `ossutil`（仓库自带 `ossutil-v1.7.19-windows-amd64/`，先 `ossutil config` 填 AccessKey）：
+脚本要求机器上有一个能用的 `ossutil`（先跑一次 `ossutil config` 填 AccessKey；或用 `--ossutil <路径>`
+指定，仓库自带的在 `ossutil-v1.7.19-windows-amd64/`）。**密钥只留在 ossutil 自己的配置里，脚本不接触。**
 
-```bash
-OSS=oss://weishuxieyi-game-res
-# 数据每次发版都会变，绝不能长缓存，否则玩家一年都拿旧数据
-ossutil cp -r data/           $OSS/data/   --meta Cache-Control:no-cache
-# 前端库内容稳定，可以长缓存
-ossutil cp -r public/vendor/  $OSS/vendor/ --meta Cache-Control:max-age=31536000
-```
+### 发版流程必须包含同步这一步
 
-**每次改过 `data/` 或升级依赖后，都要重跑上面的 `ossutil cp`**，否则玩家拿到的还是 OSS 上的旧文件。
+`/js` 和 `/css` 每次发版都变，所以**每次部署后都要重跑 `node scripts/publish-static-to-oss.mjs`**。
 
-**不要**把 `/js/` 和 `/css/` 也指过去。它们每次发版都变，OSS 上的那份一旦落后，页面会加载到旧模块，
-而 `/healthz` 报的 build 标记是新的 —— `public/js/ui/buildGuard.js` 会判定「页面过期」并自动刷新，
-刷新后仍旧模块，于是**反复刷新停不下来**。这两个留在本地，靠 gzip 传输即可。
+忘了传的后果**不是**页面反复刷新 —— `public/js/ui/buildGuard.js` 在一个新页面首次检查 `/healthz` 时就把
+当前 build 标记认作「我这一版」，之后标记不变就不再动作。真正的问题是它**也检测不出来**：build 标记来自
+服务器磁盘上的文件，而浏览器拿到的是 OSS 上的旧副本，两边对不上时没有任何一方会报错。玩家会**静默地
+一直跑旧代码**，你看到的日志一切正常。发版前用 `--check` 自查一次最省事。
+
+### Cache-Control 的取舍
+
+脚本按目录写死（见 `scripts/publish-static-to-oss.mjs` 的 `TREES`）：
+
+* `/data`、`/js`、`/css` 随发版改变 —— `Cache-Control: no-cache`。浏览器仍会带 `If-None-Match` 回源校验，
+  内容没变就是一次 304，不额外消耗多少流量；内容变了立刻生效。
+* `/vendor` 内容稳定 —— `Cache-Control: max-age=31536000`。
+
+**别用 1 年长缓存去存 `/js`**：那样发版后玩家要等缓存过期才拿得到新代码，而 `--check` 也帮不上忙。
+
+### 两个容易踩的点
+
+* **`data/local-assets.json` 是每台服务器自己的本地素材清单**（3D 棋盘靠它判断能不能启用），也被同步到
+  OSS。重新提取本地素材后必须重跑同步，否则玩家那边 3D 棋盘会按旧清单渲染。
+* **`ossutil cp -r <dir> oss://bucket/` 会把源目录的*内容*倒进目标前缀**，不是把目录本身放进去 ——
+  少写一级前缀就会把文件撒到 bucket 根目录。`scripts/publish-static-to-oss.mjs` 因此逐个文件显式指定
+  目标 key，不要图省事改回 `cp -r`。
+
 
 
 ## 3. Docker
