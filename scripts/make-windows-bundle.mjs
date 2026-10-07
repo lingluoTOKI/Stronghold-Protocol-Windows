@@ -91,7 +91,7 @@ const HELP = `node scripts/make-windows-bundle.mjs — 生成 Windows 开箱即�
   --no-node          不下载便携版 Node（目标机器需自备 Node 22+）
   --with-tests       连 test/ 一起打包（默认不打，省体积）
   --keep-webfonts    保留 index.html 里的 Google Fonts 外链（默认去掉，见下）
-  --force            目录已存在时先删掉
+  --force            目录已存在时先删掉（只肯删空目录，或上一次打的便携包；其余情况拒绝）
   --node-version X   换一个 Node 版本（默认 ${NODE_PIN.version}）；换版本必须同时给 --sha256
   --sha256 <hash>    该版本 win-x64.zip 的 sha256（取自官方 SHASUMS256.txt）
 
@@ -116,6 +116,77 @@ export function stripWebfonts(html) {
 }
 
 /**
+ * 真实路径（解析符号链接 / Windows 8.3 短名）；路径本身还不存在时，退到最长的存在祖先再拼回去。
+ * @param {string} p
+ */
+function canonical(p) {
+  let head = path.resolve(p);
+  const tail = [];
+  for (;;) {
+    try {
+      head = fs.realpathSync.native(head);
+      break;
+    } catch {
+      const parent = path.dirname(head);
+      if (parent === head) break;                 // 到根都还不存在：只能按字面量比
+      tail.unshift(path.basename(head));
+      head = parent;
+    }
+  }
+  const joined = tail.length ? path.join(head, ...tail) : head;
+  // 只有 Linux 的默认文件系统区分大小写；darwin / win32 上按不区分处理是偏保守的一侧（宁可拒绝也不误删）。
+  return process.platform === 'linux' ? joined : joined.toLowerCase();
+}
+
+/**
+ * `--out` 指到仓库本身或它的**上级**目录时，`--force` 会先 `rm -rf` 那个目录 —— 也就是把仓库整个删掉。
+ * 这种路径直接拒绝（指向仓库内部是允许的，只是产物会出现在 git status 里）。
+ *
+ * 注意这只是第一道防线：真正的保险是下面 `forceDeleteVerdict()` 那条「不确定就不删」的规则，
+ * 因为再小心的路径比较也挡不住 8.3 短名之类的花样。
+ * @param {string} out
+ * @param {string} [root]
+ */
+export function outDirIsUnsafe(out, root = ROOT) {
+  const r = canonical(root);
+  const o = canonical(out);
+  if (o === r) return true;
+  const rel = path.relative(o, r);          // 从 out 看 root 的相对位置
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/** 上一次打的便携包长这样：包根有这份说明，还有一个 app\ 目录。 */
+const BUNDLE_MARKERS = Object.freeze(['README-开箱即用.md', 'app']);
+
+/**
+ * `--force` 允不允许删掉这个目录？
+ *
+ * 只认三种情况：目录还不存在；目录是空的；目录**看起来就是上次打的便携包**。
+ * 其余一律拒绝 —— 路径比较挡不住大小写、符号链接、8.3 短名的花招，所以规则反过来写：
+ * 只有能确认「这就是上次的产物」才动手删，认不出来就什么都不删。
+ * @param {string} dir
+ * @returns {'missing' | 'empty' | 'bundle' | 'refuse'}
+ */
+export function forceDeleteVerdict(dir) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (e) {
+    return e?.code === 'ENOENT' ? 'missing' : 'refuse';   // 读不出来（权限 / 不是目录）就别删
+  }
+  if (entries.length === 0) return 'empty';
+  const app = entries.find((e) => e.name === 'app');
+  const looksLikeBundle = BUNDLE_MARKERS.every((n) => entries.some((e) => e.name === n))
+    && !!app && (app.isDirectory() || app.isSymbolicLink());
+  return looksLikeBundle ? 'bundle' : 'refuse';
+}
+
+/** PowerShell 单引号字符串：内部的 ' 写成 ''（否则 Expand-Archive 那条命令会被截断）。 */
+export function psSingleQuote(s) {
+  return `'${String(s).replace(/'/g, "''")}'`;
+}
+
+/**
  * 版本库里跟踪的文件（仓库相对路径，posix 分隔符）。
  *
  * 这是 app\ 文件清单的唯一来源。用 NUL 分隔读，避免中文 / 空格文件名被 git 转义或截断。
@@ -130,10 +201,10 @@ function trackedFiles() {
 }
 
 /** 按相对路径清单逐个复制（自动建目录）；源文件不存在就跳过（例如素材还没下载）。 */
-async function copyFiles(relPaths, dst) {
+export async function copyFiles(relPaths, dst, root = ROOT) {
   let files = 0; let bytes = 0;
   for (const rel of relPaths) {
-    const from = path.join(ROOT, rel);
+    const from = path.join(root, rel);
     const to = path.join(dst, rel);
     let st;
     try {
@@ -150,16 +221,17 @@ async function copyFiles(relPaths, dst) {
   return { files, bytes };
 }
 
-/** 整目录复制（素材 / 依赖），跳过符号链接。 */
-async function copyDir(src, dst) {
+/** 整目录复制（素材 / 依赖），跳过符号链接与点开头的条目（打包机器自己的 .DS_Store 之类）。 */
+export async function copyDir(src, dst) {
   let files = 0; let bytes = 0;
   const walk = async (d, out) => {
     await fsp.mkdir(out, { recursive: true });
     const entries = await fsp.readdir(d, { withFileTypes: true });
     for (const e of entries) {
+      // 点开头的目录整棵跳过：macOS 的 .DS_Store、编辑器临时目录都不该进包
+      if (e.name.startsWith('.') || e.isSymbolicLink()) continue;
       const from = path.join(d, e.name);
       const to = path.join(out, e.name);
-      if (e.isSymbolicLink()) continue;
       if (e.isDirectory()) {
         // eslint-disable-next-line no-await-in-loop
         await walk(from, to);
@@ -268,7 +340,7 @@ async function downloadPortableNode(bundleNodeDir, version, wantHash) {
     // Windows 10+ 自带 bsdtar，macOS / Linux 也有 tar，都能解 zip；没有才退回 Expand-Archive。
     let r = spawnSync('tar', ['-xf', zipPath, '-C', unpack], { stdio: 'inherit' });
     if ((r.error || r.status !== 0) && IS_WIN) {
-      r = spawnSync('powershell', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${unpack}' -Force`], { stdio: 'inherit' });
+      r = spawnSync('powershell', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath ${psSingleQuote(zipPath)} -DestinationPath ${psSingleQuote(unpack)} -Force`], { stdio: 'inherit' });
     }
     if (r.error || r.status !== 0) throw new Error('解压 Node 失败（需要可用的 tar）');
   }
@@ -291,24 +363,36 @@ function bat(body) {
   return `@echo off\r\nchcp 65001 >nul\r\nsetlocal\r\nset "HERE=%~dp0"\r\nset "NODE="\r\nif exist "%HERE%node\\node.exe" set "NODE=%HERE%node\\node.exe"\r\nif not defined NODE set "NODE=node"\r\n${body}\r\nset "CODE=%ERRORLEVEL%"\r\nif not "%CODE%"=="0" pause\r\nexit /b %CODE%\r\n`;
 }
 
-const README = (version) => `# 卫戍协议：盟约 · Windows 开箱即用包
+/**
+ * 包内说明（README-开箱即用.md）。
+ *
+ * 措辞有两条硬要求，别改回去：不能声称这个包「不访问外网」（页面里仍有 Google Fonts 外链），
+ * 也不能说「本包按 GPL 分发」（素材的版权在原权利人手里，GPL 覆盖不到）。
+ * @param {{ version: string, withNode?: boolean }} o
+ */
+export function bundleReadme({ version, withNode = true }) {
+  return `# 卫戍协议：盟约 · Windows 开箱即用包
 
-解压后**双击 \`启动游戏.bat\`** 即可，目标机器不需要安装 Node、不需要联网下载素材。
-这个包**不访问外网**：字体用包内自带的 \`app\\public\\fonts\`（Bender / Novecento Wide），
-原版页面里指向 \`fonts.googleapis.com\` 的外链已去掉（想保留：重新打包时加 \`--keep-webfonts\`）；
-中文会退回系统自带的黑体，和没有代理时上 Google 的效果一致。
+解压后**双击 \`启动游戏.bat\`** 即可${withNode ? '，目标机器不需要安装 Node' : '（本包没有带便携版 Node，请自行安装 Node 22 或 24）'}。
+
+**联网时**页面会去 Google Fonts 取中文字体（Noto Sans SC）；**断网**时自动退回系统自带的黑体，
+和没有代理时上 Google 的效果一致，所以**不联网也能玩**。玩家头像、立绘、Spine 小人、技能图标、
+音效与 BGM 由阿里云 OSS 分发，联网时加载快得多；OSS 取不到时游戏会自动改用本机服务器自带的素材。
 
 ## 关于本项目（务必先读）
 
 本项目是玩家自制的**非官方同人作品**，与上海鹰角网络科技有限公司（Hypergryph）、Yostar 及其关联方
 **没有任何关系**，未获其授权或认可。
 
+游戏素材（立绘、头像、Spine、图标、音效、字体等）的**版权归原权利人所有**，本项目仅按非商业同人
+用途引用，**不适用**本项目的 **GPL** 授权条款，也**不得单独再分发**；权利人若提出要求，会**立即删除**。
+本包**不提供任何担保**。
+
 **仅供学习交流与个人非商业使用。严禁任何形式的盈利**，包括但不限于：售卖本项目或整合包、
 付费下载或付费分发、收费服务器或收费代开、广告 / 打赏 / 会员等变现方式，以及其他任何商业用途。
 
-> 本包按 GPL-3.0-or-later 分发，完整条款见包内 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md)；
-> 内置 Node.js（MIT）以及其它第三方组件的许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
-> 与 \`node\\LICENSE-node.txt\`。
+> 代码部分按 GPL-3.0-or-later 分发，完整条款见包内 [LICENSE](LICENSE)、[NOTICE.md](NOTICE.md)；
+> 第三方组件的许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)${withNode ? '，以及内置 Node.js（MIT）的 `node\\LICENSE-node.txt`' : ''}。
 
 ## 开始界面（启动器菜单）
 
@@ -333,17 +417,20 @@ const README = (version) => `# 卫戍协议：盟约 · Windows 开箱即用包
 ## 目录结构
 
 \`\`\`
-node\\node.exe            便携版 Node ${version}（官方 x64，已经 sha256 校验）
+${withNode ? `node\\node.exe            便携版 Node ${version}（官方 x64，已经 sha256 校验）
 node\\LICENSE-node.txt    Node 自己的许可证（MIT）
-app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
+` : ''}app\\                    游戏本体：server / shared / public（素材）/ data / scripts / tools
 app\\scripts\\launcher.mjs 启动器（开始界面）
 启动游戏.bat             双击开始（菜单）
+本机当服务器.bat         直接开服
+连接服务器.bat           直接连别人的服务器
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 \`\`\`
 
 卸载＝直接删掉整个文件夹（不写注册表、不放系统目录）。存档/昵称在该电脑的浏览器 localStorage 里。
 `;
+}
 
 async function main() {
   const o = parseArgs(process.argv.slice(2));
@@ -372,12 +459,24 @@ async function main() {
 
   console.log(`\n卫戍协议 · Windows 开箱即用包\n  源仓库：${ROOT}\n  产物：  ${out}\n`);
 
-  if (fs.existsSync(out)) {
+  // --out 指到仓库本身 / 上级目录时直接拒绝；--force 另外只肯删「空目录」或「上一次打的包」。
+  if (outDirIsUnsafe(out)) {
+    console.error(`✖ --out 指向仓库本身或它的上级目录：${out}\n  加 --force 会把仓库删掉，请换一个仓库之外的目录（例如 D:\\Game\\Stronghold-Protocol-Windows）。`);
+    return 1;
+  }
+  const verdict = forceDeleteVerdict(out);
+  if (verdict !== 'missing') {
     if (!o.force) {
-      console.error(`✖ ${out} 已存在。加 --force 覆盖（会先删掉整个目录）。`);
+      console.error(`✖ ${out} 已存在。要覆盖请加 --force —— 它只会删掉空目录，或上一次打的便携包，其余情况一律拒绝。`);
+      return 1;
+    }
+    if (verdict === 'refuse') {
+      console.error(`✖ ${out} 已存在，但它既不是空目录，也不像上一次打的便携包（包根要有 README-开箱即用.md 和 app\\）。`
+        + '\n  为免误删，这里不会动它：请自己确认后删掉，或换一个 --out（例如 D:\\Game\\Stronghold-Protocol-Windows）。');
       return 1;
     }
     await fsp.rm(out, { recursive: true, force: true });
+    console.log(`  · 清掉 ${out}（${verdict === 'empty' ? '空目录' : '上一次的便携包'}）`);
   }
   await fsp.mkdir(out, { recursive: true });
 
@@ -441,7 +540,7 @@ async function main() {
   await fsp.writeFile(path.join(out, '启动游戏.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" %*'), 'latin1');
   await fsp.writeFile(path.join(out, '本机当服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode local %*'), 'latin1');
   await fsp.writeFile(path.join(out, '连接服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode connect %*'), 'latin1');
-  await fsp.writeFile(path.join(out, 'README-开箱即用.md'), README(nodeInfo.version), 'utf8');
+  await fsp.writeFile(path.join(out, 'README-开箱即用.md'), bundleReadme({ version: nodeInfo.version, withNode: !!o.node }), 'utf8');
 
   const total = await dirSize(out);
   console.log(`\n✔ 便携包已生成：${out}\n  ${total.files} 个文件 / ${MB(total.bytes)}`);
