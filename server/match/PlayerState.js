@@ -115,8 +115,6 @@
 import { FIELD } from './board.js';
 import { computeBonds } from './bondsMeta.js';
 import { HAND_SIZE, TEMP_SIZE } from './player/common.js';
-// 本扩展：莱茵生命扩展的科研装置与科研进度
-import { RHINE_BOND, RHINE_BALANCE, RHINE_DEVICES, rhineCapacity, rhineDevice, rhineStage, advanceRhineResearch } from '../../shared/rhineResearch.js';
 import { PlayerBasics } from './player/basics.js';
 import { PlayerPieces } from './player/pieces.js';
 import { PlayerAcquire } from './player/acquire.js';
@@ -143,9 +141,6 @@ export class PlayerState {
     this.connected = this.isBot ? true : !!seat.connected;
     this.left = false;
     this.autoplay = false;
-    // 本扩展：玩家自有的科研装置有固定备牌位（与普通手牌、召唤位互不相干）
-    this.research = { unlocked: false, hand: RHINE_DEVICES.map(() => null), points: {}, stages: {},
-      battleRound: null, participants: [], settled: new Set() };
     this.alive = true;
     this.lp = 0;
     this.bandId = null;
