@@ -8,6 +8,7 @@
 
 import { boardOrder, pieceDir } from '../board.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
+import { RHINE_BOND, RHINE_BALANCE, RHINE_DEVICES, rhineCapacity, rhineDevice, rhineStage, advanceRhineResearch } from '../../../shared/rhineResearch.js';   // 本扩展
 
 export class PlayerRound {
   startRound(r) {
@@ -78,10 +79,76 @@ export class PlayerRound {
     // a free regular hand slot pulls a temp piece in (PRTS 卫戍协议/帮助 §手牌区 "常规手牌区出现空位时自动移入")
     this._fillHandFromTemp();
     this.bonds = computeBonds(this.gd, this);
+    this._syncResearch();   // 本扩展：盟约层数变了就同步科研装置的解锁与容量
     this.dirty();
   }
 
   activatedLayers() { return activatedLayers(this.bonds); }
+
+  // ---- 本扩展：莱茵科研装置 --------------------------------------------------
+
+  /** 科研容量即三人莱茵生命盟约解锁的装置上限；解锁时发放固定槽位的装置，容量变小就收回超出的。 */
+  _syncResearch() {
+    const cap = this.alive ? rhineCapacity(this.bonds[RHINE_BOND]) : 0;
+    if (cap && !this.research.unlocked) {
+      this.research.unlocked = true;
+      for (const [idx, d] of RHINE_DEVICES.entries()) {
+        this.research.points[d.key] = 0;
+        this.research.stages[d.key] = 0;
+        this.research.hand[idx] = this.newPiece('token', d.tokenId, { research: true, researchKey: d.key, ownerUid: null });
+      }
+    }
+    let kept = 0;
+    for (const [key, p] of this.board) {
+      if (!p.research) continue;
+      if (kept++ < cap) continue;
+      this.board.delete(key);
+      this._returnResearch(p);
+    }
+  }
+
+  /** 科研视图（m.private.research 与 battleInput 的 research）：容量、层数、备牌区与每台装置。 */
+  researchView() {
+    const capacity = this.alive ? rhineCapacity(this.bonds[RHINE_BOND]) : 0;
+    const all = [...this.board.values(), ...this.research.hand.filter(Boolean)];
+    const deployed = new Set([...this.board.values()].filter((p) => p.research).map((p) => p.uid));
+    return {
+      unlocked: this.research.unlocked, active: capacity > 0, capacity,
+      layers: this.layers[RHINE_BOND] || 0,
+      hand: this.research.hand.map((p) => (p ? this.pieceView(p) : null)),
+      devices: RHINE_DEVICES.map((d) => {
+        const p = all.find((x) => x.research && x.id === d.tokenId);
+        const points = this.research.points[d.key] || 0;
+        return { key: d.key, tokenId: d.tokenId, uid: p?.uid ?? null, points, stage: rhineStage(this.research.stages[d.key]),
+          onBoard: !!p && deployed.has(p.uid) };
+      }),
+    };
+  }
+
+  /** 只由真实的主战斗构造调用，预览 / 辅助战斗 / 重连都不算。 */
+  freezeResearch(input, kind = 'normal') {
+    if (!['normal', 'boss', 'hidden'].includes(kind) || this.research.battleRound === this.m.round) return;
+    this.research.battleRound = this.m.round;
+    const uids = new Set((input?.units || []).filter((u) => u.research).map((u) => u.uid));
+    this.research.participants = input?.research?.active
+      ? input.research.devices.filter((d) => d.onBoard && uids.has(d.uid) && rhineDevice(d.key)).map((d) => d.key)
+      : [];
+  }
+
+  /** 本回合作战结算：参战的装置按成败加研究点，每回合只结算一次。 */
+  settleResearch(success) {
+    const round = this.m.round;
+    if (this.research.battleRound !== round || this.research.settled.has(round)) return false;
+    this.research.settled.add(round);
+    const gain = success ? RHINE_BALANCE.successPoints : RHINE_BALANCE.failurePoints;
+    for (const key of new Set(this.research.participants)) {
+      const next = advanceRhineResearch({ stage: this.research.stages[key], points: this.research.points[key] }, gain);
+      this.research.stages[key] = next.stage;
+      this.research.points[key] = next.points;
+    }
+    this.dirty();
+    return true;
+  }
 
   /**
    * The bond states the views show (m.private bonds, m.public players[].bonds): the computed states plus the pending
@@ -138,6 +205,7 @@ export class PlayerRound {
         id: e.id, key: e.key ?? null, source: e.iconKind ?? null, params: e.params ?? null, counter: e.counter ?? null, data: e.data ?? null,
       })),
       deviceOverrides: { ...this.deviceOverrides },
+      research: this.researchView(),   // 本扩展：科研装置与进度
     };
   }
 }
