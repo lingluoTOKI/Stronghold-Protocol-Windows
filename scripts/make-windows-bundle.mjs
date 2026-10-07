@@ -55,6 +55,13 @@ const ASSET_DIRS = ['public/assets', 'public/fonts', 'public/vendor'];
 /** 版本库里有、但便携包默认不要的（--with-tests 可加回）。 */
 const SKIP_TRACKED = ['test/'];
 
+/**
+ * 仓库根的**原地**启动器：它们假设 `%HERE%` 就是游戏根（`%HERE%scripts\launcher.mjs`）。
+ * 便携包里游戏被放进 `app\`，包根另有一份由 bat() 生成的对应脚本，所以这三个不再拷进 `app\`——
+ * 否则 `app\启动游戏.bat` 会因为找不到 `app\node\node.exe` 而退回 PATH 上的 node，双击即报错。
+ */
+const SKIP_ROOT_FILES = ['启动游戏.bat', '本机当服务器.bat', '连接服务器.bat'];
+
 /** 包根要带的许可证 / 声明。 */
 const LEGAL_FILES = ['LICENSE', 'NOTICE.md', 'THIRD-PARTY-NOTICES.md'];
 
@@ -376,7 +383,8 @@ async function main() {
 
   // 1) 游戏代码：只收 git 跟踪的文件
   const all = trackedFiles();
-  const wanted = o.tests ? all : all.filter((rel) => !SKIP_TRACKED.some((p) => rel === p || rel.startsWith(p)));
+  const wanted = (o.tests ? all : all.filter((rel) => !SKIP_TRACKED.some((p) => rel === p || rel.startsWith(p))))
+    .filter((rel) => !SKIP_ROOT_FILES.includes(rel));
   console.log(`  · 复制游戏本体（git 跟踪的 ${wanted.length} 个文件${o.tests ? '，含 test/' : `，略过 ${all.length - wanted.length} 个 test/ 文件`}）…`);
   const copied = await copyFiles(wanted, appDir);
   console.log(`    完成：${copied.files} 个文件 / ${MB(copied.bytes)}`);

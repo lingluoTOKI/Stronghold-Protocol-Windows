@@ -58,10 +58,10 @@ _gen_local_assets.mjs
 _probe_assets.mjs
 _verify_manifest.mjs
 _merge_chat.ps1
-启动游戏.bat
-本机当服务器.bat
-连接服务器.bat
 stronghold.service
+# 注：仓库根的原地启动器 启动游戏.bat / 本机当服务器.bat / 连接服务器.bat 是**要进版本库**的
+# （它们指向 scripts/launcher.mjs，供直接在仓库里运行）。便携包根目录的那一份由
+# scripts/make-windows-bundle.mjs 自己生成，因此打包时会跳过这三个（见 SKIP_ROOT_FILES）。
 
 # --- OSS 上传工具（本地工具，不进 git） -------------------------------------------------
 ossutil*/
