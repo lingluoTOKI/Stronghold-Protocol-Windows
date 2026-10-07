@@ -5,7 +5,7 @@
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { unitStatsEntry } from '../../../shared/protocol.js';
-import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO } from '../../../shared/constants.js';
+import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, CHAT_COOLDOWN_MS, CHAT_MAX_LEN, GEO } from '../../../shared/constants.js';
 import { deriveSeed } from '../../sim/rng.js';
 import { OK, fail } from './common.js';
 
@@ -34,6 +34,8 @@ export class MatchIntents {
       case 'g.choice': return this.pickCard(ps, msg.idx);
       case 'g.ready': return ps.setReady(!!msg.ready);
       case 'g.emote': return this.emote(ps, msg.id);
+      // 房间文字聊天（本扩展）：文本已在 shared/protocol.js 的 C2S['g.chat'] 校验过
+      case 'g.chat': return this.chat(ps, msg.text);
       // playerId: the player tapped (a shared field names two) — the watch preference (item 56)
       case 'g.watch': return this.watch(ps, msg.fieldId, msg.playerId ?? null);
       case 'g.autoplay': return this.setAutoplay(ps, !!msg.on);
@@ -53,6 +55,21 @@ export class MatchIntents {
     if (now - ps.lastEmoteAt < EMOTE_COOLDOWN_MS) return fail(ERR.RATE);
     ps.lastEmoteAt = now;
     this.broadcast({ t: 'm.emote', playerId: ps.playerId, id });
+    return OK;
+  }
+
+  /**
+   * 房间文字聊天（本扩展）：转发本对局内的一条文字消息给所有人。文本已在
+   * shared/protocol.js 的 C2S['g.chat'] 校验（1–200 字符、非空白）；这里再做一次
+   * 长度截断与简单限流（与表情同思路），广播携带发送者昵称，客户端按 playerId 归位。
+   */
+  chat(ps, text) {
+    const s = typeof text === 'string' ? text.trim().slice(0, CHAT_MAX_LEN) : '';
+    if (!s) return fail(ERR.BAD_MSG, 'empty chat');
+    const now = this.sched.now();
+    if (now - (ps.lastChatAt || 0) < CHAT_COOLDOWN_MS) return fail(ERR.RATE);
+    ps.lastChatAt = now;
+    this.broadcast({ t: 'm.chat', playerId: ps.playerId, name: ps.name || ps.playerId, text: s });
     return OK;
   }
 
