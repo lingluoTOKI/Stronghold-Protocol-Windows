@@ -48,10 +48,14 @@
   <link rel="modulepreload" href="/vendor/hooks.module.js" />
   <link rel="modulepreload" href="/vendor/htm.module.js" />
   <link rel="modulepreload" href="/js/main.js" />
-  <!-- Battlefield renderer libs (classic scripts, injected by js/render/app.js when a match view mounts): warm the cache
-       at low priority so entering the match doesn't wait on ~800 KB of script. -->
-  <link rel="prefetch" href="/vendor/pixi.min.js" as="script" />
-  <link rel="prefetch" href="/vendor/pixi-spine.js" as="script" />
+  <!-- 战场渲染库（pixi / pixi-spine，由 js/render/app.js 在进入对局时动态注入的 classic script）**故意不在这里 prefetch**。
+       /vendor/ 由 nginx 302 到 OSS，而 OSS 默认域名会对响应强制加 `Content-Disposition: attachment`
+       （x-oss-force-download，阿里云为防止上传物在 *.oss-*.aliyuncs.com 上被直接执行而设的策略）。
+       prefetch 一个 attachment 响应不是"预热缓存"：浏览器把它当成下载，文件会落进用户的下载目录 ——
+       Windows 上 .js 默认关联 Windows Script Host，用户一双击就弹出「语法错误 / 800A03EA」的报错框。
+       app.js 那种动态 <script> 注入属于 script 目的地请求，不受 Content-Disposition 影响，所以删掉这两行
+       唯一的代价是那约 800 KB 改成进对局时才拉。若将来 bucket 绑定了自定义域名（不再强制下载），可以把
+       prefetch 加回来。 -->
 </head>
 <body>
   <div id="app"></div>
