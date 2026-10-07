@@ -204,7 +204,15 @@ export function BulletinButton() {
     return () => { dead = true; clearInterval(iv); };
   }, []);
   const markSeen = () => { if (data && data.updatedAt) { localStorage.setItem(SEEN_KEY, data.updatedAt); setHasNew(false); } };
-  const items = (data && Array.isArray(data.items) ? data.items : []).slice().reverse();
+  // 公告按时间从近到远显示（最新的排在最上面）。
+  //
+  // 排序放在这里，而不是依赖 announcements.json 的书写顺序：那份文件被「把最新一条插到最前面」和
+  // 「追加到末尾」两种方式交替维护过，顺序已经不可信（最旧的一条曾排在最新的前面）。`time` 是
+  // `YYYY-MM-DD`，按字符串比较即等于按日期比较；同一天的多条保持它们在文件里的相对次序
+  //（Array#sort 自 ES2019 起是稳定的）。test/announcements.test.js 守住 JSON 的降序约定。
+  const items = (data && Array.isArray(data.items) ? data.items : [])
+    .slice()
+    .sort((a, b) => String((b && b.time) || '').localeCompare(String((a && a.time) || '')));
   return html`<span class="bulletin-btn">
     <${Button} variant="ghost" size="sm" icon="mail" class=${`bulletin-btn__icon${hasNew ? ' has-new' : ''}`}
       title="服务器更新公告" aria-label="服务器更新公告"
