@@ -62,3 +62,8 @@ _merge_chat.ps1
 本机当服务器.bat
 连接服务器.bat
 stronghold.service
+
+# --- OSS 上传工具（本地工具，不进 git） -------------------------------------------------
+ossutil*/
+ossutil64.exe
+ossutilconfig

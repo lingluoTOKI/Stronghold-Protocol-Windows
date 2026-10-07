@@ -45,6 +45,18 @@ const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const str = (v) => (typeof v === 'string' && v ? v : null);
 const get = (o, k) => (isObj(o) && Object.hasOwn(o, k) ? o[k] : undefined);
 
+// ---- OSS static-asset hosting (Rhine expansion; docs/ASSETS.md) -------------------------------------------
+// Static assets (`/assets/…`) are served from Aliyun OSS (`weishuxieyi-game-res`, Shanghai) to relieve the
+// 1 Mbps burst-limited public bandwidth of the game server; the WebSocket / API / page code stays on the server.
+// Only paths under `/assets/` are rewritten — every other URL (API, ws, html/css/js) is left untouched.
+export const OSS_BASE = 'https://weishuxieyi-game-res.oss-cn-shanghai.aliyuncs.com';
+
+/** Rewrite a static asset path to the OSS host; any other URL returns unchanged. */
+export function rewriteAssetUrl(url) {
+  if (typeof url === 'string' && url.startsWith('/assets/')) return OSS_BASE + url;
+  return url;
+}
+
 // ---- pure URL helpers (manifest first) ---------------------------------------------------------------------
 
 /** Strip a trailing `_1` / `_2` art-phase suffix (data/chess.json asset ids). */
@@ -788,13 +800,22 @@ export function createAssets(options) {
   const spineEntries = new Map(); // skel URL → manifest entry (for the atlas / page URLs on unload)
   const spine = new RefLru({
     load: (key, entry, o) => {
-      spineEntries.set(key, entry);
-      if (!(o && o.fresh)) return (opts.loadSpine || loadSpineData)(entry);
+      // Rewrite the entry's URLs to OSS before handing them to PIXI (the entry object itself stays relative, so
+      // `validSpine` still accepts it); unload and forgetPendingSpine use the same rewritten URLs as cache keys.
+      const oss = (u) => rewriteAssetUrl(u);
+      const e = {
+        ...entry,
+        skel: oss(entry.skel),
+        atlas: typeof entry.atlas === 'string' ? oss(entry.atlas) : entry.atlas,
+        textures: Array.isArray(entry.textures) ? entry.textures.map(oss) : entry.textures,
+      };
+      spineEntries.set(key, e);
+      if (!(o && o.fresh)) return (opts.loadSpine || loadSpineData)(e);
       // a fresh load (a restart, or after a failure): not joined to a request that may never settle — but the pages
       // another cached skeleton uses stay (forgetPendingSpine `keep`)
       const keep = new Set();
       for (const [k, other] of spineEntries) if (k !== key && spine.map.has(k)) for (const u of spinePages(other)) keep.add(u);
-      return (opts.loadSpine || loadSpineData)(entry, { fresh: true, keep });
+      return (opts.loadSpine || loadSpineData)(e, { fresh: true, keep });
     },
     unload: (key, value, rec) => {
       // a late value of an entry that was dropped while loading, with the key already loading/cached again: the
@@ -827,8 +848,9 @@ export function createAssets(options) {
 
   /** Image element (cached; failures resolve to null). An explicit retry forgets only a completed failure. */
   function image(u, options) {
-    const s = str(u);
-    if (!s) return Promise.resolve(null);
+    const raw = str(u);
+    if (!raw) return Promise.resolve(null);
+    const s = rewriteAssetUrl(raw); // cache key + load URL: OSS when under /assets/
     let e = images.get(s);
     if (e && options?.retry && e.done && !e.value) { images.delete(s); e = null; }
     if (!e) {
@@ -884,29 +906,29 @@ export function createAssets(options) {
     localUrl: (group, name) => localAssetUrl(localManifest, group, name),
     get manifest() { return manifest; },
     get loaded() { return !!manifest; },
-    avatar: (id, o) => avatarUrl(m(), id, o),
-    portrait: (id, o) => portraitUrl(m(), id, o),
-    enemyIcon: (id) => enemyIconUrl(m(), id),
-    tokenAvatar: (id) => tokenAvatarUrl(m(), id),
-    bondIcon: (id) => bondIconUrl(m(), id),
-    bandIcon: (id) => bandIconUrl(m(), id),
-    itemIcon: (item) => itemIconUrl(m(), item),
-    skillIcon: (id, o) => skillIconUrl(m(), id, o),
-    profIcon: (p, kind) => profIconUrl(m(), p, kind),
-    subProfIcon: (s) => subProfIconUrl(m(), s),
-    ui: (name) => uiUrl(m(), name),
-    picture: (id) => unitPictureUrl(m(), id),
+    avatar: (id, o) => rewriteAssetUrl(avatarUrl(m(), id, o)),
+    portrait: (id, o) => rewriteAssetUrl(portraitUrl(m(), id, o)),
+    enemyIcon: (id) => rewriteAssetUrl(enemyIconUrl(m(), id)),
+    tokenAvatar: (id) => rewriteAssetUrl(tokenAvatarUrl(m(), id)),
+    bondIcon: (id) => rewriteAssetUrl(bondIconUrl(m(), id)),
+    bandIcon: (id) => rewriteAssetUrl(bandIconUrl(m(), id)),
+    itemIcon: (item) => rewriteAssetUrl(itemIconUrl(m(), item)),
+    skillIcon: (id, o) => rewriteAssetUrl(skillIconUrl(m(), id, o)),
+    profIcon: (p, kind) => rewriteAssetUrl(profIconUrl(m(), p, kind)),
+    subProfIcon: (s) => rewriteAssetUrl(subProfIconUrl(m(), s)),
+    ui: (name) => rewriteAssetUrl(uiUrl(m(), name)),
+    picture: (id) => rewriteAssetUrl(unitPictureUrl(m(), id)),
     spineEntry: (id, o) => spineEntry(m(), id, localManifest ? { ...o, local: localManifest } : o),
     hasBack: (id) => hasBackSpine(m(), id),
     audio: {
-      bgm: (kind) => bgmEntry(m(), kind),
-      sfx: (group, key) => sfxUrl(m(), group, key),
-      unit: (id, kind, idx) => unitSfxUrl(m(), id, kind, idx),
+      bgm: (kind) => { const b = bgmEntry(m(), kind); return isObj(b) ? { ...b, intro: str(b.intro) ? rewriteAssetUrl(b.intro) : b.intro, loop: rewriteAssetUrl(b.loop) } : null; },
+      sfx: (group, key) => rewriteAssetUrl(sfxUrl(m(), group, key)),
+      unit: (id, kind, idx) => rewriteAssetUrl(unitSfxUrl(m(), id, kind, idx)),
     },
     /** Cached image element promise (null on failure); `{ retry: true }` retries a completed failure only. */
     image,
     /** Already-loaded image element or null (sync). */
-    imageNow(u) { const e = images.get(str(u) || ''); return e && e.done ? e.value : null; },
+    imageNow(u) { const e = images.get(rewriteAssetUrl(str(u) || '')); return e && e.done ? e.value : null; },
     /**
      * Preload URLs; `onProgress(done, total, url)` after each. Resolves to { ok, failed } counts (never rejects).
      */

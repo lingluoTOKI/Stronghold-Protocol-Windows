@@ -48,6 +48,7 @@
 
 import { PHASE } from '../../shared/constants.js';
 import { mediaUrl } from './media.js';
+import { rewriteAssetUrl } from './assets.js';
 
 const MAX_VOICES = 8;
 const UNIT_COOLDOWN_MS = 160;
@@ -612,6 +613,9 @@ export class AudioManager {
   /** Fetch + decode (cached, LRU). Resolves null on failure. */
   _buffer(url) {
     if (!this.ctx || typeof url !== 'string' || !url) return Promise.resolve(null);
+    // Static audio lives on OSS (assets.js rewriteAssetUrl): rewrite the manifest's /assets/ path before the fetch,
+    // keep the original as the cache key so callers (already rewritten URLs) and unrewritten ones share one buffer.
+    url = rewriteAssetUrl(url);
     const hit = this.buffers.get(url);
     if (hit) {
       this.buffers.delete(url);
