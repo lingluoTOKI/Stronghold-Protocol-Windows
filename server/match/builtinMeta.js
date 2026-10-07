@@ -181,7 +181,15 @@ const ITEM_HANDLERS = {
       // piece (0.2.0): its DIY slot is bound to this player's roster (no teammate's shop or slot can hold that operator),
       // so nothing is sent [ASSUMED: the official text names no 自选 case]
       const to = ctx.chessRecord(original)?.diyFor ? null : mostBondMate(ctx, bonds);
-      if (to) ctx.addEffect({ id: `gift:${ev.item.uid}`, key: 'effect:builtin_gift', hidden: true, battle: false, params: { toPlayerId: to.playerId, chessId: original, bonds } });
+      if (to) {
+        // Only the concrete R14 six-seat supply is immediate: the final assault need not have a next prep.
+        // Preserve the original operator (including elite); a failed immediate grant retains the upstream retry.
+        if (ev.item.meta?.sixPlayerBeaconRound === 14) {
+          if (to.grantChess(original)) { to.giftTicker(ctx.name, original); return; }
+        }
+        // Bought/ordinary beacons, including those used during R14, retain the original next-round timing.
+        ctx.addEffect({ id: `gift:${ev.item.uid}`, key: 'effect:builtin_gift', hidden: true, battle: false, params: { toPlayerId: to.playerId, chessId: original, bonds } });
+      }
     },
   },
   sell_char_count_gain_equip_owner_bond: {
