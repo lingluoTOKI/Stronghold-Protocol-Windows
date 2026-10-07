@@ -4,6 +4,9 @@
 import { SHOT_HEIGHT, bodyZ } from './camera.js';
 import { fxSpec, tilesAround, wallTiles } from './kinds.js';
 import { clamp } from './limits.js';
+import { RHINE_BALANCE } from '../../../shared/rhineResearch.js';
+import { energyPulseRange, researchRangeTiles } from '../../../shared/rhineRange.js';
+import { GEO } from '../../../shared/constants.js';
 
 /**
  * An fx anchored on a unit (extra.id) is drawn at that unit's rendered position while the event's own (x, y) is within
@@ -62,10 +65,83 @@ export class FxSim {
     if (kind === 'crit' && ex.src != null && ex.id != null) {
       for (const L of this.locks) if (L.src === ex.src && L.id === ex.id) this._releaseLock(L);
     }
-    const col = spec.c;
+    // 本扩展：多萝西陷阱暴击时改用红色
+    const col = kind === 'dorothyTrap' && ex.critical ? 0xff665c : spec.c;
     const r = clamp(num(ex.r ?? ex.radius, spec.r ?? 1), 0.3, 30);
     const ts = this.ctx.timeScale ? Math.max(0.25, this.ctx.timeScale()) : 2;
     const dur = num(ex.dur ?? ex.duration, spec.dur ?? 0) / ts;
+    // ---- 本扩展：多萝西的陷阱与共鸣器链 ----
+    if (kind === 'dorothyTrap' && ex.skill === 'sktok_doroth_3') {
+      const row = Math.round(at.y), column = Math.round(at.x);
+      const cross = [[0, 0], [1, 0], [2, 0], [-1, 0], [-2, 0], [0, 1], [0, 2], [0, -1], [0, -2]];
+      this.tileFlash(cross.map(([dr, dc]) => [row + dr, column + dc]), col, .35, true);
+    }
+    if (spec.a === 'dorothyChain') {
+      // A chained Resonator has a delay before it fires; keep the preview at the trap's own tile.
+      const wait = Math.max(.2, num(ex.delay, 2) / ts);
+      const from = this._viewOf(ex.source) || (Number.isFinite(ex.fromX) && Number.isFinite(ex.fromY) ? this._point(ex.fromX, ex.fromY) : null);
+      if (from) this._beam(from, at, col, Math.min(.6, wait), 0);
+      this.ring(at.x, at.y, at.z, .25, .5, col, wait, 'ring', 'pulse');
+      return;
+    }
+    // ---- 本扩展：莱茵科研装置 ----
+    // Research emits explicit source ids because the effect point can be a different unit's tile.
+    // Idle rigs never invent activations; these cues are tied to successful sim events only.
+    if (spec.a.startsWith('research')) {
+      const src = this._viewOf(ex.source ?? ex.src ?? ex.id);
+      if (spec.a === 'researchEcology' && src?.info && typeof ex.active === 'boolean') src.info.researchActive = ex.active;
+      src?.onResearchFx?.(kind, ex);
+      if (spec.a === 'researchEcology' && ex.active === false) {
+        const key = `rhineEcology:${ex.source ?? ex.src ?? ex.id ?? `${at.x},${at.y}`}`;
+        for (let i = this.tileFlashes.length - 1; i >= 0; i--) {
+          const f = this.tileFlashes[i];
+          if (f.key === key || f.key === `${key}:bind` || (src && f.anchor === src)) this.tileFlashes.splice(i, 1);
+        }
+        return;
+      }
+      if (spec.a === 'researchHeal') {
+        const target = this._viewOf(ex.target);
+        if (src && target && src !== target) this._beam(src, target, col, 0.28, 0.1);
+        this.ring(at.x, at.y, at.z, 0.12, 0.48, col, 0.48);
+      } else if (spec.a === 'researchPulse') {
+        if (src) {
+          this.ring(src.x, src.y, src.z || 0, 0.16, 0.68, col, 0.38, 'shock');
+          // The shot resolves instantly in the sim: a short bright beam links the firing tower
+          // to the actual impact point even if the struck enemy has already been removed.
+          const point = { x: at.x, y: at.y, z: at.z, _headTiles: .75 };
+          this._beam(src, point, col, .32, .16);
+          if (this.rich) {
+            const bp = this._bodyPt(src, SHOT_HEIGHT.launch, this._p);
+            this.particle('glow', bp.x, bp.y, { tint: 0xffe8c4, life: .22, s0: bp.s * .5 / 128, s1: bp.s / 128, a0: .95, a1: 0 });
+          }
+        }
+        const pulse = energyPulseRange(ex.stage);
+        if (pulse.tileBased) {
+          // Calcification is a tile grid, not a larger Euclidean circle. Centre it on the
+          // struck enemy's cell exactly as the sim does; the tower still acquires nearby targets.
+          const bounds = this.ctx.fieldRect?.() || { r0: 0, r1: GEO.ROWS - 1, c0: 0, c1: GEO.COLS - 1 };
+          const row = Math.floor(at.y + .5), column = Math.floor(at.x + .5);
+          const tiles = pulse.grid.map(([dr, dc]) => [row + dr, column + dc])
+            .filter(([rr, cc]) => rr >= bounds.r0 && rr <= bounds.r1 && cc >= bounds.c0 && cc <= bounds.c1);
+          this.tileFlash(tiles, col, .65);
+          this.ring(at.x, at.y, at.z, .1, .38, col, .46, 'shock');
+        } else {
+          this.ring(at.x, at.y, at.z, 0.1, pulse.radius, col, 0.46, 'shock');
+          if (this.rich) this.ring(at.x, at.y, at.z, 0.18, pulse.radius * 0.86, col, 0.65);
+        }
+      } else {
+        const bounds = this.ctx.fieldRect?.() || { r0: 0, r1: GEO.ROWS - 1, c0: 0, c1: GEO.COLS - 1 };
+        const tiles = researchRangeTiles(Math.floor(at.y + .5), Math.floor(at.x + .5), r, bounds);
+        this.tileFlash(tiles, col, Math.max(.2, dur || RHINE_BALANCE.ecologyInterval / ts), !ex.continuous,
+          ex.continuous ? { steady: true, key: `rhineEcology:${ex.source ?? ex.src ?? ex.id ?? `${at.x},${at.y}`}` } : undefined);
+        // The persistent slow field starts immediately; only explicit periodic bind events flash.
+        if (ex.bind) {
+          this.tileFlash(tiles, 0xbaffef, RHINE_BALANCE.ecologyBindDuration / ts, true,
+            { key: `rhineEcology:${ex.source ?? ex.src ?? ex.id ?? `${at.x},${at.y}`}:bind` });
+        }
+      }
+      return;
+    }
     const cam = this.ctx.cam();
     const chest = (v, out = this._p) => (v ? this._chest(v, out) : cam.project(at.x, at.y, at.z + 0.5, out));
     const p = chest(at.v);
