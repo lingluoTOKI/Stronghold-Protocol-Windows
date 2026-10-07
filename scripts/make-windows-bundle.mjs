@@ -12,6 +12,9 @@
 //   本机当服务器.bat         ← 直接当服务器
 //   联机.bat                 ← 本机素材 + 远程服务器
 //   连接服务器.bat           ← 直接打开别人的网页
+//
+// 给 --server <host> 时，生成的 .bat 会把该地址烤进去，「联机.bat」连确认也跳过（--yes）：
+// 玩家解压后双击即进线上，不用选菜单、不用输地址。
 //   README-开箱即用.md       给玩家看的说明（含非官方 / 严禁盈利声明）
 //   LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 //
@@ -67,7 +70,7 @@ const SKIP_ROOT_FILES = ['启动游戏.bat', '本机当服务器.bat', '联机.b
 const LEGAL_FILES = ['LICENSE', 'NOTICE.md', 'THIRD-PARTY-NOTICES.md'];
 
 function parseArgs(argv) {
-  const o = { out: '', zip: false, node: true, tests: false, force: false, nodeSpec: '', sha256: '', webfonts: false };
+  const o = { out: '', zip: false, node: true, tests: false, force: false, nodeSpec: '', sha256: '', webfonts: false, server: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const [k, v] = a.split('=');
@@ -75,6 +78,7 @@ function parseArgs(argv) {
     if (k === '--out') o.out = String(val() || '');
     else if (k === '--node-version') o.nodeSpec = String(val() || '');
     else if (k === '--sha256') o.sha256 = String(val() || '').toLowerCase();
+    else if (k === '--server') o.server = String(val() || '').trim();
     else if (a === '--zip') o.zip = true;
     else if (a === '--no-node') o.node = false;
     else if (a === '--with-tests') o.tests = true;
@@ -95,6 +99,9 @@ const HELP = `node scripts/make-windows-bundle.mjs — 生成 Windows 开箱即�
   --force            目录已存在时先删掉（只肯删空目录，或上一次打的便携包；其余情况拒绝）
   --node-version X   换一个 Node 版本（默认 ${NODE_PIN.version}）；换版本必须同时给 --sha256
   --sha256 <hash>    该版本 win-x64.zip 的 sha256（取自官方 SHASUMS256.txt）
+  --server <host>    把联机服务器地址烤进包里的 .bat（如 game.lingluotoki.dpdns.org）：
+                     玩家解压后**双击「联机.bat」直接进线上** —— 不弹地址提示、也不再问确认。
+                     玩法是本机素材 + 反向代理，只有 /ws 与 /api/* 出网。
 
   app\\ 里只放 git 跟踪的文件 + 生产依赖（npm ci --omit=dev）+ public/{assets,fonts,vendor}；
   因此 .env / .venv / .claude / data/local-assets.json 这些本机文件不会被打进去。
@@ -371,10 +378,14 @@ function bat(body) {
  * 也不能说「本包按 GPL 分发」（素材的版权在原权利人手里，GPL 覆盖不到）。
  * @param {{ version: string, withNode?: boolean }} o
  */
-export function bundleReadme({ version, withNode = true }) {
+export function bundleReadme({ version, withNode = true, server = '' }) {
   return `# 卫戍协议：盟约 · Windows 开箱即用包
 
-解压后**双击 \`启动游戏.bat\`** 即可${withNode ? '，目标机器不需要安装 Node' : '（本包没有带便携版 Node，请自行安装 Node 22 或 24）'}。
+解压后**双击 \`启动游戏.bat\`** 即可${withNode ? '，目标机器不需要安装 Node' : '（本包没有带便携版 Node，请自行安装 Node 22 或 24）'}。${server ? `
+
+**本包已内置联机服务器 \`${server}\`：直接双击 \`联机.bat\` 就能进线上** —— 不用先选菜单，也不用输地址。
+这一种玩法把页面、代码与全部素材都从**本机磁盘**读，只有联机对战（\`/ws\`）与公告、在线人数（\`/api/*\`）
+走网络，所以进对局最快、也几乎不耗流量。` : ''}
 
 **联网时**页面会去 Google Fonts 取中文字体（Noto Sans SC）；**断网**时自动退回系统自带的黑体，
 和没有代理时上 Google 的效果一致，所以**不联网也能玩**。玩家头像、立绘、Spine 小人、技能图标、
@@ -430,7 +441,8 @@ node\\LICENSE-node.txt    Node 自己的许可证（MIT）
 app\\scripts\\launcher.mjs 启动器（开始界面）
 启动游戏.bat             双击开始（菜单）
 本机当服务器.bat         直接开服
-连接服务器.bat           直接连别人的服务器
+联机.bat                 本机素材 + 对方服务器（进对局最快）${server ? `｜已内置 ${server}` : ''}
+连接服务器.bat           直接打开别人的网页
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 \`\`\`
@@ -546,12 +558,17 @@ async function main() {
 
   await fsp.writeFile(path.join(out, '启动游戏.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" %*'), 'latin1');
   await fsp.writeFile(path.join(out, '本机当服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode local %*'), 'latin1');
-  await fsp.writeFile(path.join(out, '连接服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode connect %*'), 'latin1');
-  await fsp.writeFile(path.join(out, 'README-开箱即用.md'), bundleReadme({ version: nodeInfo.version, withNode: !!o.node }), 'utf8');
+  // 给了 --server 就把它烤进 .bat：联机那个连确认也跳过（--yes），双击即进线上
+  const srv = o.server ? ` --server ${o.server}` : '';
+  const srvOneClick = o.server ? `${srv} --yes` : '';
+  await fsp.writeFile(path.join(out, '联机.bat'), bat(`"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode proxy${srvOneClick} %*`), 'latin1');
+  await fsp.writeFile(path.join(out, '连接服务器.bat'), bat(`"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode connect${srv} %*`), 'latin1');
+  await fsp.writeFile(path.join(out, 'README-开箱即用.md'), bundleReadme({ version: nodeInfo.version, withNode: !!o.node, server: o.server }), 'utf8');
 
   const total = await dirSize(out);
   console.log(`\n✔ 便携包已生成：${out}\n  ${total.files} 个文件 / ${MB(total.bytes)}`);
-  console.log('  双击「启动游戏.bat」即可（开始界面：本机当服务器 / 连接服务器）。');
+  console.log('  双击「启动游戏.bat」即可（开始界面：本机当服务器 / 联机 / 连接服务器）。');
+  if (o.server) console.log(`  已内置联机服务器 ${o.server}：玩家双击「联机.bat」直接进线上。`);
 
   if (o.zip) {
     const zipPath = `${out}.zip`;

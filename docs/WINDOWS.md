@@ -45,6 +45,8 @@ node scripts/make-windows-bundle.mjs --zip        # 产物默认在 <仓库上�
 node scripts/make-windows-bundle.mjs --out D:\Game --zip --force
 node scripts/make-windows-bundle.mjs --no-node    # 目标机器已装 Node 22+ 时不必带便携 Node
 node scripts/make-windows-bundle.mjs --keep-webfonts   # 保留 index.html 里的 Google Fonts 外链
+node scripts/make-windows-bundle.mjs --zip --server game.example.com
+                                                  # 把联机地址烤进包：玩家解压后双击「联机.bat」直接进线上
 ```
 
 产出的始终是 **Windows** 包（内含 win-x64 的 `node.exe`），但它**可以在 macOS / Linux 上打**：
