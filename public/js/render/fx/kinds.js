@@ -5,6 +5,8 @@
  * Covers every kind emitted by server/sim (Battle, kits, tokens, enemies, bosses, devices, bonds, items); unknown
  * kinds fall back to a keyword guess, then to a generic sparkle (fxSpec).
  */
+import { RHINE_BALANCE } from '../../../shared/rhineResearch.js';
+
 export const FX_KINDS = Object.freeze({
   // blasts
   aoe: { a: 'blast', c: 0xffb35c }, explode: { a: 'blast', c: 0xff7a33 }, explosion: { a: 'blast', c: 0xff7a33 },
@@ -57,6 +59,15 @@ export const FX_KINDS = Object.freeze({
   flame: { a: 'buff', c: 0xff6a2a }, grow: { a: 'buff', c: 0x7fd37a }, weightlessBuff: { a: 'buff', c: 0xcfe0ff },
   // 炎佑 祛恶之焰: a continuous jet from the dragon (`id`) onto its locked target (`target`) + a burning disc (_flame)
   yanyouFlame: { a: 'flame', c: 0xff8a3d, r: 1 },
+  // 本扩展：莱茵科研装置与多萝西的召唤物（缺了会落到「未知种类」的通用闪光兜底上）
+  form: { a: 'none' },
+  burn: { a: 'flame', c: 0xff713b, r: 0.6 },
+  rhineHeal: { a: 'researchHeal', c: 0x6fe8c1, pt: true },
+  rhinePulse: { a: 'researchPulse', c: 0xffbc70, r: RHINE_BALANCE.energySpreadRadius, pt: true },
+  rhineEcology: { a: 'researchEcology', c: 0x73dfd5, r: RHINE_BALANCE.radius, dur: RHINE_BALANCE.ecologyDuration, pt: true },
+  dorothyTrap: { a: 'blast', c: 0xffcf69, r: 1.2, pt: true },
+  dorothyCritical: { a: 'summon', c: 0xff665c, r: 0.4, pt: true },
+  dorothyChain: { a: 'dorothyChain', c: 0xffcf69, r: 0.5, pt: true },
   // states
   takeoff: { a: 'lift', c: 0xcfe0ff }, levitate: { a: 'lift', c: 0xcfe0ff }, weightless: { a: 'lift', c: 0xcfe0ff },
   sleep: { a: 'sleep', c: 0xa8b6ff }, crit: { a: 'crit', c: 0xffe066 },
