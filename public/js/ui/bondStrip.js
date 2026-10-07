@@ -24,7 +24,7 @@
 
 import { html, BondDisc, Icon, MicroLabel, Tooltip } from './components.js';
 import { RichText, UnitThumb, BondGlyph, GIcon } from './gameComponents.js';
-import { sortBonds, bondMembers, nextThreshold, bondTier, harmonyMembers, HARMONY_BOND, memberHeadCount, briefingBondTip, diyGetter, diyRecordFor, memberStandIn, standInForText } from './gameLogic.js';
+import { sortBonds, bondMembers, nextThreshold, bondTier, harmonyMembers, HARMONY_BOND, memberHeadCount, briefingBondTip, bannedPerBond, diyGetter, diyRecordFor, memberStandIn, standInForText } from './gameLogic.js';
 import { formatBondEffect } from './richText.js';
 import { bondIconUrl } from './assetUrls.js';
 import { data } from '../data.js';
@@ -41,9 +41,10 @@ function OwnerTag({ owner }) {
 
 /**
  * @param {{ bonds: any[], layersDisabled?: boolean, onOpen:(bondId:string)=>void, openId?: string|null, max?: number,
- *   owner?: string|null }} props — owner: the watched teammate's name (null = your own bonds)
+ *   owner?: string|null, banned?: string[] }} props — owner: the watched teammate's name (null = your own bonds);
+ *   banned: this match's disabled chess (m.public.bannedChess) — a bond with banned members gets a red user badge
  */
-export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null, max = 14, owner = null }) {
+export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null, max = 14, owner = null, banned = [] }) {
   const sorted = sortBonds(bonds, (id) => data.lookup('bonds', id));
   if (!sorted.length) {
     return html`<div class=${cx('bstrip', 'bstrip--empty', owner && 'is-other')} data-owner=${owner || null}>
@@ -51,6 +52,11 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
   }
   const m = data.get('assets');
   const shown = sorted.slice(0, max);
+  const perBond = bannedPerBond(data.list('bonds'), banned);
+  const banBadge = (bondId, name) => {
+    const n = perBond.get(bondId) || 0;
+    return n > 0 ? html`<span class="bslot__ban" title=${`${name}：${n} 名干员无法出现`} data-ban=${n}><${Icon} name="user" /><b class="num">${n}</b></span>` : null;
+  };
   const strip = html`<div class=${cx('bstrip', layersDisabled && 'is-frozen', owner && 'is-other')} role="list"
       aria-label=${owner ? t('{owner} 的盟约', { owner }) : t('我的盟约')} data-owner=${owner || null}>
     ${owner ? html`<${OwnerTag} owner=${owner} />` : null}
@@ -65,6 +71,7 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
           <${BondDisc} name=${name} icon=${bondIconUrl(m, b.bondId)} tier=${0} maxTier=${Math.max(1, th.length)} active=${false}
             disabled=${true} size="sm" showName=${true} layersDisabled=${layersDisabled} onClick=${() => onOpen(b.bondId)}
             title=${t('{tip} · {n} 名成员', { tip: briefingBondTip(name, 'off'), n: b.count ?? 0 })} />
+          ${banBadge(b.bondId, name)}
           <span class="bslot__count bslot__off">${t('本局禁用')}</span>
         </div>`;
       }
@@ -75,6 +82,7 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
           tier=${b.tier ?? 0} maxTier=${Math.max(1, th.length)} active=${!!b.active} size="sm" showName=${true}
           layersDisabled=${layersDisabled} onClick=${() => onOpen(b.bondId)}
           title=${`${rec?.name || b.bondId} ${b.count ?? 0}/${next ?? th[th.length - 1] ?? '-'}${b.harmony > 0 ? t('（含调和 +{harmony}）', { harmony: b.harmony }) : ''}`} />
+        ${banBadge(b.bondId, rec?.name || b.bondId)}
         <span class=${cx('bslot__count', 'num', next == null && 'is-max')}>${b.count ?? 0}<small>/${next ?? th[th.length - 1] ?? '-'}</small></span>
       </div>`;
     })}

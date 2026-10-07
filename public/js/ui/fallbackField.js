@@ -16,12 +16,12 @@
 // Final Assault prep) keeps the own board layout here — every coordinate the UI exchanges is a board coordinate anyway —
 // but draws the tiles of the player's half of the boss field (gameLogic fieldTile, the legality the highlights use: act2
 // m01's fence tiles are floor there, not the normal field's walls; user playtest #5 item 7).
-// A tap on the ground itself emits tileClick { row, col } like render/app.js does, so a special terrain tile
-// explains itself on this board too (GitHub issue #184).
 
 import { render } from '../../vendor/preact.module.js';
 import { html, TierChip } from './components.js';
 import { GEO } from '../../../shared/constants.js';
+import { circleRangeSections } from '../../../shared/rhineRange.js';
+import { rhineDevice } from '../../../shared/rhineResearch.js';
 import { chessAvatarUrl, itemIconUrl, tokenAvatarUrl, enemyIconUrl } from './assetUrls.js';
 import { tileKey, hasFlag, UF, penPlacement, PEN, fieldTile, ownStandIn, ownDiyRecord } from './gameLogic.js';
 import { t } from '../../../shared/i18n.js';
@@ -197,7 +197,7 @@ export function createFallbackView(host, opts = {}) {
     if (d.moved) {
       const t = targetAt(e.clientX, e.clientY);
       st.hoverTarget = t;
-      emit('tileHover', t.area === 'board' ? { row: t.row, col: t.col } : null);
+      emit('tileHover', t.area === 'board' ? { area: 'board', row: t.row, col: t.col } : null);
       schedule();
     }
   }
@@ -249,18 +249,19 @@ export function createFallbackView(host, opts = {}) {
     const px = (x - st.rect.c0 + 0.5) * L.tile;
     const py = (st.rect.r1 - y + 0.5) * L.tile;
     const enemy = info.side === 'enemy';
+    const device = rhineDevice(info.defId);
     const size = info.boss ? L.tile * 1.3 : L.tile * 0.86;
     const src = unitArt(m(), info);
     const dead = anim === 4;
     const hpPct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0;
     const spPct = spMax > 0 ? Math.max(0, Math.min(100, (sp / spMax) * 100)) : 0;
-    return html`<div class=${cx('ff-unit', enemy ? 'is-enemy' : 'is-ally', info.golden && 'is-golden', info.boss && 'is-boss', dead && 'is-dead',
+    return html`<div class=${cx('ff-unit', enemy ? 'is-enemy' : 'is-ally', device && 'is-research', device?.key === 'energy' && 'is-research-energy', info.golden && 'is-golden', info.boss && 'is-boss', dead && 'is-dead',
         hasFlag(flags, UF.SKILL) && 'is-skill', hasFlag(flags, UF.STUNNED | UF.FROZEN | UF.SLEEP) && 'is-stunned', hasFlag(flags, UF.FLYING) && 'is-fly')}
         style=${`transform:translate(${px - size / 2}px,${py - size / 2}px);width:${size}px;height:${size}px`}
         onPointerDown=${(e) => { if (e.button === 0) emit('pieceClick', { unitId: id, uid: info.uid ?? null, unit: info, button: 0, clientX: e.clientX, clientY: e.clientY }); }}
         onContextMenu=${(e) => { e.preventDefault(); emit('pieceClick', { unitId: id, uid: info.uid ?? null, unit: info, button: 2, clientX: e.clientX, clientY: e.clientY }); }}>
       <div class="ff-unit__art">${src ? html`<img src=${src} alt="" draggable=${false} />` : html`<span>${[...(info.name || '?')][0]}</span>`}</div>
-      <div class="ff-unit__bars"><i class="hp" style=${`width:${hpPct}%`}></i>${!enemy && spMax > 0 ? html`<i class="sp" style=${`width:${spPct}%`}></i>` : null}</div>
+      <div class="ff-unit__bars"><i class="hp" style=${`width:${hpPct}%`}></i>${!enemy && spMax > 0 ? html`<i class="sp" role=${device?.key === 'energy' ? 'progressbar' : undefined} aria-label=${device?.key === 'energy' ? '科研装置充能' : undefined} aria-valuenow=${device?.key === 'energy' ? sp : undefined} aria-valuemin=${device?.key === 'energy' ? 0 : undefined} aria-valuemax=${device?.key === 'energy' ? spMax : undefined} style=${`width:${spPct}%`}></i>` : null}</div>
     </div>`;
   }
 
@@ -319,7 +320,7 @@ export function createFallbackView(host, opts = {}) {
         const p = tilePos(L, row, col);
         const k = tileKey(row, col);
         let hl = st.highlight.get(k);
-        for (const g of st.hlGroups.values()) if (g.tiles.has(k)) hl = g.name;
+        for (const g of st.hlGroups.values()) if (!g.circle && g.tiles.has(k)) hl = g.name;
         const hov = st.hoverTarget?.area === 'board' && st.hoverTarget.row === row && st.hoverTarget.col === col ? dropState(st.hoverTarget) : null;
         tiles.push(html`<div key=${k} class=${cx('ff-tile', `ff-tile--${tileClass(row, col)}`, hl && `is-${hl}`, hov && `is-hover-${hov}`)}
           data-drop="board" data-row=${row} data-col=${col}
@@ -374,7 +375,14 @@ export function createFallbackView(host, opts = {}) {
     if (st.camera === 'pen') { render(html`${penView()}<div class="ff-badge">SIMPLIFIED VIEW</div>`, root); return; }
     render(html`<div class=${cx('ff-board', `ff-board--${st.mode}`, `ff-cam--${st.camera}`)} style=${`left:${L.left}px;top:${L.top}px;width:${L.bw}px;height:${L.bh}px;--tile:${L.tile}px`}>
       ${st.mode === 'prep' ? html`<div class="ff-hand-label" style=${`top:${(L.rows + 0.18) * L.tile}px`}><span>${t('整备区')}</span><i></i></div>` : null}
-      ${tiles}${hand}${units}${pieces}${floats}
+      ${tiles}${hand}${units}${pieces}${floats}${[...st.hlGroups.values()].filter(g=>g.circle).map(g=>{
+        const {row,col,radius}=g.circle, color=`#${(g.color??0xff9c33).toString(16).padStart(6,'0')}`;
+        const point=([x,y])=>`${(x-r.c0+.5)*L.tile},${(r.r1-y+.5)*L.tile}`;
+        return html`<svg data-research-range=${radius} style=${`position:absolute;left:0;top:0;width:${L.bw}px;height:${L.rows*L.tile}px;pointer-events:none;overflow:hidden;z-index:1`}>
+          ${circleRangeSections(row,col,radius,r).map(s=>html`<g><polygon points=${s.polygon.map(point).join(' ')} fill=${color} fill-opacity=".2" />
+            ${s.arcs.map(([a,b])=>html`<polyline points=${`${point(a)} ${point(b)}`} fill="none" stroke=${color} stroke-width="2" />`)}</g>`)}
+        </svg>`;
+      })}${units}${pieces}${floats}
     </div>${ghost}
     <div class="ff-badge">SIMPLIFIED VIEW</div>`, root);
     if (st.floats.length) schedule();
@@ -420,7 +428,7 @@ export function createFallbackView(host, opts = {}) {
       if (field?.rect && Number.isFinite(field.rect.r0)) st.rect = { ...field.rect };
       for (const u of Array.isArray(field?.units) ? field.units : []) if (u && u.id != null) {
         st.units.set(u.id, u);
-        st.snapUnits.set(u.id, [u.id, u.x, u.y, u.maxHp, u.maxHp, 0, 0, 0, 0]);
+        st.snapUnits.set(u.id, [u.id, u.x, u.y, u.maxHp, u.maxHp, u.sp || 0, u.spMax || 0, 0, 0]);
       }
       schedule();
     },
@@ -445,7 +453,7 @@ export function createFallbackView(host, opts = {}) {
         if (!Array.isArray(e)) continue;
         if (e[0] === 'spawn' && e[1] && e[1].id != null) {
           st.units.set(e[1].id, e[1]);
-          if (!st.snapUnits.has(e[1].id)) st.snapUnits.set(e[1].id, [e[1].id, e[1].x, e[1].y, e[1].maxHp, e[1].maxHp, 0, 0, 0, 6]);
+          if (!st.snapUnits.has(e[1].id)) st.snapUnits.set(e[1].id, [e[1].id, e[1].x, e[1].y, e[1].maxHp, e[1].maxHp, e[1].sp || 0, e[1].spMax || 0, 0, 6]);
         } else if ((e[0] === 'dmg' || e[0] === 'heal') && st.settings.damageNumbers && st.floats.length < 60) {
           const amount = Math.round(Number(e[2]) || 0);
           if (amount <= 0) continue;
@@ -465,7 +473,7 @@ export function createFallbackView(host, opts = {}) {
           const col = Array.isArray(t) ? t[1] : t?.col;
           if (Number.isInteger(row) && Number.isInteger(col)) set.add(tileKey(row, col));
         }
-        if (set.size) st.hlGroups.set(style.group, { name: 'range', tiles: set }); else st.hlGroups.delete(style.group);
+        if (set.size) st.hlGroups.set(style.group, { name: 'range', tiles: set, circle: style.circle, color: style.color }); else st.hlGroups.delete(style.group);
         schedule();
         return;
       }
