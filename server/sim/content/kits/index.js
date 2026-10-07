@@ -159,6 +159,18 @@ export const OPERATOR_KIT_FILES = Object.freeze([
 export const GENERIC_KIT_CHARS = Object.freeze(['char_600_cpione', 'char_601_cguard', 'char_602_cdfend', 'char_603_csnipe',
   'char_604_ccast', 'char_605_cmedic', 'char_606_csuppo', 'char_607_cspec']);
 
+/**
+ * The Rhine kit barrel (kits/rhine.js) sits beside `ops/`, not inside it: same guarded import, one level up.
+ */
+async function loadKitBarrel(file) {
+  try {
+    return await import(`./${file}`);
+  } catch (e) {
+    console.error(`[content] failed to load kits/${file}: ${e && e.stack ? e.stack.split('\n').slice(0, 3).join('  ') : e}`);
+    return {};
+  }
+}
+
 async function loadKitFile(file) {
   try {
     return await import(`./ops/${file}`);
@@ -168,9 +180,16 @@ async function loadKitFile(file) {
   }
 }
 
+/**
+ * The Rhine Lab expansion's operator kits: one barrel (kits/rhine.js) that re-exports the kits of
+ * kits/rhineSupport.js, kits/rhineAssault.js and kits/rhineNew.js. Loaded guarded like every kit file.
+ */
+export const RHINE_KIT_FILES = Object.freeze(['rhine.js']);
+
 const MODULES = await Promise.all(KIT_FILES.map((group) => Promise.all(group.map(loadKitFile))));
 const STANDIN_MODULES = await Promise.all(STANDIN_KIT_FILES.map(loadKitFile));
 const OPERATOR_MODULES = await Promise.all(OPERATOR_KIT_FILES.map(loadKitFile));
+const RHINE_MODULES = await Promise.all(RHINE_KIT_FILES.map(loadKitBarrel));
 const registryOf = (m) => (m && m.default && typeof m.default === 'object' ? m.default : {});
 
 /** The registry of each tier group (index 0 = tier 1): baseChessId → kit builder, in KIT_FILES order. */
@@ -182,11 +201,17 @@ export const STANDIN_KITS = Object.freeze(Object.assign({}, ...STANDIN_MODULES.m
 /** The 自选 operator kits: owned-6★ charId → kit builder, in OPERATOR_KIT_FILES order. */
 export const OPERATOR_KITS = Object.freeze(Object.assign({}, ...OPERATOR_MODULES.map(registryOf)));
 
+/** The Rhine operators' kits: baseChessId → builder (the default export of kits/rhine.js). */
+export const RHINE_KITS = Object.freeze(Object.assign({}, ...RHINE_MODULES.map(registryOf)));
+
+/** The Rhine summons' kits: tokenId → builder (kits/rhine.js `tokenKits`). */
+export const RHINE_TOKEN_KITS = Object.freeze(Object.assign({}, ...RHINE_MODULES.map((m) => (m && m.tokenKits) || {})));
+
 /**
  * The merged kit registry: baseChessId → (bb, chess, def) => Kit, tier 1 … tier 6, then the stand-ins' charIds, then
  * the 自选 operators' charIds.
  */
-export const KITS = Object.freeze(Object.assign({}, ...TIER_KITS, STANDIN_KITS, OPERATOR_KITS));
+export const KITS = Object.freeze(Object.assign({}, ...TIER_KITS, STANDIN_KITS, OPERATOR_KITS, RHINE_KITS));
 
 /**
  * Every character a 自选 pick may field with a faithful kit: the 预备干员 (GENERIC_KIT_CHARS), the stand-ins with a kit

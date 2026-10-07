@@ -41,9 +41,12 @@ async function safeImport(path) {
 }
 
 const KIT_REGISTRY = await safeImport('./kits/index.js');
-const DOMAIN_NAMES = ['tokens', 'devices', 'enemies', 'bosses', 'bonds', 'garrisons', 'items', 'bands', 'choices'];
+// 'rhine'（对局内的莱茵装置）与 'rhineMeta'（备战侧的莱茵科研）是本扩展的内容域，排在原版域之后；
+// installContent / registerAllMeta 会自动调用它们的 install(battle) / registerMeta(registry)。
+const DOMAIN_NAMES = ['tokens', 'devices', 'enemies', 'bosses', 'bonds', 'garrisons', 'items', 'bands', 'choices', 'rhine', 'rhineMeta'];
 const DOMAINS = await Promise.all(DOMAIN_NAMES.map((n) => safeImport(`./${n}.js`)));
 const tokens = DOMAINS[0];
+const rhine = DOMAINS[DOMAIN_NAMES.indexOf('rhine')];
 
 /**
  * Merged kit registry: baseChessId → (bb, chess, def) => Kit, then the 补位 stand-in kits: stand-in charId → builder
@@ -102,7 +105,10 @@ export function setupUnitKit(battle, unit, mode = 'full') {
   const raw = def.raw ?? def;
   const bb = def.skill?.bb ?? {};
   if (unit.kind === 'token') {
-    const tk = mode === 'full' ? (tokens.kits?.[def.id] ?? tokens.default?.[def.id]) : null;
+    // 召唤物：莱茵装置/召唤物的 kit 优先，然后是原版 tokens 域
+    const tk = mode === 'full'
+      ? (rhine.kits?.[def.id] ?? KIT_REGISTRY.RHINE_TOKEN_KITS?.[def.id] ?? tokens.kits?.[def.id] ?? tokens.default?.[def.id])
+      : null;
     if (typeof tk === 'function') {
       try { const k = tk(bb, raw, def); if (k) return k; } catch (e) { battle._handlerError(`tokenKit:${def.id}`, unit, e); }
     }

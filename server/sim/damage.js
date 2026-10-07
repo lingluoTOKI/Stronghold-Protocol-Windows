@@ -532,6 +532,23 @@ export function reduceElement(target, amount, el = null) {
  * a summon's 禁疗 sets and the flag `healFree` (not a profile's `noHeal`, 无法被友方治疗): 凯尔希 on her Mon3tr (PRTS
  * Mon3tr(凯尔希的召唤物) "持有禁疗（可被凯尔希…无视）"; her heal selection takes it too, Battle.injuredAlliesInKeys).
  */
+/**
+ * Shared recipient rule for healing selectors and the final pipeline (the Rhine kits call it directly to
+ * decide whether a target may be healed at all). Mirrors the guards `heal` applies below: `noHeal` stops
+ * heals from others (`self` heals pass, and a healer whose profile `healThrough(healer, target)` says so
+ * heals through it — 凯尔希 on her Mon3tr), and 禁疗 (`healFree`) stops the unit's own too — except an
+ * HP-regeneration tick (`opts.regen`) and a heal that ignores it (`opts.ignoreHealFree`).
+ */
+export function canReceiveHeal(source, target, opts = {}) {
+  if (!target) return false;
+  const self = source === target || !!opts.self;
+  const through = !!(source && source.profile && typeof source.profile.healThrough === 'function'
+    && source.profile.healThrough(source, target));
+  if (!self && ((target.s.flags.noHeal && !through) || (target.profile && target.profile.noHeal))) return false;
+  if (target.s.flags.healFree && !opts.regen && !opts.ignoreHealFree && !through) return false;
+  return true;
+}
+
 export function heal(battle, source, target, amount, opts = {}) {
   if (!target || !target.alive || target.removed || !target.deployed || target.bossPool) return 0;
   const self = source === target || !!opts.self;
