@@ -214,6 +214,13 @@ export const RHINE_TOKEN_KITS = Object.freeze(Object.assign({}, ...RHINE_MODULES
 export const KITS = Object.freeze(Object.assign({}, ...TIER_KITS, STANDIN_KITS, RHINE_KITS, OPERATOR_KITS));
 
 /**
+ * 本扩展：莱茵档案用的那份注册表 —— 与 KITS 的唯一区别是 RHINE_KITS 放在最后，
+ * 因此伊芙利特 / 森蚺 / 多萝西这三位用本扩展重写的莱茵版 kit。
+ * 原版档案继续用 KITS，两个模式互不干扰（分派见 content/index.js 的 kitsFor）。
+ */
+export const KITS_RHINE = Object.freeze(Object.assign({}, ...TIER_KITS, STANDIN_KITS, OPERATOR_KITS, RHINE_KITS));
+
+/**
  * Every character a 自选 pick may field with a faithful kit: the 预备干员 (GENERIC_KIT_CHARS), the stand-ins with a kit
  * file and the operators of OPERATOR_KIT_FILES whose file loaded. The `kitted` option of shared/diy.js diyPool /
  * validateDiyPicks.
