@@ -8,7 +8,7 @@ import { isObj, tileKey } from './shared.js';
 import { boardTileOf, fieldTile } from './camera.js';
 import { deployedRecord, fieldsStandIn, standInOf } from './standIn.js';
 import { t } from '../../../../shared/i18n.js';
-import { isRhineDevice } from '../../../shared/rhineResearch.js';
+import { isRhineDevice } from '../../../../shared/rhineResearch.js';
 
 
 // ---- placement (canPlace mirror) ------------------------------------------------------------------------

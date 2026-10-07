@@ -4,9 +4,9 @@
 import { SHOT_HEIGHT, bodyZ } from './camera.js';
 import { fxSpec, tilesAround, wallTiles } from './kinds.js';
 import { clamp } from './limits.js';
-import { RHINE_BALANCE } from '../../../shared/rhineResearch.js';
-import { energyPulseRange, researchRangeTiles } from '../../../shared/rhineRange.js';
-import { GEO } from '../../../shared/constants.js';
+import { RHINE_BALANCE } from '../../../../shared/rhineResearch.js';
+import { energyPulseRange, researchRangeTiles } from '../../../../shared/rhineRange.js';
+import { GEO } from '../../../../shared/constants.js';
 
 /**
  * An fx anchored on a unit (extra.id) is drawn at that unit's rendered position while the event's own (x, y) is within

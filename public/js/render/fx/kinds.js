@@ -5,7 +5,7 @@
  * Covers every kind emitted by server/sim (Battle, kits, tokens, enemies, bosses, devices, bonds, items); unknown
  * kinds fall back to a keyword guess, then to a generic sparkle (fxSpec).
  */
-import { RHINE_BALANCE } from '../../../shared/rhineResearch.js';
+import { RHINE_BALANCE } from '../../../../shared/rhineResearch.js';
 
 export const FX_KINDS = Object.freeze({
   // blasts

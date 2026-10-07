@@ -2,8 +2,8 @@
 // Installed on FxSystem.prototype by ./system.js (a method container: never instantiated; `this` is the effect system).
 
 import { NO_OPTS, clamp, easeOut } from './limits.js';
-import { researchRange, researchRangeTiles } from '../../../shared/rhineRange.js';
-import { GEO } from '../../../shared/constants.js';
+import { researchRange, researchRangeTiles } from '../../../../shared/rhineRange.js';
+import { GEO } from '../../../../shared/constants.js';
 import { FX_KINDS } from './kinds.js';
 
 /** A zone lasting longer than this (real s) is a persistent area (炼金单元, fields): drawn dimmer than a skill's short burst. */
