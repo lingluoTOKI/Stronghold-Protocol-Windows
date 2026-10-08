@@ -13,10 +13,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const { DATA_DIR, DATA_PROFILE } = await import('../helpers/dataFile.mjs');
 globalThis.fetch = async (url) => {
   const name = String(url).split('/').pop();
   try {
-    const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
+    const body = readFileSync(path.join(DATA_DIR, name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };
   } catch {
     return { ok: false, status: 404, json: async () => ({}) };
@@ -89,7 +90,7 @@ describe('干员持有 model (ui/ownershipModel.js)', () => {
     const roster = M.ownershipRoster(data.list('chess'));
     assert.equal(roster.length, 53);
     assert.ok(!roster.some((c) => c.chessType !== 'NORMAL' || c.isGolden || !c.visible));
-    assert.deepEqual(M.rosterByTier(roster).map((g) => [g.tier, g.list.length]), [[3, 6], [4, 13], [5, 17], [6, 17]]);
+    assert.deepEqual(M.rosterByTier(roster).map((g) => [g.tier, g.list.length]), DATA_PROFILE === 'rhine' ? [[3, 7], [4, 13], [5, 16], [6, 17]] : [[3, 6], [4, 13], [5, 17], [6, 17]]);
     for (const c of roster) {
       const si = M.standInSummary(c, BACKUPS);
       assert.ok(si && si.charId === c.backup.charId && si.skill.index === c.backup.skillIndex, c.chessId);

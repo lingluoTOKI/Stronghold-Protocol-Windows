@@ -201,7 +201,7 @@ Param names below are the keys of `items[].normal.params` / `items[].golden.para
 
 ### SURVIVAL - 生存 Survival (taunt, shields, undying, revive, DR, CC-immunity)
 
-- **坚固维式重锤** (`chess_item_3_09_e_a`, TIII, 2) - ATK% += atk. First time per battle carrier would take lethal damage: HP cannot drop below 1 for undeadable_duration s.  
+- **坚固维式重锤** (`chess_item_3_09_e_a`, TIII, 2) - ATK% += atk. Once per deployment carrier would take lethal damage: HP cannot drop below 1 for undeadable_duration s.  
   params: `atk=0.25/0.45, undeadable_duration=8.0`; buff keys: `env_gbuff_new_with_verify, env_gbuff_new_with_verify`
 - **蜂鸣器** (`chess_item_4_02_e_a`, TIV, 1) - tauntLevel = 1 (enemies prefer this unit as target); maxHP% += max_hp.  
   params: `taunt_level=1.0, max_hp=0.4/0.6`; buff keys: `env_gbuff_new_with_verify, env_gbuff_new_with_verify`

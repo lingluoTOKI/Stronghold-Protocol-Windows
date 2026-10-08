@@ -100,8 +100,10 @@ test('迅捷 / 不屈 proc chances: p = min(1, base + per·L) at each layer coun
   close(procChance(sw, 228), 0.20 + 0.0035 * 228);
   close(procChance(sw, 229), 1, 'swift reaches 100 % at 229');
   close(procChance(ind, 0), 0.18);
-  close(procChance(ind, 50), 0.18 + 0.0041 * 50);
-  close(procChance(ind, 200), 1, 'indom reaches 100 % at 200 (200-202 叠满必复活, playtest 2026-10-05)');
+  const indPer = Number(ind.prob_per_stack);
+  close(procChance(ind, 50), 0.18 + indPer * 50);
+  const indL = Math.ceil((1 - 0.18) / indPer);                 // vanilla 0.004 → 205; rhine playtest 0.0041 → 200
+  close(procChance(ind, indL), 1, `indom reaches 100 % at ${indL} (叠满必复活)`);
   close(procChance(ind, 1000), 1, 'capped');
 });
 

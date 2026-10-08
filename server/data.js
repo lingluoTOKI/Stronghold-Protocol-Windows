@@ -58,7 +58,7 @@ export function deepFreeze(root) {
  * @param {{ log?: { warn: Function, error: Function, info?: Function }, expected?: readonly string[] }} [opts]
  * @returns {Readonly<Record<string, any>>}
  */
-export function loadData(dir = DATA_DIR, { log = console, expected = DATA_FILES } = {}) {
+export function loadData(dir = DATA_DIR, { log = console, expected = DATA_FILES, profile = null } = {}) {
   /** @type {Record<string, any>} */
   const out = {};
   let names = [];
@@ -80,6 +80,8 @@ export function loadData(dir = DATA_DIR, { log = console, expected = DATA_FILES 
   }
   const missing = expected.filter((k) => !(k in out));
   if (missing.length) log.warn(`[data] missing data files: ${missing.map((k) => k + '.json').join(', ')}`);
+  // Profile tag carried through to the sim's DataSource (kitsFor / Rhine hooks gate on dataProfile === 'rhine').
+  if (profile) out.dataProfile = profile;
   return deepFreeze(out);
 }
 
@@ -93,8 +95,19 @@ const vanillaProfiles = new Map();
  * @returns {Readonly<Record<string, any>>}
  */
 export function getData({ dir = DATA_DIR, log = console } = {}) {
-  if (!singleton) singleton = loadData(dir, { log });
+  // Test-only: SP_TEST_PROFILE=vanilla serves the pristine upstream profile through the same entry point
+  // the sim uses (nodeData.loadGenerated calls getData, not getDataProfile).
+  if (testProfileOverride() === false) return getDataProfile(false, { dir, log });
+  if (!singleton) singleton = loadData(dir, { log, profile: 'rhine' });
   return singleton;
+}
+
+/**
+ * Test-only profile override: SP_TEST_PROFILE=vanilla makes the default loader serve the pristine upstream profile
+ * (used together with test/helpers/profile.mjs). Production rooms always pass an explicit rhineEnabled boolean.
+ */
+function testProfileOverride() {
+  return process.env.SP_TEST_PROFILE === 'vanilla' ? false : null;
 }
 
 /**
@@ -105,10 +118,12 @@ export function getData({ dir = DATA_DIR, log = console } = {}) {
  */
 export function getDataProfile(rhineEnabled = true, { dir = DATA_DIR, vanillaDir = path.join(dir, 'vanilla'), log = console } = {}) {
   if (typeof rhineEnabled !== 'boolean') throw new TypeError('rhineEnabled must be a boolean');
+  const override = testProfileOverride();
+  if (override !== null) rhineEnabled = override;
   if (rhineEnabled) return getData({ dir, log });
   const key = path.resolve(vanillaDir);
   if (vanillaProfiles.has(key)) return vanillaProfiles.get(key);
-  const data = loadData(key, { log });
+  const data = loadData(key, { log, profile: 'vanilla' });
   const missing = DATA_FILES.filter((file) => !data[file] || typeof data[file] !== 'object' || Array.isArray(data[file]));
   if (missing.length) {
     throw new Error(`Vanilla game data unavailable in ${key}: missing or invalid ${missing.map((file) => `${file}.json`).join(', ')}`);

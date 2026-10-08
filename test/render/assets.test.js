@@ -3,7 +3,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -12,8 +12,7 @@ import {
   validSpine, RefLru, createAssets, unloadSpineData, spinePages, spineDataWeight, SPINE_WEIGHT_MIN, SPINE_IDLE_BYTES,
   SPINE_IDLE_GRACE_MS, SPINE_EVICT_DELAY_MS, SPINE_QUIET_DELAY_MS,
 } from '../../public/js/assets.js';
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+import { loadDataJson, dataFilePath } from '../helpers/dataFile.mjs';
 
 /** Fake clock + timers for the spine LRU memory budget (RefLru `now` / `timers`). */
 const clock = () => {
@@ -139,11 +138,11 @@ describe('URL helpers (synthetic manifest)', () => {
 });
 
 describe('URL helpers (real data/assets.json)', () => {
-  const file = path.join(ROOT, 'data/assets.json');
+  const file = dataFilePath('assets.json');
   const hasManifest = existsSync(file);
   test('every pool chess resolves avatar + front spine; enemies resolve icon; paths are site-absolute', { skip: !hasManifest }, () => {
-    const m = JSON.parse(readFileSync(file, 'utf8'));
-    const chess = JSON.parse(readFileSync(path.join(ROOT, 'data/chess.json'), 'utf8'));
+    const m = loadDataJson('assets.json');
+    const chess = loadDataJson('chess.json');
     let n = 0;
     for (const c of Object.values(chess)) {
       if (!c.visible || !c.assets?.spine) continue;
@@ -155,7 +154,7 @@ describe('URL helpers (real data/assets.json)', () => {
       if (c.skill?.iconId) assert.ok(skillIconUrl(m, c.skill.iconId, { fallback: false }), `skill icon ${c.chessId}`);
     }
     assert.ok(n >= 200, `checked ${n}`);
-    const enemies = JSON.parse(readFileSync(path.join(ROOT, 'data/enemies.json'), 'utf8'));
+    const enemies = loadDataJson('enemies.json');
     let withSpine = 0, total = 0;
     for (const e of Object.values(enemies)) {
       total++;
@@ -164,7 +163,7 @@ describe('URL helpers (real data/assets.json)', () => {
     assert.ok(withSpine / total > 0.9, `enemy spines ${withSpine}/${total}`);
     assert.equal(spineEntry(m, 'enemy_5601_entlec'), null);
     assert.ok(uiUrl(m, 'battle/sprite_shadow'));
-    for (const b of Object.keys(JSON.parse(readFileSync(path.join(ROOT, 'data/bonds.json'), 'utf8')))) assert.ok(bondIconUrl(m, b), b);
+    for (const b of Object.keys(loadDataJson('bonds.json'))) assert.ok(bondIconUrl(m, b), b);
   });
 });
 

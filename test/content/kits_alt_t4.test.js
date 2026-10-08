@@ -8,9 +8,14 @@ import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.
 import { getDefaultSource } from '../../server/sim/simdata.js';
 import { loadoutOptions } from '../../shared/protocol.js';
 import { skillSpecSource } from '../../server/sim/content/index.js';
+import { KITS, KITS_RHINE } from '../../server/sim/content/kits/index.js';
+import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 import { kitCoverage } from '../../tools/kit-coverage.mjs';
 import { canTargetAlly } from '../../server/sim/targeting.js';
 import { aggregateMods } from '../../server/sim/buffs.js';
+
+// Audit coverage against KITS_RHINE under the Rhine profile, otherwise the Rhine preset chess look uncovered.
+const ACTIVE_KITS = DATA_PROFILE === 'rhine' ? KITS_RHINE : KITS;
 
 const ds = getDefaultSource();
 const C = ds.raw.chess;
@@ -40,14 +45,14 @@ function battle(units, o = {}) {
 // coverage + smoke
 
 test('tier4 loadouts: every selectable skill of every visible chess is hand-authored (normal + elite)', () => {
-  const rep = kitCoverage({ tier: 4 });
-  assert.equal(rep.summary.chess, 23);
+  const rep = kitCoverage({ tier: 4, kits: ACTIVE_KITS });
+  assert.equal(rep.summary.chess, DATA_PROFILE === 'vanilla' ? 22 : 23);
   assert.equal(rep.summary.covered, rep.summary.skills, JSON.stringify(rep.chess.flatMap((r) => r.skills.filter((s) => !s.covered).map((s) => `${r.name} S${s.index + 1}`))));
   for (const base of T4) {
     const { skills } = loadoutOptions(C[base], C[gold(base)]);
     for (const i of skills) {
       if (C[base].skills.find((s) => s.index === i).isDefault) continue;
-      for (const id of pair(base)) assert.equal(skillSpecSource(D(id, i)), 'skills', `${id} S${i + 1}`);
+      for (const id of pair(base)) assert.equal(skillSpecSource(D(id, i), ACTIVE_KITS), 'skills', `${id} S${i + 1}`);
     }
   }
 });

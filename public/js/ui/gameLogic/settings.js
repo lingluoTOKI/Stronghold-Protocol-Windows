@@ -3,7 +3,6 @@
 import { clamp, isObj } from './shared.js';
 import { DEFAULT_HOTKEYS, sanitizeHotkeys } from './shortcuts.js';
 
-
 // ---- settings ------------------------------------------------------------------------------------------------------
 
 /** keys: the in-match shortcuts' key map (ui/gameLogic/shortcuts.js; settings → 快捷键). */
@@ -16,7 +15,7 @@ const QUALITIES = ['high', 'medium', 'low'];
  * @returns {{ bgm: number, sfx: number, voice: number, muted: boolean, damageNumbers: boolean, quality: 'high'|'medium'|'low',
  *   keys: Record<'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready', string> }}
  */
-export function sanitizeSettings(raw) {
+export function sanitizeSettings(raw, hotkeyDefaults = DEFAULT_HOTKEYS) {
   const r = isObj(raw) ? raw : {};
   const vol = (v, d) => (Number.isFinite(v) ? clamp(Math.round(v * 100) / 100, 0, 1) : d);
   return {
@@ -26,6 +25,6 @@ export function sanitizeSettings(raw) {
     muted: typeof r.muted === 'boolean' ? r.muted : DEFAULT_SETTINGS.muted,
     damageNumbers: typeof r.damageNumbers === 'boolean' ? r.damageNumbers : DEFAULT_SETTINGS.damageNumbers,
     quality: QUALITIES.includes(r.quality) ? r.quality : DEFAULT_SETTINGS.quality,
-    keys: sanitizeHotkeys(r.keys),
+    keys: sanitizeHotkeys(r.keys, hotkeyDefaults),
   };
 }

@@ -689,6 +689,7 @@ test('real data: every owned IN_BATTLE garrison installs without errors on its r
     h.runToEnd(60);
     assert.deepEqual(h.b.errors.filter((e) => /garrison|content:garrisons/.test(JSON.stringify(e))), [], `batch ${i}`);
     checkInvariants(h.b);
+    for (const u of units) for (const g of D.chess[u.chessId].garrisonIds || []) if (GR(g).eventType === 'IN_BATTLE') cover(g);
   }
 });
 

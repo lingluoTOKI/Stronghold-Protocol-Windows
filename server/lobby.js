@@ -166,7 +166,14 @@ function freezeDiy(picks) {
   return Object.freeze(out);
 }
 
-/** One room: 4 seat slots, host, difficulty, optional running match. */
+/**
+ * Seat capacity of a room: rhine rooms expand to MAX_SEATS (6, the 6-player Rhine expansion);
+ * vanilla rooms stay at the upstream v0.2.0 cap of 4 (git show 1303321:shared/constants.js).
+ */
+export const VANILLA_MAX_SEATS = 4;
+export function maxSeatsFor(rhineEnabled) { return rhineEnabled ? MAX_SEATS : VANILLA_MAX_SEATS; }
+
+/** One room: maxSeats seat slots, host, difficulty, optional running match. */
 export class Room {
   /** @param {string} code @param {'solo'|'coop'} mode @param {string} difficulty @param {number} now */
   constructor(code, mode, difficulty, now, rhineEnabled = true) {
@@ -174,12 +181,13 @@ export class Room {
     this.mode = mode;
     this.difficulty = difficulty;
     this.rhineEnabled = rhineEnabled;
+    this.capacity = maxSeatsFor(rhineEnabled);
     /** @type {Readonly<Record<string, any>> | null} the room's selected immutable tables */
     this.data = null;
     /** @type {string | null} */
     this.hostId = null;
     /** @type {(Seat | null)[]} */
-    this.seats = new Array(MAX_SEATS).fill(null);
+    this.seats = new Array(this.capacity).fill(null);
     /** @type {{ playerId: string, name: string, connected: boolean }[]} spectator seats, ≤ MAX_SPECTATORS (header) */
     this.spectators = [];
     /** @type {any} running Match instance */
@@ -227,6 +235,7 @@ export class Room {
       difficulty: this.difficulty,
       rhineEnabled: this.rhineEnabled,
       dataProfile: this.rhineEnabled ? 'rhine' : 'vanilla',
+      capacity: this.capacity,
       inMatch: !!this.match,
       seats: this.seats.map((s) => (s
         ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left }

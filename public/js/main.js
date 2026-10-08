@@ -309,7 +309,7 @@ function App() {
     <div class="app-bg" aria-hidden="true"></div>
     ${error ? html`<${ScreenCrashed} error=${error} reset=${resetError} />`
       : route === 'game' && !dataReady ? html`<div class="screen gload"><${Spinner} size="lg" label="LOADING DATA" />
-          <p class="t-lo" role="status">${dataError || '正在载入本局模拟数据…'}</p></div>`
+          <p class="t-lo" role="status">${dataError || t('正在载入本局模拟数据…')}</p></div>`
       : html`<${Screen} key=${route} />`}
     <${ConnectionBanner} />
     <${ToastHost} />

@@ -7,9 +7,14 @@ import assert from 'node:assert/strict';
 import { makeBattle, enemyRec, chessRec, checkInvariants } from '../helpers/battleHarness.js';
 import { getDefaultSource } from '../../server/sim/simdata.js';
 import { KITS, skillSpecSource } from '../../server/sim/content/index.js';
+import { KITS_RHINE } from '../../server/sim/content/kits/index.js';
+import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 import { kitCoverage } from '../../tools/kit-coverage.mjs';
 
 const ds = getDefaultSource();
+// kitCoverage / skillSpecSource default to the pristine upstream KITS; under the Rhine profile audit KITS_RHINE so the
+// Rhine preset chess (chess_rhine_*) resolve to their Rhine-authored skills.
+const ACTIVE_KITS = DATA_PROFILE === 'rhine' ? KITS_RHINE : KITS;
 const raw = (id) => ds.rawChess(id);
 /** The selectable non-default SkillRecord of a chess (tier 2 chess are E1: one alternative). */
 const alt = (id) => raw(id).skills.find((s) => !s.isDefault);
@@ -51,8 +56,8 @@ const plain = (id, o = {}) => chessRec({ id, skill: null, ...o });
 // coverage
 
 test('kit coverage: every selectable skill of every visible tier-2 chess is hand-authored (normal + elite)', () => {
-  const rep = kitCoverage({ tier: 2 });
-  assert.equal(rep.summary.chess, 18);
+  const rep = kitCoverage({ tier: 2, kits: ACTIVE_KITS });
+  assert.equal(rep.summary.chess, DATA_PROFILE === 'vanilla' ? 17 : 18);
   assert.equal(rep.summary.covered, rep.summary.skills, JSON.stringify(rep.chess.filter((r) => r.skills.some((s) => !s.covered)).map((r) => r.name)));
   for (const r of rep.chess) {
     for (const s of r.skills.filter((x) => !x.isDefault)) {
@@ -62,7 +67,7 @@ test('kit coverage: every selectable skill of every visible tier-2 chess is hand
         for (const moduleId of [null, 'none']) {
           const def = ds.getChess(id, { skillIndex: s.index, moduleId });
           assert.equal(def.skill.id, s.skillId);
-          assert.equal(skillSpecSource(def, KITS), 'skills', `${id} ${s.skillId} module ${moduleId}`);
+          assert.equal(skillSpecSource(def, ACTIVE_KITS), 'skills', `${id} ${s.skillId} module ${moduleId}`);
         }
       }
     }
@@ -742,7 +747,9 @@ test('modules: removing the elite module changes the trait / talent behaviour th
 // smoke: every loadout of every tier-2 chess fights without content errors
 
 test('every tier-2 loadout (skill × module, normal & elite) fights 30 s with its authored kit and no content errors', () => {
-  const bases = Object.values(ds.raw.chess).filter((c) => c.tier === 2 && c.visible && !c.isGolden);
+  // Upstream tier-2 loadouts only: the Rhine preset chess (chess_rhine_*) are audited in the coverage test above and
+  // follow Rhine's own kit conventions (their default skill is hand-authored, unlike the upstream generic default).
+  const bases = Object.values(ds.raw.chess).filter((c) => c.tier === 2 && c.visible && !c.isGolden && /^chess_char_2_/.test(c.chessId));
   for (const base of bases) {
     for (const id of [base.chessId, base.goldenId].filter(Boolean)) {
       const r = raw(id);

@@ -130,6 +130,9 @@ function compileChess(ctx, config, spec, gold, index) {
     skill.index = index; skill.overrideTokenKey = s.overrideTokenKey || null;
     if (spec.key === 'mayer' && index === 1) skill.trigger = { rule: 'SP_FULL', rawRule: 'ALWAYS', customRangeGrid: null };
     if (spec.key === 'dorothy') skill.trigger = { rule: 'SP_FULL', rawRule: 'ALWAYS', customRangeGrid: null };
+    // 预设重装(决战者森蚺)惯例：手动受击触发技能 S2/S3 的 trigger 为 TAKE_DAMAGE/TAKE_DAMAGE（DIY 原记录为 DEFAULT/DEFAULT，
+    // 升级为莱茵预设棋时须转成预设 TANK 惯例，S1 保持 DEFAULT）。顶层默认技能快照由默认技能克隆，自动同步。
+    if (spec.key === 'eunectes' && index >= 1) skill.trigger = { rule: 'TAKE_DAMAGE', rawRule: 'TAKE_DAMAGE', customRangeGrid: null };
     return [{ ...skill, isDefault: s.skillId === spec.skillId }];
   });
   const skill = clone(skills.find(s => s.isDefault)); delete skill.isDefault;
@@ -204,8 +207,19 @@ function applyEquipment({ items, effects }) {
 
 export async function applyRhineData(files, source = null) {
   const ctx = source || JSON.parse(await readFile(new URL('./rhine-data-source.json', import.meta.url), 'utf8'));
-  const { chess, bonds, garrisons, tokens, effects, config } = files;
+  const { chess, bonds, garrisons, tokens, effects, config, backups } = files;
   applyOpeningBans(config);
+  // Profile split (vanilla = pristine upstream; Rhine = live legacy): the six operators this overlay adds as
+  // chess_rhine_* pieces are obtained ONLY through the 莱茵生命 bond in the Rhine profile, exactly as in the shipped
+  // legacy build (each charId exists solely as its chess_rhine_* piece there). They must therefore be dropped from the
+  // upstream v0.2.0 自选 (DIY) pool — ownedPool / prototypes — so they are not offered a second time as DIY picks.
+  if (backups && backups.diy) {
+    const rhineCharIds = new Set(RHINE_ADDITIONS.map((s) => s.charId));
+    const drop = (list) => (Array.isArray(list) ? list.filter((id) => !rhineCharIds.has(id)) : list);
+    backups.diy.ownedPool = drop(backups.diy.ownedPool);
+    if (backups.diy.prototypes) for (const tier of Object.keys(backups.diy.prototypes)) backups.diy.prototypes[tier] = drop(backups.diy.prototypes[tier]);
+    files.backups = backups;
+  }
   for (const [index, spec] of RHINE_ADDITIONS.entries()) for (const gold of [false, true]) {
     const c = compileChess(ctx, config, spec, gold, index);
     chess[c.chessId] = c;
@@ -234,6 +248,15 @@ export async function applyRhineData(files, source = null) {
   for (const b of Object.values(bonds)) {
     b.members = Object.values(chess).filter(c => !c.isGolden && c.bonds.includes(b.bondId)).map(c => c.chessId);
     b.visibleMembers = b.members.filter(id => chess[id].visible);
+  }
+  // 莱茵平衡覆写（playtest 2026-10-05 拍板）：不屈(indomShip) 每层触发概率 0.004 → 0.0041，使 200 层叠满恰为 1.0。
+  // 纯上游 1303321 与 legacy 上线版均为 0.004；此覆写只在莱茵档案生效，data/vanilla 保持上游 0.004。
+  // 两处（盟约 bb 与其 buffs[0].bb）须同步，否则重新生成 data/bonds.json 会回退该拍板值。
+  if (bonds.indomShip) {
+    const INDOM_PER_STACK = 0.0041;
+    if (bonds.indomShip.bb) bonds.indomShip.bb.prob_per_stack = INDOM_PER_STACK;
+    const indomBuff0 = Array.isArray(bonds.indomShip.buffs) ? bonds.indomShip.buffs[0] : null;
+    if (indomBuff0 && indomBuff0.bb) indomBuff0.bb.prob_per_stack = INDOM_PER_STACK;
   }
   effects.bondeffect_rhine = { effectId: 'bondeffect_rhine', effectType: 'BOND', name: '莱茵生命', desc: TEXT, descRaw: TEXT,
     counterType: 'NONE', continuedRound: -1, decoIconId: null, enemyPrice: 0, buffs: [], params: { base_atk: RHINE_BALANCE.baseAttack, atk_per_stack: RHINE_BALANCE.attackPerLayer, sharing_count: RHINE_BALANCE.sharingCount, sharing_atk: RHINE_BALANCE.researchSharing[0], sharing_golden_atk: RHINE_BALANCE.researchSharing[1] } };
@@ -307,7 +330,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const args = process.argv.slice(2);
   if (args.length && (args.length !== 2 || args[0] !== '--out')) throw new Error('usage: node tools/rhine-data.mjs [--out data]');
   const out = resolve(args[1] || fileURLToPath(new URL('../data', import.meta.url)));
-  const names = ['chess','bonds','garrisons','tokens','effects','config','items'];
+  const names = ['chess','bonds','garrisons','tokens','effects','config','items','backups'];
   const files = Object.fromEntries(await Promise.all(names.map(async n => [n, JSON.parse(await readFile(join(out, `${n}.json`), 'utf8'))])));
   await applyRhineData(files);
   const errors = validateRhineData(files);

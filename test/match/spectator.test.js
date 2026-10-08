@@ -101,12 +101,15 @@ test('during a battle a spectator may watch any field at once; one added mid-bat
   assert.deepEqual(m.handle(S, { t: 'g.watch', fieldId: 'n:p_1' }), { ok: true });
   const st = h.lastTo(S, 'b.start');
   assert.deepEqual([st.fieldId, st.watch, st.authoritative], ['n:p_1', true, false]);
-  // the field's spec as every watcher gets it — minus the player's funds at the battle start (no battle effect reads it)
+  // the field's spec as a SPECTATOR gets it — minus the player's funds at battle start AND the rhine research hand
+  // (no battle effect reads either; the authoritative replica keeps them)
   const spec = m.fields.find((f) => f.fieldId === 'n:p_1').spec;
   assert.ok(Object.hasOwn(spec.players[0].contentInfo, 'funds'), 'a player / teammate replica gets contentInfo.funds');
   const { funds, ...counters } = spec.players[0].contentInfo;
   assert.ok(Number.isFinite(funds));
-  assert.deepEqual(st.spec, { ...spec, players: [{ ...spec.players[0], contentInfo: counters }] }, 'the same spec without funds');
+  const repl = { ...spec.players[0], contentInfo: counters };
+  if (repl.research && Object.hasOwn(repl.research, 'hand')) { const { hand, ...research } = repl.research; void hand; repl.research = research; }
+  assert.deepEqual(st.spec, { ...spec, players: [repl] }, 'the same spec without funds / research hand');
   assert.deepEqual(privateKeys(st), []);
   assert.equal(m.watchers.get(S), 'n:p_1');
   for (const f of m.fields) assert.notEqual(f.authority, S);

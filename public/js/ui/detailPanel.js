@@ -491,7 +491,7 @@ export function ItemDetail({ item, piece, editable, onDestroy, offBonds = null }
       </div>
     </div>
     <${Section} title=${t('效果')} micro="EFFECT"><${RichText} as="p" text=${item.descRaw || item.desc} class="dtext" /><//>
-    ${immediateGift ? html`<p class="dhint dhint--rule"><${Icon} name="info" />第14回合六人补给信标 · 使用后立即转赠</p>` : null}
+    ${immediateGift ? html`<p class="dhint dhint--rule"><${Icon} name="info" />${t('第14回合六人补给信标 · 使用后立即转赠')}</p>` : null}
     ${item.canGiveBond ? html`<${Section} title=${t('天赋')} micro="TALENT" class="dsec--morph"><${MorphPairings} off=${offBonds} /><//>` : null}
     ${!item.canGiveBond && item.giveBondId ? html`<${MorphGrantLine} item=${item} off=${offBonds} />` : null}
     ${item.note ? html`<p class="dhint dhint--rule"><${Icon} name="info" />${item.note}</p>` : null}
@@ -558,7 +558,7 @@ function EnemyDetail({ enemy, snapHp, count, live = null }) {
  * @param {boolean} [startDeploy] the sim's switch (tests pass both values)
  */
 export function summonDeployHint(token, startDeploy = SKILL_SUMMON_START_DEPLOY) {
-  if (rhineDevice(token?.tokenId)) return '莱茵生命科研装置：不占部署人数，无敌且不阻挡；只能收回科研备牌区。实际参战后记录研究进度，胜利+2、失败+1。';
+  if (rhineDevice(token?.tokenId)) return t('莱茵生命科研装置：不占部署人数，无敌且不阻挡；只能收回科研备牌区。实际参战后记录研究进度，胜利+2、失败+1。');
   if (!token || token.kind !== 'summon' || token.placeable !== true) return null;
   const talent = Object.values(token.variants || {}).some((v) => (v?.sources || []).includes('talent'));
   if (talent) return t('作战开始时在摆放的位置部署');
@@ -609,19 +609,19 @@ export function TokenDetail({ token, piece, ownerId = null, snapHp = null, live 
     <div class="dhead dhead--item">
       <div class="dhead__icon"><${Img} src=${tokenAvatarUrl(m, token.tokenId)} fallback=${html`<${GIcon} name="target" />`} /></div>
       <div class="dhead__info">
-        <div class="dhead__chips"><span class="dtag-token">${research ? '科研装置' : t('召唤物')}</span>${piece?.count > 1 ? html`<span class="dtag-kind num">×${piece.count}</span>` : null}</div>
+        <div class="dhead__chips"><span class="dtag-token">${research ? t('科研装置') : t('召唤物')}</span>${piece?.count > 1 ? html`<span class="dtag-kind num">×${piece.count}</span>` : null}</div>
         <h3 class="dhead__name">${token.name}</h3>
         ${hp ? html`<div class="dhp"><i style=${`width:${Math.max(0, Math.min(100, (hp.hp / Math.max(1, hp.max)) * 100))}%`}></i><span class="num">${fmtNum(hp.hp)} / ${fmtNum(hp.max)}</span></div>` : null}
       </div>
     </div>
     <div class=${cx('dstats', live && 'is-live')} data-live=${live ? live.src || 'prep' : undefined}>
       <${LiveTag} live=${live} />
-      <${Stat} k=${t('生命上限')} ...${st.maxHp} /><${Stat} k=${baseResearchAttack ? '基础攻击' : t('攻击')} ...${st.atk} />
+      <${Stat} k=${t('生命上限')} ...${st.maxHp} /><${Stat} k=${baseResearchAttack ? t('基础攻击') : t('攻击')} ...${st.atk} />
       <${Stat} k=${t('防御')} ...${st.def} /><${Stat} k=${t('阻挡数')} ...${st.blockCnt} />
     </div>
     ${hint ? html`<p class="dhint"><${Icon} name="info" />${hint}</p>` : null}
-    ${baseResearchAttack ? html`<p class="dhint">基础攻击未计入科研层数、装备与梅尔加成；实际数值以开战时或实时数值为准。</p>` : null}
-    ${research ? html`<${Section} title="作用范围"><p class="dtext">${researchRangeText({ id: token.tokenId, stage: piece?.stage ?? researchStage ?? live?.researchStage })}</p><p class="dhint">高亮的整格区域均生效，不随朝向改变。移动单位按所在格判断；巨型单位按占据格判断。</p><//>` : null}
+    ${baseResearchAttack ? html`<p class="dhint">${t('基础攻击未计入科研层数、装备与梅尔加成；实际数值以开战时或实时数值为准。')}</p>` : null}
+    ${research ? html`<${Section} title=${t('作用范围')}><p class="dtext">${researchRangeText({ id: token.tokenId, stage: piece?.stage ?? researchStage ?? live?.researchStage })}</p><p class="dhint">${t('高亮的整格区域均生效，不随朝向改变。移动单位按所在格判断；巨型单位按占据格判断。')}</p><//>` : null}
     ${token.descRaw || token.desc ? html`<${Section} title=${t('说明')}><${RichText} as="p" text=${token.descRaw || token.desc} class="dtext" /><//>` : null}
     ${skill ? html`<${Section} title=${t('技能')}><p class="dtext"><b>${skill.name}</b> ${skill.desc}</p><//>` : null}
     ${talents.length ? html`<${Section} title=${t('天赋')}>${talents.map((t, i) => html`<p class="dtext" key=${i}><b>${t.name}</b> ${t.desc}</p>`)}<//>` : null}`;

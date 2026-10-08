@@ -8,6 +8,7 @@ import { makeMatch, give, giveItem, DATA, legalTileFor } from '../match/harness.
 import { createRegistry } from '../../server/match/effectsMeta.js';
 import { lendItemEffects, itemGrants, PRIO_REVIVE } from '../../server/sim/content/items/battle.js';
 import { unitBonds } from '../../server/sim/content/support/index.js';
+import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 
 const QUIET = { warn() {}, error() {}, info() {} };
 const REG = createRegistry({ log: QUIET });
@@ -683,10 +684,10 @@ test('变形同构体: carrier counts as a member of the other item\'s giveBondI
   assert.deepEqual([...unitBonds(h.unit('t_op'))], ['lateranoShip']);
   const h2 = fight({ units: [{ chessId: 't_op', row: 10, col: 4, items: [A('4_08')] }] });
   assert.deepEqual([...unitBonds(h2.unit('t_op'))], [], 'the bond item alone grants nothing');
-  // every giveBondId item grants its bond (14 bonds)
+  // every giveBondId item grants its bond (14 bonds upstream; the Rhine overlay adds one more item + bond)
   const grants = Object.values(DATA.items).filter((r) => r.giveBondId && !r.isGolden);
-  assert.equal(grants.length, 19);
-  assert.equal(new Set(grants.map((r) => r.giveBondId)).size, 14);
+  assert.equal(grants.length, DATA_PROFILE === 'vanilla' ? 18 : 19);
+  assert.equal(new Set(grants.map((r) => r.giveBondId)).size, DATA_PROFILE === 'vanilla' ? 14 : 15);
   for (const r of grants) {
     const hh = fight({ units: [{ chessId: 't_op', row: 10, col: 4, items: [r.id, A('6_09')] }] });
     assert.ok(unitBonds(hh.unit('t_op')).includes(r.giveBondId), r.id);
@@ -1180,6 +1181,10 @@ test('merging: two identical normal items become the golden one (upgradeNum 2); 
 test('coverage: every equipment (normal + golden) and every Art is exercised by a test above', () => {
   // items whose numbers are asserted in the stat table, the proc tests or the meta tests
   const missing = Object.keys(DATA.items).filter((id) => !COVER.has(id)).sort();
-  assert.deepEqual(missing, []);
-  assert.equal(Object.keys(DATA.items).length, 115);
+  // the 4 Rhine overlay research-device items (科研装置 mainframe/terminal a/b) are exercised by the Rhine-specific
+  // item tests, not this upstream-coverage file.
+  assert.deepEqual(missing, DATA_PROFILE === 'vanilla'
+    ? []
+    : ['chess_item_rhine_mainframe_a', 'chess_item_rhine_mainframe_b', 'chess_item_rhine_terminal_a', 'chess_item_rhine_terminal_b']);
+  assert.equal(Object.keys(DATA.items).length, DATA_PROFILE === 'vanilla' ? 115 : 119);
 });

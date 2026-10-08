@@ -12,10 +12,23 @@ import { fileURLToPath } from 'node:url';
 import {
   HOTKEY_ACTIONS, DEFAULT_HOTKEYS, isBindableCode, hotkeyLabel, sanitizeHotkeys, rebindHotkey, isDefaultHotkeys, hotkeyOf,
   actionForKey, captureHotkey, facingSwallows, shortcutFor, shortcutBlocked, sanitizeSettings, DEFAULT_SETTINGS,
+  hotkeyActionsFor, defaultHotkeysFor,
 } from '../../public/js/ui/gameLogic.js';
+import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(path.join(ROOT, p), 'utf8');
+
+// Upstream baseline = the six keys of 0.1.4; rhine additionally gates buy(B)/chat(E)/speed(V). Expected action list /
+// default map / key labels follow the profile under test.
+const R = DATA_PROFILE === 'rhine';
+const EXTRA = R ? { buy: 'KeyB', chat: 'KeyE', speed: 'KeyV' } : {};
+const ACT = ['refresh', 'freeze', 'levelUp', 'retreat', 'sell', ...(R ? ['buy', 'chat', 'speed'] : []), 'ready'];
+const DEF = { refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ...EXTRA, ready: 'Space' };
+const LABELS = ['R', 'F', 'D', 'Q', 'X', ...(R ? ['B', 'E', 'V'] : []), 'Space'];
+// profile-aware wrappers: the defaults are upstream six at the module level, so the test passes the per-profile map.
+const sh = (raw, def = DEF) => sanitizeHotkeys(raw, def);
+const ss = (raw) => sanitizeSettings(raw, DEF);
 
 // the bindable codes, as the settings offer them
 const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((c) => `Key${c}`);
@@ -26,19 +39,22 @@ const BINDABLE = [...LETTERS, ...DIGITS, ...PUNCT, ...NAMED];
 const RESERVED = ['Escape', 'Tab', 'Enter', 'NumpadEnter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F1', 'F5', 'F12',
   'ShiftLeft', 'ControlLeft', 'AltLeft', 'MetaLeft', 'CapsLock', 'Backspace', 'ContextMenu', 'IntlBackslash', '', 'keyq', 'constructor', '__proto__'];
 
-const rebound = { ...DEFAULT_HOTKEYS, retreat: 'KeyW' };
+const rebound = { ...DEF, retreat: 'KeyW' };
 
 describe('the key map: defaults and labels', () => {
   test('the defaults are the keys of 0.1.4 (R / F / D / Q / X / Space), in the settings order', () => {
-    assert.deepEqual([...HOTKEY_ACTIONS], ['refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'buy', 'chat', 'speed', 'ready']);
-    assert.deepEqual({ ...DEFAULT_HOTKEYS }, { refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', buy: 'KeyB', chat: 'KeyE', speed: 'KeyV', ready: 'Space' });
-    assert.deepEqual(HOTKEY_ACTIONS.map((a) => hotkeyLabel(DEFAULT_HOTKEYS[a])), ['R', 'F', 'D', 'Q', 'X', 'B', 'E', 'V', 'Space']);
+    assert.deepEqual(hotkeyActionsFor(DATA_PROFILE), ACT);
+    assert.deepEqual(defaultHotkeysFor(DATA_PROFILE), DEF);
+    // the module-level baseline is always the upstream six (vanilla == upstream); rhine only adds via the profile fn
+    assert.deepEqual([...HOTKEY_ACTIONS], ['refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'ready']);
+    assert.deepEqual({ ...DEFAULT_HOTKEYS }, { refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' });
+    assert.deepEqual(ACT.map((a) => hotkeyLabel(DEF[a])), LABELS);
     assert.ok(Object.isFrozen(DEFAULT_HOTKEYS) && Object.isFrozen(HOTKEY_ACTIONS));
-    assert.equal(DEFAULT_SETTINGS.keys, DEFAULT_HOTKEYS, 'the settings default is the same map');
-    assert.deepEqual(sanitizeSettings(null).keys, { ...DEFAULT_HOTKEYS });
-    assert.deepEqual(sanitizeSettings({ bgm: 0.4 }).keys, { ...DEFAULT_HOTKEYS }, 'a profile saved before 0.2.0 (no keys) keeps the old keys');
-    assert.equal(isDefaultHotkeys(DEFAULT_HOTKEYS), true);
-    assert.equal(isDefaultHotkeys(rebound), false);
+    assert.equal(DEFAULT_SETTINGS.keys, DEFAULT_HOTKEYS, 'the settings default is the upstream baseline map');
+    assert.deepEqual(sh(null), DEF);
+    assert.deepEqual(ss({ bgm: 0.4 }).keys, DEF, 'a profile saved before 0.2.0 (no keys) keeps the old keys');
+    assert.equal(isDefaultHotkeys(DEF, DEF), true);
+    assert.equal(isDefaultHotkeys(rebound, DEF), false);
   });
 
   test('which keys may be a shortcut, and how each is shown', () => {
@@ -59,64 +75,64 @@ describe('the key map: defaults and labels', () => {
 
 describe('the key map: sanitising (the settings store, localStorage sp.pref.settings)', () => {
   test('a valid map is kept as saved; it survives the JSON round trip of the store', () => {
-    const mine = { refresh: 'KeyG', freeze: 'Digit2', levelUp: 'Comma', retreat: 'KeyW', sell: 'Delete', ready: 'KeyE' };
-    assert.deepEqual(sanitizeHotkeys(mine), mine);
-    const saved = JSON.parse(JSON.stringify(sanitizeSettings({ bgm: 0.3, keys: mine })));
-    assert.deepEqual(sanitizeSettings(saved).keys, mine);
-    assert.equal(sanitizeSettings(saved).bgm, 0.3);
+    const mine = { refresh: 'KeyG', freeze: 'Digit2', levelUp: 'Comma', retreat: 'KeyW', sell: 'Delete', ready: 'KeyT', ...EXTRA };
+    assert.deepEqual(sh(mine), mine);
+    const saved = JSON.parse(JSON.stringify(ss({ bgm: 0.3, keys: mine })));
+    assert.deepEqual(ss(saved).keys, mine);
+    assert.equal(ss(saved).bgm, 0.3);
   });
 
   test('bad entries fall back to their default; unknown actions are dropped', () => {
-    assert.deepEqual(sanitizeHotkeys({ retreat: 'KeyW', sell: 'Escape', ready: 42 }), { ...DEFAULT_HOTKEYS, retreat: 'KeyW' });
-    assert.deepEqual(sanitizeHotkeys({ ...DEFAULT_HOTKEYS, pen: 'KeyP', toString: 'KeyT' }), { ...DEFAULT_HOTKEYS });
-    for (const c of RESERVED) assert.deepEqual(sanitizeHotkeys({ refresh: c }), { ...DEFAULT_HOTKEYS }, c);
+    assert.deepEqual(sh({ retreat: 'KeyW', sell: 'Escape', ready: 42 }), { ...DEF, retreat: 'KeyW' });
+    assert.deepEqual(sh({ ...DEF, pen: 'KeyP', toString: 'KeyT' }), { ...DEF });
+    for (const c of RESERVED) assert.deepEqual(sh({ refresh: c }), DEF, c);
     // keys of the prototype are not saved keys
-    assert.deepEqual(sanitizeHotkeys(Object.create({ refresh: 'KeyG' })), { ...DEFAULT_HOTKEYS });
-    assert.deepEqual(sanitizeHotkeys(JSON.parse('{"__proto__": {"refresh": "KeyG"}, "sell": "KeyV"}')), { ...DEFAULT_HOTKEYS, sell: 'KeyX' , buy: 'KeyB', chat: 'KeyE', speed: 'KeyV' });
+    assert.deepEqual(sh(Object.create({ refresh: 'KeyG' })), DEF);
+    assert.deepEqual(sh(JSON.parse('{"__proto__": {"refresh": "KeyG"}, "sell": "KeyV"}')), R ? DEF : { ...DEF, sell: 'KeyV' });
   });
 
   test('bad data — not a map, or two actions on one key — gives the defaults', () => {
-    for (const raw of [null, undefined, 'KeyQ', 7, true, [], ['KeyW'], () => 'KeyQ']) assert.deepEqual(sanitizeHotkeys(raw), { ...DEFAULT_HOTKEYS }, String(raw));
-    assert.deepEqual(sanitizeHotkeys({ ...DEFAULT_HOTKEYS, sell: 'KeyQ' }), { ...DEFAULT_HOTKEYS }, 'retreat and sell on Q');
+    for (const raw of [null, undefined, 'KeyQ', 7, true, [], ['KeyW'], () => 'KeyQ']) assert.deepEqual(sh(raw), DEF, String(raw));
+    assert.deepEqual(sh({ ...DEF, sell: 'KeyQ' }), DEF, 'retreat and sell on Q');
     // an invalid entry whose default another action now holds is a conflict too
-    assert.deepEqual(sanitizeHotkeys({ refresh: 'KeyF', freeze: 'nonsense' }), { ...DEFAULT_HOTKEYS });
-    assert.deepEqual(sanitizeSettings({ quality: 'low', keys: { ready: 'KeyR' } }).keys, { ...DEFAULT_HOTKEYS });
-    assert.equal(sanitizeSettings({ quality: 'low', keys: { ready: 'KeyR' } }).quality, 'low', 'the other settings are kept');
+    assert.deepEqual(sh({ refresh: 'KeyF', freeze: 'nonsense' }), DEF);
+    assert.deepEqual(ss({ quality: 'low', keys: { ready: 'KeyR' } }).keys, DEF);
+    assert.equal(ss({ quality: 'low', keys: { ready: 'KeyR' } }).quality, 'low', 'the other settings are kept');
   });
 });
 
 describe('the key map: rebinding and conflicts', () => {
   test('a free key just moves the action', () => {
-    const r = rebindHotkey(DEFAULT_HOTKEYS, 'retreat', 'KeyW');
+    const r = rebindHotkey(DEF, 'retreat', 'KeyW');
     assert.deepEqual(r, { keys: rebound, changed: true, swapped: null });
-    assert.deepEqual({ ...DEFAULT_HOTKEYS }, { refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' , buy: 'KeyB', chat: 'KeyE', speed: 'KeyV' }, 'the defaults are untouched');
+    assert.deepEqual({ ...DEF }, DEF, 'the defaults are untouched');
   });
 
   test('a key another action holds is swapped: that action takes the old key', () => {
-    const r = rebindHotkey(DEFAULT_HOTKEYS, 'retreat', 'KeyX');
+    const r = rebindHotkey(DEF, 'retreat', 'KeyX');
     assert.equal(r.changed, true);
     assert.equal(r.swapped, 'sell');
-    assert.deepEqual(r.keys, { ...DEFAULT_HOTKEYS, retreat: 'KeyX', sell: 'KeyQ' });
+    assert.deepEqual(r.keys, { ...DEF, retreat: 'KeyX', sell: 'KeyQ' });
     const back = rebindHotkey(r.keys, 'ready', 'KeyQ');
-    assert.deepEqual(back.keys, { ...DEFAULT_HOTKEYS, retreat: 'KeyX', sell: 'Space', ready: 'KeyQ' });
+    assert.deepEqual(back.keys, { ...DEF, retreat: 'KeyX', sell: 'Space', ready: 'KeyQ' });
     assert.equal(back.swapped, 'sell');
   });
 
   test('the same key, an unknown action or a reserved key change nothing', () => {
-    assert.deepEqual(rebindHotkey(DEFAULT_HOTKEYS, 'retreat', 'KeyQ'), { keys: { ...DEFAULT_HOTKEYS }, changed: false, swapped: null });
+    assert.deepEqual(rebindHotkey(DEF, 'retreat', 'KeyQ'), { keys: { ...DEF }, changed: false, swapped: null });
     for (const [action, code] of [['pen', 'KeyP'], ['escape', 'KeyE'], ['retreat', 'Escape'], ['retreat', 'Enter'], ['retreat', 'ArrowUp'], ['retreat', 'F5']]) {
-      assert.deepEqual(rebindHotkey(DEFAULT_HOTKEYS, action, code), { keys: { ...DEFAULT_HOTKEYS }, changed: false, swapped: null }, `${action} ${code}`);
+      assert.deepEqual(rebindHotkey(DEF, action, code), { keys: { ...DEF }, changed: false, swapped: null }, `${action} ${code}`);
     }
   });
 
   test('whatever is rebound, every action keeps exactly one key and no key does two things', () => {
-    let keys = { ...DEFAULT_HOTKEYS };
+    let keys = { ...DEF };
     let seed = 7;
     const rnd = (n) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
     for (let i = 0; i < 2000; i++) {
-      keys = rebindHotkey(keys, HOTKEY_ACTIONS[rnd(HOTKEY_ACTIONS.length)], BINDABLE[rnd(BINDABLE.length)]).keys;
-      assert.equal(new Set(Object.values(keys)).size, HOTKEY_ACTIONS.length);
-      assert.deepEqual(sanitizeHotkeys(keys), keys, 'a rebound map is a valid saved map');
+      keys = rebindHotkey(keys, ACT[rnd(ACT.length)], BINDABLE[rnd(BINDABLE.length)]).keys;
+      assert.equal(new Set(Object.values(keys)).size, ACT.length);
+      assert.deepEqual(sh(keys, keys), keys, 'a rebound map is a valid saved map');
     }
   });
 });
@@ -263,7 +279,7 @@ describe('every handler and key hint reads the map', () => {
   test('the HUD hints follow the settings: hotkeyLabelOf and the ready button after a rebind', async () => {
     const { settingsStore, updateSettings, hotkeyLabelOf } = await import('../../public/js/ui/settings.js');
     const { ReadyToggle } = await import('../../public/js/ui/hud.js');
-    after(() => updateSettings({ keys: DEFAULT_HOTKEYS }));
+    after(() => updateSettings({ keys: DEF }));
     const kbdOf = (v) => {
       const stack = [v];
       while (stack.length) {
@@ -276,16 +292,17 @@ describe('every handler and key hint reads the map', () => {
       return null;
     };
     const priv = { ready: false, alive: true, temp: [], funds: 0 };
-    assert.deepEqual(HOTKEY_ACTIONS.map(hotkeyLabelOf), ['R', 'F', 'D', 'Q', 'X', 'Space']);
+    assert.deepEqual(ACT.map(hotkeyLabelOf), LABELS);
     assert.equal(kbdOf(ReadyToggle({ priv, onToggle() {} })), 'Space');
-    updateSettings({ keys: rebindHotkey(settingsStore.get().keys, 'ready', 'KeyE').keys });
+    const start = settingsStore.get().keys; // whatever the client profile initialised (rhine nine in the browser)
+    updateSettings({ keys: rebindHotkey(start, 'ready', 'KeyE').keys });
     updateSettings({ keys: rebindHotkey(settingsStore.get().keys, 'retreat', 'KeyW').keys });
-    assert.deepEqual(settingsStore.get().keys, { ...DEFAULT_HOTKEYS, ready: 'KeyE', retreat: 'KeyW' });
+    assert.deepEqual(settingsStore.get().keys, rebindHotkey(rebindHotkey(start, 'ready', 'KeyE').keys, 'retreat', 'KeyW').keys);
     assert.equal(hotkeyLabelOf('retreat'), 'W');
     assert.equal(kbdOf(ReadyToggle({ priv, onToggle() {} })), 'E');
     updateSettings({ keys: { retreat: 'Escape' } });
     assert.equal(hotkeyLabelOf('retreat'), 'Q', 'a bad patch falls back to the defaults');
-    updateSettings({ keys: DEFAULT_HOTKEYS });
+    updateSettings({ keys: DEF });
     assert.equal(kbdOf(ReadyToggle({ priv, onToggle() {} })), 'Space');
   });
 });

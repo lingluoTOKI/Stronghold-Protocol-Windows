@@ -31,6 +31,7 @@
 
 import { itemKeyOf, isCoreBond } from '../support/index.js';
 import { metaBonds } from '../support/meta.js';
+import { RHINE_BOND } from '../../../../shared/rhineResearch.js';
 
 const int = (v, d = 0) => (Number.isFinite(v) ? Math.trunc(v) : d);
 
@@ -85,12 +86,21 @@ export function registerMeta(registry) {
     },
   }));
 
+  // Bonds the pager/phone may search for mates. The Rhine research bond (rhineShip) grows by research, not by
+  // recruitment pager — community #45 (2026-10-06): on 缪尔赛思 (maniShip + rhineShip) the pager must see only 调和,
+  // so below shop level 6 there is no mate and the item is used up with nothing. (No-op in vanilla: rhineShip absent.)
+  const pagerBonds = (ctx, targetUid) => {
+    const b = new Set(ctx.pieceBonds(targetUid));
+    b.delete(RHINE_BOND);
+    return b;
+  };
+
   // 寻呼模块 — use_equip_reward_special_goods_char_chess {refresh_cnt, choice_cnt}
   wrap(registry, 'chess_item_4_01_e', () => ({
     onEquip(ctx, ev) {
       const p = buffP(ctx, ev.item && ev.item.id, 'use_equip_reward_special_goods_char_chess') || {};
       const n = Math.max(1, int(p.refresh_cnt, 3));
-      const bonds = new Set(ctx.pieceBonds(ev.target.uid));
+      const bonds = pagerBonds(ctx, ev.target.uid);
       const maxTier = ctx.shopLevel();
       const shares = (id) => { const c = ctx.gd.chess(id); return !!(c && Array.isArray(c.bonds) && c.bonds.some((b) => bonds.has(b))); };
       const ids = [];
@@ -100,6 +110,21 @@ export function registerMeta(registry) {
         if (id) ids.push(id);
       }
       if (ids.length) ctx.offerChess(ids, { source: 'item' });
+    },
+  }));
+
+  // 简易通讯机 — use_equip_reward_char_chess_with_same_bond {count}: grant `count` mates directly (same rhineShip exclusion).
+  wrap(registry, 'chess_item_2_06_e', () => ({
+    onEquip(ctx, ev) {
+      const p = buffP(ctx, ev.item && ev.item.id, 'use_equip_reward_char_chess_with_same_bond') || {};
+      const n = Math.max(1, int(p.count, 1));
+      const bonds = pagerBonds(ctx, ev.target.uid);
+      const maxTier = ctx.shopLevel();
+      const shares = (id) => { const c = ctx.gd.chess(id); return !!(c && Array.isArray(c.bonds) && c.bonds.some((b) => bonds.has(b))); };
+      for (let k = 0; k < n; k++) {
+        const id = ctx.rollChess({ maxTier, filter: (x) => shares(x) });
+        if (id) ctx.grantChess(id);
+      }
     },
   }));
 

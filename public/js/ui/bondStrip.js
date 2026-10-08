@@ -55,7 +55,7 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
   const perBond = bannedPerBond(data.list('bonds'), banned);
   const banBadge = (bondId, name) => {
     const n = perBond.get(bondId) || 0;
-    return n > 0 ? html`<span class="bslot__ban" title=${`${name}：${n} 名干员无法出现`} data-ban=${n}><${Icon} name="user" /><b class="num">${n}</b></span>` : null;
+    return n > 0 ? html`<span class="bslot__ban" title=${t('{name}：{n} 名干员无法出现', { name, n })} data-ban=${n}><${Icon} name="user" /><b class="num">${n}</b></span>` : null;
   };
   const strip = html`<div class=${cx('bstrip', layersDisabled && 'is-frozen', owner && 'is-other')} role="list"
       aria-label=${owner ? t('{owner} 的盟约', { owner }) : t('我的盟约')} data-owner=${owner || null}>

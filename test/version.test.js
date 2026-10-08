@@ -50,6 +50,12 @@ test('the release version is what players see', () => {
   assert.match(read('server/http/routes.js'), /app: APP_VERSION/, '/healthz');
 });
 
+// Detect whether this checkout is the upstream alliance repo or a downstream fork (e.g. the Rhine Lab expansion).
+// The game title "Stronghold Protocol: Alliance" stays the same; only package.name / repo / lock identity differ.
+const IS_RHINE_FORK = pkg.name === 'stronghold-protocol-rhine';
+const EXPECTED_PKG_NAME = IS_RHINE_FORK ? 'stronghold-protocol-rhine' : 'stronghold-protocol-alliance';
+const EXPECTED_REPO_RE = IS_RHINE_FORK ? /github\.com\/YUYUYUYUYUYUYUTOUA\/Stronghold-Protocol-Rhine/ : /github\.com\/sganggs\/Stronghold-Protocol/;
+
 test('the English title is the official one: Stronghold Protocol: Alliance (as in the reply to GitHub issue #38, which stays open)', () => {
   // EN client data, activity_table basicInfo.act2autochess.name = "Stronghold Protocol: Alliance" (CN 卫戍协议:盟约);
   // the project used to call it "Covenant". The Chinese title stays 卫戍协议：盟约; the repository keeps its name.
@@ -57,7 +63,7 @@ test('the English title is the official one: Stronghold Protocol: Alliance (as i
   assert.match(readme.split('\n')[0], /^# 卫戍协议：盟约 · Stronghold Protocol: Alliance$/, 'README title');
   assert.match(readme, /mode \*Stronghold Protocol: Alliance\*/, 'README English summary');
   assert.match(read('server/http/boot.js'), /卫戍协议：盟约 · Stronghold Protocol: Alliance v/, 'boot banner');
-  assert.equal(pkg.name, 'stronghold-protocol-alliance');
+  assert.equal(pkg.name, EXPECTED_PKG_NAME);
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.packages[''].name, pkg.name);
   for (const f of ['README.md', 'server/index.js', 'server/http/boot.js', 'package.json', 'package-lock.json', 'NOTICE.md', 'public/index.html', 'docs/DEPLOY.md']) {
@@ -71,7 +77,7 @@ test('GPL-3.0-or-later: LICENSE, package metadata and notices', () => {
   assert.match(license, /END OF TERMS AND CONDITIONS/);
   assert.equal(pkg.license, 'GPL-3.0-or-later');
   assert.equal(lock.packages[''].license, 'GPL-3.0-or-later');
-  assert.match(pkg.repository.url, /github\.com\/sganggs\/Stronghold-Protocol/);
+  assert.match(pkg.repository.url, EXPECTED_REPO_RE);
   for (const f of ['NOTICE.md', 'THIRD-PARTY-NOTICES.md', 'tools/local-extract/LICENSE-Ark-Unpacker.txt']) {
     assert.ok(existsSync(join(ROOT, f)), f);
   }

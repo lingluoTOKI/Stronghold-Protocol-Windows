@@ -146,7 +146,8 @@ export const closeLoadout = () => loadoutStore.set({ open: false });
  * `msgType` / `field` = the C2S message, `prepare()` → the payload to send (may await data; null = the data is missing:
  * nothing is sent, state 'error'), `lockedText` = what a refused edit tells the player.
  */
-function installPrefSync({ net, cache, timers, target, notify, key, stateKey, msgType, field, prepare, lockedText, tag }) {
+function installPrefSync({ net, cache: cacheOpt, timers, target, notify, key, stateKey, msgType, field, prepare, lockedText, tag }) {
+  const cache = cacheOpt || data; // param wins (production injects it); else the module-level double-profile data store
   const T = timers || { setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms), clearTimeout: (id) => globalThis.clearTimeout(id) };
   // (`lockedText` is a msgid: the toast is translated when it shows — docs/I18N.md)
   const tell = notify || ((text) => toast(t(text), 'warn'));

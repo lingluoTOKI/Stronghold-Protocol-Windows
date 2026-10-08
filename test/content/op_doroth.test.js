@@ -5,14 +5,14 @@
 // 梦中人 at stage 1 (tier 5) / 3 (tier 6). Numbers from data/backups.json; the fidelity checklist of kits/README.md.
 // Run: node --test test/content/op_doroth.test.js
 
-import { test } from 'node:test';
+// Profile split: this asserts the PRISTINE UPSTREAM DIY 多萝西 — vanilla-only (skipped under the Rhine profile, where
+// 多萝西 exists only as the bond piece chess_rhine_dorothy). Data resolves via the profile-aware helper.
+import { vanillaTest as test } from '../helpers/profile-test.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
 import { KITTED_CHARS, OPERATOR_KITS, KITS } from '../../server/sim/content/kits/index.js';
 import { diyPool, validateDiyPicks } from '../../shared/diy.js';
-
-const load = (f) => JSON.parse(readFileSync(new URL(`../../data/${f}.json`, import.meta.url), 'utf8'));
+import { loadDataJson as load } from '../helpers/dataFile.mjs';
 const CHESS = load('chess');
 const BACKUPS = load('backups');
 const DOR = 'char_4048_doroth';

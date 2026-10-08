@@ -309,8 +309,8 @@ export function PauseButton({ paused, busy = false, onToggle }) {
  */
 export function SpeedButton({ value, onCycle }) {
   const v = Number(value) > 0 ? Number(value) : 2;
-  return html`<${Tooltip} text=${`战斗倍速 ${v}×（点击切换 1× / 2× / 4×）`} placement="bottom">
-    <button type="button" class=${cx('speedbtn', 'tapx', v !== 2 && 'is-on')} aria-label=${`战斗倍速 ${v} 倍，点击切换`}
+  return html`<${Tooltip} text=${t('战斗倍速 {v}×（点击切换 1× / 2× / 4×）', { v })} placement="bottom">
+    <button type="button" class=${cx('speedbtn', 'tapx', v !== 2 && 'is-on')} aria-label=${t('战斗倍速 {v} 倍，点击切换', { v })}
       data-testid="speed" onClick=${() => onCycle?.()}>
       <span class="speedbtn__txt num">${v}×</span>
     </button>
@@ -348,16 +348,16 @@ export function SkipButton({ onSkip, ready = true }) {
     try { onSkip?.(); } catch { /* the runner ignores a non-skippable battle */ }
   };
   const tip = armed
-    ? '再次点击确认：场上剩余敌人立刻冲家、扣除生命值，并直接进入下一轮整备'
+    ? t('再次点击确认：场上剩余敌人立刻冲家、扣除生命值，并直接进入下一轮整备')
     : ready
-      ? '跳过本场：剩余敌人冲家扣血，直接进入下一轮买卖（联防 / Boss 关不可用）'
-      : '敌人尚未全部出场：等所有敌人进场后才可跳过，届时剩余敌人冲家扣血并进入下一轮';
+      ? t('跳过本场：剩余敌人冲家扣血，直接进入下一轮买卖（联防 / Boss 关不可用）')
+      : t('敌人尚未全部出场：等所有敌人进场后才可跳过，届时剩余敌人冲家扣血并进入下一轮');
   return html`<${Tooltip} text=${tip} placement="bottom">
     <button type="button" class=${cx('skipbtn', 'tapx', armed && 'is-armed', !ready && 'is-disabled')}
-      aria-label=${armed ? '确认跳过本场' : ready ? '跳过本场' : '等待敌人全部出场后跳过本场'}
+      aria-label=${armed ? t('确认跳过本场') : ready ? t('跳过本场') : t('等待敌人全部出场后跳过本场')}
       aria-pressed=${armed ? 'true' : 'false'} aria-disabled=${ready ? 'false' : 'true'}
       disabled=${!ready} data-testid="skip" onClick=${onClick}>
-      ${armed ? html`<span class="skipbtn__txt">确认跳过</span>` : html`<${SkipGlyph} />`}
+      ${armed ? html`<span class="skipbtn__txt">${t('确认跳过')}</span>` : html`<${SkipGlyph} />`}
     </button>
   <//>`;
 };
@@ -456,7 +456,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
         ${speed?.show
           ? html`<${SpeedButton} value=${speed.value} onCycle=${speed.onCycle} />`
           : isCombatPhase(pub?.phase) && !spectator
-            ? html`<span class="gtop__nospeed" title="本阶段无法调整战斗倍速">本阶段不可调倍速</span>`
+            ? html`<span class="gtop__nospeed" title=${t('本阶段无法调整战斗倍速')}>${t('本阶段不可调倍速')}</span>`
             : null}
         ${skip?.show ? html`<${SkipButton} onSkip=${skip.onSkip} ready=${skip.ready !== false} />` : null}
         ${pause && (pause.show || pause.paused) ? html`<${PauseButton} paused=${!!pause.paused} busy=${pause.busy} onToggle=${pause.onToggle} />` : null}

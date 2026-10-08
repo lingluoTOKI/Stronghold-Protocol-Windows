@@ -468,8 +468,8 @@ describe('9: busy indicators and data loading', () => {
     const missing = [...used].filter((n) => !GAME_FILES.includes(n));
     assert.deepEqual(missing, [], 'read by the match UI but not awaited by the match screen');
     const main = read('public/js/main.js');
-    assert.match(main, /if \(s\.room && !prev\.room\) warmGameData\(\);/);
-    assert.match(main, /data\.loadAll\(GAME_FILES\)/);
+    assert.match(main, /warmGameData\(\);/);
+    assert.match(main, /CORE_DATA_FILES, \.\.\.GAME_FILES/);
   });
 });
 

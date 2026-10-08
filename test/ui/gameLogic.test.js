@@ -7,6 +7,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DATA_PROFILE } from '../helpers/dataFile.mjs';
+const R = DATA_PROFILE === 'rhine';
+const defKeys = defaultHotkeysFor(DATA_PROFILE);
 import {
   phaseMode, phaseBanner, isCombatPhase, isBossPhase, countdownState, phaseTotalSeconds, sortBonds, bondTier, nextThreshold,
   battleOverSfx, ownRoundLoss, uniteResultBox, battleResultBox, roundResultBox, RESULT_BOX_MS,
@@ -14,6 +17,7 @@ import {
   boardTargets, dropIntent, normalizeDraft, normalizeSp, groupEnemies, factionTypes, snapHud, bossFrac, attackInterval, fmtNum,
   rangeGridBox, shortcutFor, sanitizeSettings, DEFAULT_SETTINGS, normalizeResult, cycleField, fieldLabel, homeFieldId,
   activeBubbles, sortedPlayers, tileKey, prepCapsuleLabel, prepCamera, dropFailureReason, terrainInfo,
+  defaultHotkeysFor,
 } from '../../public/js/ui/gameLogic.js';
 import { pairPlayers } from '../../server/match/finalAssault.js';
 import { PHASE, GEO } from '../../shared/constants.js';
@@ -633,10 +637,12 @@ describe('keyboard & settings', () => {
     assert.equal(shortcutFor({ key: ' ', code: 'Space', target: { tagName: 'BUTTON' } }), 'ready', 'space readies even with a HUD button focused');
     assert.equal(shortcutFor({ key: ' ', code: 'Space', target: { tagName: 'TEXTAREA' } }), null);
     assert.equal(shortcutFor({ key: 'd', target: { tagName: 'DIV', isContentEditable: true } }), null);
-    assert.equal(shortcutFor({ key: 's', code: 'KeyS' }), 'sell');
-    assert.equal(shortcutFor({ key: 'b', code: 'KeyB' }), 'buy');
-    assert.equal(shortcutFor({ key: 'e', code: 'KeyE' }), 'chat');
-    assert.equal(shortcutFor({ key: 'x' }), 'speed');
+    assert.equal(shortcutFor({ key: 's', code: 'KeyS' }, defKeys), null, 'KeyS unused upstream');
+    assert.equal(shortcutFor({ key: 'x' }), 'sell');
+    // rhine-only: buy (B) / chat (E) / battle speed (V); upstream keeps KeyE idle and KeyV free
+    assert.equal(shortcutFor({ key: 'b', code: 'KeyB' }, defKeys), R ? 'buy' : null);
+    assert.equal(shortcutFor({ key: 'e', code: 'KeyE' }, defKeys), R ? 'chat' : null);
+    assert.equal(shortcutFor({ key: 'v', code: 'KeyV' }, defKeys), R ? 'speed' : null);
     assert.equal(shortcutFor({ key: 'z' }), null);
     assert.equal(shortcutFor(null), null);
   });

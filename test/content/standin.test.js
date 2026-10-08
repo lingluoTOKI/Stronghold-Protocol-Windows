@@ -13,7 +13,6 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { makeBattle, enemyRec, standInRec, checkInvariants } from '../helpers/battleHarness.js';
 import { DataSource, getDefaultSource, withUnitLoadouts } from '../../server/sim/simdata.js';
 import { buildBattleSpec, createBattleFromSpec, sanitizeUnitLoadout } from '../../server/sim/spec.js';
@@ -22,8 +21,8 @@ import { statTalentMods } from '../../server/sim/content/generic.js';
 import { unitInfo } from '../../server/sim/snapshot.js';
 import { standInRecord, unitForm } from '../../shared/standIn.js';
 import { bodyInKeys } from '../../server/sim/body.js';
+import { loadDataJson as load, DATA_PROFILE } from '../helpers/dataFile.mjs';
 
-const load = (f) => JSON.parse(readFileSync(new URL(`../../data/${f}.json`, import.meta.url), 'utf8'));
 const CHESS = load('chess');
 const BACKUPS = load('backups');
 const ds = getDefaultSource();

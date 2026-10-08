@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.
 import { html } from './components.js';
 import { GIcon } from './gameComponents.js';
 import { useStore } from '../store.js';
+import { t } from '../../shared/i18n.js';
 import { EMOTE_THEMES, CHAT_MAX_LEN } from '../../../shared/constants.js';
 import { emoteArtUrl } from './emotes.js';
 import { actions } from './gameActions.js';
@@ -45,7 +46,7 @@ export function ensureChatCss(doc = globalThis.document) {
     '.chat-dock__close:hover{color:var(--mint-400,#59f4ca);border-color:var(--mint-700,#2a9e7f);background:var(--mint-a10,rgba(78,216,175,.1));}',
     /* 消息列表：终端日志风（左对齐、等宽、名字翡翠绿、左侧细线） */
     '.chat-dock__body{overflow-y:auto;flex:1 1 auto;min-height:1.1rem;max-height:34vh;padding:.1rem .12rem;display:flex;flex-direction:column;gap:.05rem;}',
-    '/* 用户拖拽过尺寸后：消息区填满面板剩余高度（不再受 34vh 限制） */',
+    '/* after user resize: body fills remaining panel height (no longer capped at 34vh) */',
     '.chat-dock__panel.is-sized .chat-dock__body{max-height:none;min-height:0;}',
     /* 右下角拖拽手柄（落在消息区右下，避开输入行）：翡翠绿小三角，触摸可拖，双击复位 */
     '.chat-dock__resize{position:absolute;right:0;bottom:.74rem;width:.32rem;min-width:26px;height:.32rem;min-height:26px;z-index:5;cursor:nwse-resize;touch-action:none;}',
@@ -280,25 +281,25 @@ export function ChatDock({ open, onToggle, disabled = false }) {
     <div class="chat-dock">
       <button type="button" class=${cx('ewheel__btn', 'chat-dock__btn', open && 'is-on')}
         aria-expanded=${open ? 'true' : 'false'} aria-haspopup="dialog" disabled=${disabled}
-        onClick=${() => onToggle(!open)} title="房间聊天 / 交流">
-        <${GIcon} name="emote" /><span class="ewheel__label">交流</span>
+        onClick=${() => onToggle(!open)} title=${t('房间聊天 / 交流')}>
+        <${GIcon} name="emote" /><span class="ewheel__label">${t('交流')}</span>
         ${!open && unread > 0 ? html`<span class="chat-dock__badge">${unread > 99 ? '99+' : unread}</span>` : null}
       </button>
 
       ${open ? html`
-        <div class=${cx('chat-dock__panel', size && 'is-sized', pos && 'is-moved')} role="dialog" aria-label="房间聊天"
+        <div class=${cx('chat-dock__panel', size && 'is-sized', pos && 'is-moved')} role="dialog" aria-label=${t('房间聊天')}
           style=${[size && `width:${size.w}px;height:${size.h}px`, pos && `left:${pos.x}px;top:${pos.y}px`].filter(Boolean).join(';') || undefined}>
-          <div class="chat-dock__head chat-dock__head--drag" title="拖动移动聊天框 · 双击复位位置"
+          <div class="chat-dock__head chat-dock__head--drag" title=${t('拖动移动聊天框 · 双击复位位置')}
             onPointerDown=${beginDrag} onDoubleClick=${resetPos}>
             <span class="chat-dock__tag">COMMS</span>
-            <span class="chat-dock__title">房间聊天</span>
-            <button type="button" class="chat-dock__close" aria-label="收起" title="收起 (Esc)"
+            <span class="chat-dock__title">${t('房间聊天')}</span>
+            <button type="button" class="chat-dock__close" aria-label=${t('收起')} title=${t('收起 (Esc)')}
               onPointerDown=${(e) => e.stopPropagation()}
               onClick=${() => onToggle(false)}>✕</button>
           </div>
 
           <div class="chat-dock__body" ref=${listRef}>
-            ${chat.length === 0 ? html`<div class="chat-dock__empty">// 暂无消息，说点什么吧</div>`
+            ${chat.length === 0 ? html`<div class="chat-dock__empty">${t('暂无消息，说点什么吧')}</div>`
               : chat.map((c) => html`
                 <div key=${c.seq} class="chat-item">
                   <span class="chat-item__who">${c.name || c.playerId}</span>
@@ -317,17 +318,17 @@ export function ChatDock({ open, onToggle, disabled = false }) {
             </div>` : null}
 
           <div class="chat-dock__input">
-            <button type="button" class=${cx('chat-dock__emoji', showPanel && 'is-on')} aria-label="选择表情" title="选择表情"
+            <button type="button" class=${cx('chat-dock__emoji', showPanel && 'is-on')} aria-label=${t('选择表情')} title=${t('选择表情')}
               onClick=${() => setShowPanel((v) => !v)}><${GIcon} name="emote" /></button>
             <input ref=${inputRef} class="chat-dock__field" type="text" maxlength=${CHAT_MAX_LEN}
-              placeholder="输入讯息，可插入表情…" value=${text}
+              placeholder=${t('输入讯息，可插入表情…')} value=${text}
               onInput=${(e) => setText(e.target.value)}
               onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } }} />
-            <button type="button" class="chat-dock__send" disabled=${disabled} onClick=${send}>发送</button>
+            <button type="button" class="chat-dock__send" disabled=${disabled} onClick=${send}>${t('发送')}</button>
           </div>
 
           <div class="chat-dock__resize" role="separator" aria-orientation="both"
-            title="拖拽调整大小 · 双击复位"
+            title=${t('拖拽调整大小 · 双击复位')}
             onPointerDown=${beginResize} onDoubleClick=${resetSize}></div>
         </div>` : null}
     </div>`;

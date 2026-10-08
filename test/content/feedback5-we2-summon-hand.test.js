@@ -8,15 +8,19 @@
 // card — 予愿安洁莉娜 S3's “一会儿见！” (PRTS 予愿安洁莉娜 S3 备注: the skill deploys it at her initial tile).
 // Run: node --test test/content/feedback5-we2-summon-hand.test.js
 
-import { test } from 'node:test';
+// Profile split: this asserts PRISTINE UPSTREAM DIY summoner hand counts (麦哲伦/令/望/夜莺 自选 and the upstream
+// display invariant) — vanilla-only. Under the Rhine profile the Rhine-only board tokens (e.g. Mayer's 机械水獭, a
+// board talent-summoned otter with no `display` source) are not DIY hand pieces, so the upstream invariant must not
+// be applied to them. Data resolves via the profile-aware helper.
+// Run: node --test test/content/feedback5-we2-summon-hand.test.js
+import { vanillaTest as test } from '../helpers/profile-test.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { loadDataJson as load } from '../helpers/dataFile.mjs';
 import { getData } from '../../server/data.js';
 import { GameData } from '../../server/match/gamedata.js';
 import { diyGameData } from '../../server/match/player/diy.js';
 import { diyRecord, diySlot } from '../../shared/diy.js';
 
-const load = (f) => JSON.parse(readFileSync(new URL(`../../data/${f}.json`, import.meta.url), 'utf8'));
 const CHESS = load('chess');
 const BACKUPS = load('backups');
 const DATA = { chess: CHESS, backups: BACKUPS };

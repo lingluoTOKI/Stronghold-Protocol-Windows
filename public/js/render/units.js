@@ -1098,7 +1098,7 @@ export class UnitView {
     // head height: operators/tokens are uniform chibis; enemies vary (setup-pose bounds, when known; else the chibi
     // headroom × their official model factor)
     let headTiles = this.researchActor?.look.head ?? UNIT.headroom;
-    if (this.isEnemy && spineShown && this.actor.entry.bounds) headTiles = clamp(this.actor.height * UNIT.modelScale * this.modelK * 0.92, 0.55, this.isBoss ? 3.2 : 2.2);
+    if (this.isEnemy && spineShown && this.actor.entry.bounds) headTiles = clamp(this.actor.height * UNIT.modelScale * this.modelK * this.modelKY * 0.92, 0.55, this.isBoss ? 3.2 : 2.2);
     else if (this.isEnemy && this.isBoss) headTiles = 2.2;
     else if (this.isEnemy && spineShown) headTiles = clamp(UNIT.headroom * this.modelK * this.modelKY, 0.55, 2.2);
     this._headTiles = headTiles;

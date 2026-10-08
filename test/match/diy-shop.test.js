@@ -71,7 +71,7 @@ function diyMatch(extra = {}) {
     { seat: 1, playerId: 'p_1', name: 'P1', isBot: false, connected: true, diy: { [T5A]: { charId: SIEGE, skillIndex: 0, uniEquipId: null } } },
     { seat: 2, playerId: 'ai_0', name: 'AI0', isBot: true, connected: true, diy: PICKS },
   ];
-  return makeMatch({ mode: 'coop', seats, seed: 11, ...extra });
+  return makeMatch({ mode: 'coop', seats, seed: 6, ...extra });
 }
 /** Gain a chess the way the shop does (acquireChess: the player's copy accounting, merges). */
 const gain = (ps, id) => ps.acquireChess(id, { source: 'buy' });

@@ -214,7 +214,7 @@ test('equipment with the hand and temp full: the elite keeps up to its 2 equip s
 });
 
 test('summons: the copies\' placed summons and stacks are removed; the elite on the board gets its own full stack (伺夜 狼群)', () => {
-  const { m, ps } = prep({ seed: 46 });
+  const { m, ps } = prep({ seed: 47 });
   assert.ok(m.pool.has(VIGIL), '伺夜 is in this match\'s pool');
   const a = give(m, ps, VIGIL);
   const at = legalTileFor(m, ps, VIGIL);
@@ -243,7 +243,7 @@ test('summons: the copies\' placed summons and stacks are removed; the elite on 
 
 test('loadout: the deployed elite\'s summon card and battle unit follow the player\'s loadout (赫默 S2 default → drone card, S1 → none)', () => {
   for (const [label, loadout, drone] of [['default S2', null, true], ['S1', checkLoadout({ [SILENCE]: { skill: 0 } }, chess).loadout, false]]) {
-    const { m, ps } = prep({ seed: 47, loadout });
+    const { m, ps } = prep({ seed: 46, loadout });
     assert.ok(m.pool.has(SILENCE), '赫默 is in this match\'s pool');
     const a = deploy(m, ps, SILENCE, 'LEFT');
     const tile = keyOf(ps, a);

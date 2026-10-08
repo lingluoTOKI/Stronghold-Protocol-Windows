@@ -7,6 +7,7 @@
 // 临时整备区 at the prep deadline "会于下一回合返还" (§手牌区). The battle side is test/content/playtest6_summons.test.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { PROFILE_NAME } from '../helpers/profile-test.mjs';
 import { ERR, PHASE } from '../../shared/constants.js';
 import { checkLoadout } from '../../shared/protocol.js';
 import { DATA, makeMatch, give, giveItem, checkInvariants, legalTileFor } from './harness.js';
@@ -18,6 +19,13 @@ const SHAMARE = 'chess_char_3_15_a';
 const DRONE = 'token_10000_silent_healrb';
 const DEVICE = 'token_10041_cathy_catsld';
 const DOLL = 'token_10006_vodfox_doll';
+// Rhine overlay adds two more manually deployable summons whose owner stands on the board: 麦哲伦's 机械水獭
+// (token_10004_otter_motter, variant sources ["talent"]) and 多萝西's TRP trap (token_10025_doroth_recttp, sources
+// ["talent"]). Both match sp_legacy: placeable=true and talent-sourced, so placeableTokens() sends them to the hand
+// exactly like 伺夜's wolves / 缪尔赛思's water. The upstream six are unchanged.
+const RHINE_EXTRA_PLACEABLE = PROFILE_NAME === 'rhine'
+  ? ['token_10004_otter_motter', 'token_10025_doroth_recttp']
+  : [];
 const chess = (id) => (Object.hasOwn(DATA.chess, id) ? DATA.chess[id] : null);
 
 function prep({ loadout = null, stageId = 'act2autochess_m04', seed = 11 } = {}) {
@@ -39,7 +47,7 @@ const move = (m, uid, to, dir) => m.handle('p_0', { t: 'g.move', uid, to, ...(di
 
 test('tokens.json: the manually deployable summons are hand pieces — 医疗探机, 诅咒娃娃, 爬行号·防护单元 with the talent ones', () => {
   const placeable = Object.values(DATA.tokens).filter((t) => t.placeable).map((t) => t.tokenId).sort();
-  assert.deepEqual(placeable, [DRONE, DOLL, 'token_10017_skadi2_dedant', 'token_10028_vigil_wolf', 'token_10030_mlyss_wtrman', DEVICE].sort());
+  assert.deepEqual(placeable, [DRONE, DOLL, 'token_10017_skadi2_dedant', 'token_10028_vigil_wolf', 'token_10030_mlyss_wtrman', DEVICE, ...RHINE_EXTRA_PLACEABLE].sort());
   // HIDDEN shop-state tokens stay battle-only (PRTS: 新约能天使 with 使命必达！ provides no 投递坐标 card)
   for (const t of Object.values(DATA.tokens)) if (t.displayType === 'HIDDEN') assert.equal(t.placeable, false, t.name);
   assert.equal(DATA.tokens.token_10056_angel2_target.placeable, false);

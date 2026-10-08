@@ -5,16 +5,15 @@
 // (validateDiyPicks). Research 0.2.0 §2; the owner's decisions of 2026-10-05.
 // Run: node --test test/diy.test.js
 
-import { test } from 'node:test';
+import { test, vanillaTest } from './helpers/profile-test.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { diyPool, diySlot, diySlotIds, checkDiyPick, diyRecord, diyRecordOf, validateDiyPicks, lockedSelection, diyTokenOwner, isDiyModule, DIY_TIERS } from '../shared/diy.js';
 import { unitForm, composeUnitRecord } from '../shared/standIn.js';
 import { composeStats, composeTalents } from '../shared/loadoutRecord.js';
 import { normalizeChess, resolveLoadout, loadoutRecord } from '../server/sim/simdata.js';
 import { KITTED_CHARS, GENERIC_KIT_CHARS, STANDIN_KITS, OPERATOR_KITS } from '../server/sim/content/kits/index.js';
+import { loadDataJson as load } from './helpers/dataFile.mjs';
 
-const load = (f) => JSON.parse(readFileSync(new URL(`../data/${f}.json`, import.meta.url), 'utf8'));
 const chess = load('chess');
 const backups = load('backups');
 const DATA = { chess, backups };
@@ -35,7 +34,7 @@ test('slots: two per tier (5, 6), each with its elite twin', () => {
   assert.equal(diyTokenOwner(SIEGE, chess.chess_char_6_diy1_b.status), 'char_112_siege@2/60/7/3');
 });
 
-test('diyPool: tier 5 = 15 prototypes + 71 owned 6★, tier 6 = 9 + 71; no preset, no collab; with the kit registry only kitted operators', () => {
+vanillaTest('diyPool: tier 5 = 15 prototypes + 71 owned 6★, tier 6 = 9 + 71; no preset, no collab; with the kit registry only kitted operators', () => {
   const p5 = diyPool(5, { data: DATA }), p6 = diyPool(6, { data: DATA });
   assert.deepEqual(p5, [...RESERVES5, ...ELITES, ...ownedPool]);
   assert.deepEqual(p6, [...ELITES, ...ownedPool]);
@@ -103,7 +102,7 @@ test('checkDiyPick: an owned 6★ chooses any of its 3 skills and any module of 
   for (const [slot, pick, re] of bad) assert.match(checkDiyPick(slot, pick, DATA).error, re, JSON.stringify(pick));
 });
 
-test('validateDiyPicks: a roster never carries a module of another game mode — 集成战略 ISW-A / SO-A / SO-B, 生息演算 RA-A [ASSUMED, the owner\'s decision of 2026-10-05 for ISW-A]; the record still composes it', () => {
+vanillaTest('validateDiyPicks: a roster never carries a module of another game mode — 集成战略 ISW-A / SO-A / SO-B, 生息演算 RA-A [ASSUMED, the owner\'s decision of 2026-10-05 for ISW-A]; the record still composes it', () => {
   const backups = DATA.backups;
   const refused = new Set();
   for (const charId of backups.diy.ownedPool) {

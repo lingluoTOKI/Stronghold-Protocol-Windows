@@ -9,9 +9,14 @@ import { skillSpecSource } from '../../server/sim/content/index.js';
 import { effectiveProfile } from '../../server/sim/ai.js';
 import { kitCoverage } from '../../tools/kit-coverage.mjs';
 import { wolfShadows, wolfTacticalPoint } from '../../server/sim/content/tokens.js';
-import { TIER_KITS } from '../../server/sim/content/kits/index.js';
+import { KITS as UPSTREAM_KITS, KITS_RHINE } from '../../server/sim/content/kits/index.js';
+import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 
-const KITS = TIER_KITS[2];
+// The Rhine overlay re-tiers some upstream chess into tier 3 (e.g. chess_char_4_21 plosis, chess_char_5_11 demkni),
+// so their kit builders live in other tier groups. Resolve kit builders against the full active registry, not just
+// TIER_KITS[2], and audit coverage against KITS_RHINE under the Rhine profile.
+const ACTIVE_KITS = DATA_PROFILE === 'rhine' ? KITS_RHINE : UPSTREAM_KITS;
+const KITS = ACTIVE_KITS;
 
 const ds = getDefaultSource();
 /** Skill index of `skillId` on chess `id`. */
@@ -36,14 +41,17 @@ const atkHits = (h, u, skill = null) => h.hooksOf('damaged').filter((c) => c.sou
 // ---------------------------------------------------------------------------------------------------------------
 
 test('coverage: every selectable skill of every visible tier-3 chess is hand-authored (normal + 精锐)', () => {
-  const rep = kitCoverage({ tier: 3 });
-  assert.equal(rep.summary.chess, 21);
+  const rep = kitCoverage({ tier: 3, kits: ACTIVE_KITS });
+  assert.equal(rep.summary.chess, DATA_PROFILE === 'vanilla' ? 19 : 21);
   assert.equal(rep.summary.covered, rep.summary.skills, rep.chess.filter((r) => r.skills.some((s) => !s.covered)).map((r) => r.name).join(' '));
   for (const r of rep.chess) for (const s of r.skills) if (!s.isDefault) assert.deepEqual([s.normal, s.elite], ['skills', 'skills'], `${r.name} S${s.index + 1}`);
 });
 
 test('skills map: each alternate spec is built from its OWN record whichever skill is selected', () => {
-  const rows = kitCoverage({ tier: 3 }).chess;
+  // Only native tier-3 kits (chess_char_3_*). The Rhine overlay re-tiers a couple of upstream chess (4_21 plosis,
+  // 5_11 demkni) into tier 3; their kits are authored for their original tiers and do not follow the tier-3 skills-map
+  // layout — they stay covered by the coverage audit above and by their own tier tests.
+  const rows = kitCoverage({ tier: 3, kits: ACTIVE_KITS }).chess.filter((r) => /^chess_char_3_/.test(r.chessId));
   for (const r of rows) for (const id of BOTH(r.chessId)) {
     const d0 = ds.getChess(id);
     const kit = KITS[r.chessId](d0.skill.bb, d0.raw, d0);
@@ -64,7 +72,7 @@ test('skills map: each alternate spec is built from its OWN record whichever ski
 });
 
 test('every alternate skill × module of the visible tier-3 chess fights and casts in a real battle without content errors', () => {
-  const rows = kitCoverage({ tier: 3 }).chess;
+  const rows = kitCoverage({ tier: 3, kits: ACTIVE_KITS }).chess.filter((r) => /^chess_char_3_/.test(r.chessId));
   for (const r of rows) {
     const raw = ds.rawChess(r.chessId.replace(/_a$/, '_b'));
     const mods = [null, 'none', ...(raw.modules || []).map((m) => m.uniEquipId)];

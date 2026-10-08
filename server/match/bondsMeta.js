@@ -37,13 +37,26 @@ export const DEPUTY_BOND = 'deputShip';
 export function pieceBonds(gd, piece) {
   const c = gd.chess(piece.id);
   const out = c && Array.isArray(c.bonds) ? c.bonds.slice() : [];
+  for (const b of grantedBonds(gd, piece)) if (!out.includes(b)) out.push(b);
+  return out;
+}
+
+/**
+ * Only the bonds a piece wears *by item grant* (变形同构体 pairing), i.e. NOT its static `c.bonds`. Used to tell a
+ * 调和 bearer's static faction bond (rhine: rhineShip) apart from one it actively joined through an item (e.g. 维式重锤
+ * → victoriaShip): the former must not self-trigger 调和, the latter must (research 02 §2.1 / PR#40).
+ */
+function grantedBonds(gd, piece) {
+  const c = gd.chess(piece.id);
+  const staticBonds = c && Array.isArray(c.bonds) ? c.bonds : [];
+  const out = [];
   const items = Array.isArray(piece.items) ? piece.items : [];
   if (items.length >= 2) {
     const recs = items.map((it) => gd.item(it.id)).filter(Boolean);
     if (recs.some((r) => r.canGiveBond)) {
       for (const r of recs) {
         if (r.canGiveBond) continue;
-        if (typeof r.giveBondId === 'string' && gd.bond(r.giveBondId) && !out.includes(r.giveBondId)) out.push(r.giveBondId);
+        if (typeof r.giveBondId === 'string' && gd.bond(r.giveBondId) && !staticBonds.includes(r.giveBondId) && !out.includes(r.giveBondId)) out.push(r.giveBondId);
       }
     }
   }
@@ -60,18 +73,20 @@ function membership(gd, ps) {
   const handChess = ps.hand.filter((p) => p && p.kind === 'chess');
   const onBoard = new Map();
   const onBoardVariant = new Map();
+  const grantedOnBoard = new Map();
   const inHand = new Map();
   const add = (m, bond, key) => { let s = m.get(bond); if (!s) m.set(bond, (s = new Set())); s.add(key); };
   for (const p of boardChess) {
     const base = gd.baseIdOf(p.id);
     const golden = gd.isGolden(p.id);
     for (const b of pieceBonds(gd, p)) { add(onBoard, b, base); add(onBoardVariant, b, `${base}|${golden ? 1 : 0}`); }
+    for (const b of grantedBonds(gd, p)) add(grantedOnBoard, b, base);
   }
   for (const p of handChess) {
     const base = gd.baseIdOf(p.id);
     for (const b of pieceBonds(gd, p)) add(inHand, b, base);
   }
-  return { onBoard, onBoardVariant, inHand, goldenOnBoard: boardChess.filter((p) => gd.isGolden(p.id)).length };
+  return { onBoard, onBoardVariant, grantedOnBoard, inHand, goldenOnBoard: boardChess.filter((p) => gd.isGolden(p.id)).length };
 }
 
 /** A bond's member count by its counting mode (before 调和's +1), with the effects' per-bond count bonus. */
@@ -120,9 +135,23 @@ export function computeBonds(gd, ps) {
   // 调和: +1 to core bonds with ≥ 1 real board member while it is active
   const harmony = gd.bond(HARMONY_BOND);
   const harmonyActive = harmony && raw[HARMONY_BOND] != null && tierFor(harmony, raw[HARMONY_BOND]) >= 1;
+  // The harmony bearer(s) carry HARMONY_BOND (缪尔赛思). A core bond earns the +1 from a board member `base` when
+  // either: (a) `base` is not the bearer at all, or (b) `base` is the bearer but it joined THIS bond by item grant
+  // (grantedOnBoard) — e.g. 缪尔赛思 wearing 变形同构体+维式重锤 actively joins victoriaShip (PR#40 → harmony still
+  // counts her). The bearer's *static* faction bond (rhine: rhineShip) is NOT granted, so it does not self-trigger
+  // harmony (§21.26). The raw count keeps the bearer everywhere (she is a real static member of her faction).
+  const harmonyBearers = harmonyActive ? (onBoard.get(HARMONY_BOND) || new Set()) : new Set();
+  const granted = mem.grantedOnBoard;
   for (const id of Object.keys(raw)) {
     const bond = gd.bond(id);
-    const harmonyBonus = harmonyActive && bond.isCore && (onBoard.get(id)?.size ?? 0) >= 1 ? 1 : 0;
+    let harmonyBonus = 0;
+    if (harmonyActive && bond.isCore) {
+      let real = 0;
+      for (const base of (onBoard.get(id) || [])) {
+        if (!harmonyBearers.has(base) || granted.get(id)?.has(base)) real++;
+      }
+      harmonyBonus = real >= 1 ? 1 : 0;
+    }
     const count = raw[id] + harmonyBonus;
     let tier = tierFor(bond, count);
     if (id === DEPUTY_BOND && tier >= 1) {

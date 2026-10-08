@@ -7,7 +7,7 @@
 // re-derived from the raw tables.
 // Run: node --test test/backups.test.js
 
-import { test } from 'node:test';
+import { test, vanillaTest } from './helpers/profile-test.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -15,12 +15,11 @@ import { fileURLToPath } from 'node:url';
 import { standInRecord, composeUnitRecord, unitForm, statusKey, IDENTITY_FIELDS } from '../shared/standIn.js';
 import { diyRecordOf, lockedSelection } from '../shared/diy.js';
 import { composeStats, composeTalents, resolveLoadout, loadoutRecord, normalizeChess } from '../server/sim/simdata.js';
+import { loadDataJson as load } from './helpers/dataFile.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const DATA = process.env.DATA_DIR || join(ROOT, 'data');
 const CACHE = join(ROOT, '.cache', 'gamedata');
 const HAS_CACHE = ['activity_table', 'character_table', 'skill_table', 'battle_equip_table'].every((f) => existsSync(join(CACHE, 'excel', `${f}.json`)));
-const load = (name) => JSON.parse(readFileSync(join(DATA, `${name}.json`), 'utf8'));
 const chess = load('chess');
 const backups = load('backups');
 const bonds = load('bonds');
@@ -34,7 +33,7 @@ const isFiniteNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const ELITES = ['char_608_acpion', 'char_609_acguad', 'char_610_acfend', 'char_611_acnipe', 'char_612_accast', 'char_613_acmedc', 'char_614_acsupo', 'char_615_acspec', 'char_617_sharp2'];
 const RESERVES = ['char_600_cpione', 'char_601_cguard', 'char_602_cdfend', 'char_603_csnipe', 'char_604_ccast', 'char_605_cmedic', 'char_606_csuppo', 'char_607_cspec'];
 
-test('chess: 133 base chess — 74 PRESET / 55 NORMAL / 4 DIY — and every record keeps the five official backup fields', () => {
+vanillaTest('chess: 133 base chess — 74 PRESET / 55 NORMAL / 4 DIY — and every record keeps the five official backup fields', () => {
   assert.equal(base.length, 133);
   assert.deepEqual([ofType('PRESET').length, ofType('NORMAL').length, ofType('DIY').length], [74, 55, 4]);
   for (const c of all) {
@@ -54,7 +53,7 @@ test('chess: 133 base chess — 74 PRESET / 55 NORMAL / 4 DIY — and every reco
   assert.deepEqual(ofType('NORMAL').filter((c) => c.isHidden).map((c) => c.chessId), ['chess_char_5_18_a', 'chess_char_6_10_a']);
 });
 
-test('chess: the backup fields are the official shop row, verbatim', { skip: !HAS_CACHE && 'no .cache/gamedata' }, () => {
+vanillaTest('chess: the backup fields are the official shop row, verbatim', { skip: !HAS_CACHE && 'no .cache/gamedata' }, () => {
   const act = raw('activity_table').activity.AUTOCHESS_SEASON.act2autochess;
   for (const c of all) {
     const s = act.charShopChessDatas[c.baseId];
@@ -65,7 +64,7 @@ test('chess: the backup fields are the official shop row, verbatim', { skip: !HA
 
 const STAT_KEYS = ['maxHp', 'atk', 'def', 'res', 'cost', 'blockCnt', 'bat', 'aspd', 'respawnTime', 'spRecovery', 'moveSpeed'];
 
-test('backups: the 17 stand-in characters, each with a form for every status it fights at', () => {
+vanillaTest('backups: the 17 stand-in characters, each with a form for every status it fights at', () => {
   const ids = Object.keys(backups.units).filter((id) => backups.units[id].standsIn.length);
   assert.deepEqual(ids, [...RESERVES, ...ELITES]);
   assert.deepEqual(Object.keys(backups.units), [...RESERVES, ...ELITES, ...backups.diy.ownedPool], 'the stand-ins, then the owned 6★ picks');
@@ -165,7 +164,7 @@ test('backups: every NORMAL chess (both forms) resolves to its stand-in with the
   assert.equal(ofType('NORMAL').filter((c) => standInRecord(c, backups).profession !== c.profession).length, 26);
 });
 
-test('backups: the stand-in numbers re-derived from the raw official tables', { skip: !HAS_CACHE && 'no .cache/gamedata' }, () => {
+vanillaTest('backups: the stand-in numbers re-derived from the raw official tables', { skip: !HAS_CACHE && 'no .cache/gamedata' }, () => {
   const CT = raw('character_table'), ST = raw('skill_table'), BE = raw('battle_equip_table');
   const PH = { PHASE_0: 0, PHASE_1: 1, PHASE_2: 2 };
   let n = 0;
@@ -235,7 +234,7 @@ test('DIY: prototype picks — the 9 elites at tiers 5 and 6, six 4★ reserves 
   assert.equal(diyRecordOf(chess.chess_char_5_01_a, { charId: 'char_608_acpion' }, data), null, 'not a DIY slot');
 });
 
-test('DIY: the 71 owned 6★ picks — a form at every slot status with all three skills, every module at stage 1 and 3, their summons', () => {
+vanillaTest('DIY: the 71 owned 6★ picks — a form at every slot status with all three skills, every module at stage 1 and 3, their summons', () => {
   const { ownedPool } = backups.diy;
   assert.equal(ownedPool.length, 71);
   let summoners = 0;
@@ -287,7 +286,7 @@ test('DIY: the 71 owned 6★ picks — a form at every slot status with all thre
   assert.deepEqual([soul3.sources, soul3.bySkill['2'].sources], [['display'], ['skill', 'display']], '弦惊: made by S3 only');
 });
 
-test('DIY: prototype picks carry the skill / module of their 补位 rows at the slot tier (预备干员-医疗: S3, assumed)', () => {
+vanillaTest('DIY: prototype picks carry the skill / module of their 补位 rows at the slot tier (预备干员-医疗: S3, assumed)', () => {
   const { locked, prototypes } = backups.diy;
   assert.deepEqual(Object.keys(locked), ['5', '6']);
   for (const tier of ['5', '6']) {
@@ -306,7 +305,7 @@ test('DIY: prototype picks carry the skill / module of their 补位 rows at the 
   assert.deepEqual(locked['5'].char_605_cmedic, { skillIndex: 2, uniEquipId: null, from: [] }, '预备干员-医疗 has no tier-5 补位 row: S3 [ASSUMED]');
 });
 
-test('DIY: the owned-6★ pool and the faction → bond rule (mainPower + every subPower vs powerIdList, else 协防干员)', () => {
+vanillaTest('DIY: the owned-6★ pool and the faction → bond rule (mainPower + every subPower vs powerIdList, else 协防干员)', () => {
   const { ownedPool, operators, prototypes } = backups.diy;
   const roster = new Set(base.map((c) => c.charId).filter(Boolean));
   assert.equal(ownedPool.length, 71);
@@ -332,7 +331,7 @@ test('DIY: the owned-6★ pool and the faction → bond rule (mainPower + every 
   for (const id of [...prototypes['5'], ...prototypes['6']]) assert.deepEqual(operators[id].bonds, ['emptyShip'], `${id}: no faction`);
 });
 
-test('DIY: powers and the owned pool re-derived from character_table', { skip: !HAS_CACHE && 'no .cache/gamedata' }, () => {
+vanillaTest('DIY: powers and the owned pool re-derived from character_table', { skip: !HAS_CACHE && 'no .cache/gamedata' }, () => {
   const CT = raw('character_table');
   const act = raw('activity_table').activity.AUTOCHESS_SEASON.act2autochess;
   const roster = new Set(Object.values(act.charShopChessDatas).map((r) => r.charId).filter(Boolean));

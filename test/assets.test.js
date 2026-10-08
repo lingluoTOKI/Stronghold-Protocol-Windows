@@ -5,7 +5,7 @@
 // produced by `npm run assets`); the optional local-client enemy and token models
 // (spineLocal, tools/local-extract) only when data/local-assets.json lists them.
 
-import { test, describe } from 'node:test';
+import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';

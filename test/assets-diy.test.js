@@ -7,16 +7,17 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import fs from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dataExtras, orphanFiles, parseArgs } from '../tools/fetch-assets.mjs';
 import { patternOperator, buildPlan } from '../tools/assets/plan.mjs';
 import { indexAudio } from '../tools/assets/audio.mjs';
 import { Downloader } from '../tools/assets/downloader.mjs';
+import { loadDataJson as load, dataFilePath, DATA_DIR } from './helpers/dataFile.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const load = (f) => JSON.parse(readFileSync(join(ROOT, 'data', `${f}.json`), 'utf8'));
 const BACKUPS = load('backups');
 const CHESS = load('chess');
 const YUAN = 'https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/';
@@ -89,9 +90,9 @@ test('--add-only: parsed, refused with --prune / --force; its downloader keeps e
   assert.equal(parseArgs([]).addOnly, false);
   assert.throws(() => parseArgs(['--add-only', '--prune']), /never deletes or rewrites/);
   assert.throws(() => parseArgs(['--add-only', '--force']), /never deletes or rewrites/);
-  const dl = new Downloader({ root: join(ROOT, 'data'), ledgerPath: join(ROOT, '.cache', 'test-never-written.json'), keepExisting: true, force: true, log() {} });
+  const dl = new Downloader({ root: DATA_DIR, ledgerPath: join(ROOT, '.cache', 'test-never-written.json'), keepExisting: true, force: true, log() {} });
   assert.equal(dl.force, false, '--force never applies');
-  assert.equal(await dl.existingSize({ rel: 'chess.json', urls: [], kind: 'png', bytes: 1 }), readFileSync(join(ROOT, 'data', 'chess.json')).length, 'an existing file is kept whatever its size / kind');
+  assert.equal(await dl.existingSize({ rel: 'chess.json', urls: [], kind: 'png', bytes: 1 }), fs.readFileSync(dataFilePath('chess')).length, 'an existing file is kept whatever its size / kind');
   assert.equal(await dl.existingSize({ rel: 'no-such-file.png', urls: [], kind: 'png' }), -1);
   assert.deepEqual([...dl.written], []);
 });

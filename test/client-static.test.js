@@ -1059,12 +1059,15 @@ describe('screen helpers', () => {
     };
     assert.equal(normalizeSeats(room).length, 6);
     assert.equal(normalizeSeats({ mode: 'solo', seats: [room.seats[0], null, null, null] }).length, 1);
-    assert.deepEqual(normalizeSeats({ mode: 'coop', seats: 'bad' }), [null, null, null, null]);
+    assert.deepEqual(normalizeSeats({ mode: 'coop', seats: 'bad' }), Array(6).fill(null));
+    // a vanilla room carries capacity=4 (upstream v0.2.0) and pads to 4, not 6
+    assert.equal(normalizeSeats({ mode: 'coop', capacity: 4, seats: [room.seats[0]] }).length, 4);
+    assert.deepEqual(normalizeSeats({ mode: 'coop', capacity: 4, seats: 'bad' }), Array(4).fill(null));
     let f = roomFacts(room, 'h');
     assert.equal(f.isHost, true);
     assert.equal(f.canStart, false, 'guest not ready');
     assert.equal(f.humans.length, 2);
-    assert.equal(f.emptySeats, 1);
+    assert.equal(f.emptySeats, 3);
     assert.equal(f.readyHumans, 1, 'host counts as ready (start = host ready)');
     room.seats[1].ready = true;
     f = roomFacts(room, 'h');

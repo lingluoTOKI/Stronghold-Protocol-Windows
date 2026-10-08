@@ -220,14 +220,14 @@ export function BulletinButton() {
     .sort((a, b) => String((b && b.time) || '').localeCompare(String((a && a.time) || '')));
   return html`<span class="bulletin-btn">
     <${Button} variant="ghost" size="sm" icon="mail" class=${`bulletin-btn__icon${hasNew ? ' has-new' : ''}`}
-      title="服务器更新公告" aria-label="服务器更新公告"
+      title=${t('服务器更新公告')} aria-label=${t('服务器更新公告')}
       onClick=${() => { const n = !open; setOpen(n); if (n) markSeen(); }} aria-expanded=${open}>
     <//>
-    <${Modal} open=${open} onClose=${() => setOpen(false)} title="服务器更新公告"
+    <${Modal} open=${open} onClose=${() => setOpen(false)} title=${t('服务器更新公告')}
       micro="SERVER BULLETIN" class="bulletin-modal-box">
-      ${failed ? html`<div class="bulletin-modal__empty">暂无法连接公告服务</div>` : null}
-      ${!failed && !data ? html`<div class="bulletin-modal__empty">加载中…</div>` : null}
-      <div class="bulletin-modal__when">最近更新：${(data && data.updatedAt) || '—'}</div>
+      ${failed ? html`<div class="bulletin-modal__empty">${t('暂无法连接公告服务')}</div>` : null}
+      ${!failed && !data ? html`<div class="bulletin-modal__empty">${t('加载中…')}</div>` : null}
+      <div class="bulletin-modal__when">${t('最近更新：')}${(data && data.updatedAt) || '—'}</div>
       ${items.map((it, i) => html`<div class="bulletin-modal__item" key=${i}>
         <div class="bulletin-modal__row">
           ${it.version ? html`<span class="bulletin-modal__ver">v${it.version}</span>` : null}
@@ -236,7 +236,7 @@ export function BulletinButton() {
         </div>
         ${it.content ? html`<div class="bulletin-modal__content">${it.content}</div>` : null}
       </div>`)}
-      ${!failed && data && !items.length ? html`<div class="bulletin-modal__empty">暂无公告</div>` : null}
+      ${!failed && data && !items.length ? html`<div class="bulletin-modal__empty">${t('暂无公告')}</div>` : null}
     <//>
   </span>`;
 }

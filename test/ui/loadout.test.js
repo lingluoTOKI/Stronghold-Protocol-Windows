@@ -19,11 +19,14 @@ import { installLoadoutSync, SYNC_DEBOUNCE_MS, RETRY_MS, applyLoadoutEntries, se
 import { createStore } from '../../public/js/store.js';
 import { shouldAutoClose } from '../../public/js/screens/loadout.js';
 
+import { loadDataJson, DATA_PROFILE } from '../helpers/dataFile.mjs';
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const CHESS = JSON.parse(readFileSync(path.join(ROOT, 'data/chess.json'), 'utf8'));
-const BONDS = JSON.parse(readFileSync(path.join(ROOT, 'data/bonds.json'), 'utf8'));
+const CHESS = loadDataJson('chess.json');
+const BONDS = loadDataJson('bonds.json');
 const get = (id) => (Object.hasOwn(CHESS, id) ? CHESS[id] : null);
 const getBond = (id) => (Object.hasOwn(BONDS, id) ? BONDS[id] : null);
+const VISIBLE_CHESS = DATA_PROFILE === 'rhine' ? 118 : 112;
 const INSIDE = 'chess_char_1_01_a';
 const SWIRE = 'chess_char_3_04_a';
 const { base: IB, golden: IG } = recordsOf(INSIDE, get);
@@ -165,7 +168,7 @@ test('sanitizeEntries: drops unknown chess / illegal parts one by one, and the r
     all[c.chessId] = { skill: o.skills.find((i) => i !== o.defaultSkill), module: o.modules[o.modules.length - 1] };
   }
   const s = sanitizeEntries(all, get);
-  assert.equal(Object.keys(s).length, 118);
+  assert.equal(Object.keys(s).length, VISIBLE_CHESS);
   assert.ok(checkLoadout(s, get).ok);
 });
 
@@ -181,7 +184,7 @@ test('selectedSkill / selectedModule for the in-match UI (shop cards, detail pan
 
 test('roster and filters: 112 visible chess in shop order; tier / class / bond / search / changed-only', () => {
   const roster = rosterOf(Object.values(CHESS));
-  assert.equal(roster.length, 112);
+  assert.equal(roster.length, VISIBLE_CHESS);
   assert.ok(roster.every((c) => !c.isGolden && c.visible));
   for (let i = 1; i < roster.length; i++) assert.ok(roster[i - 1].tier <= roster[i].tier);
   const t3 = filterRoster(roster, { tier: 3 }, {}, get, getBond);

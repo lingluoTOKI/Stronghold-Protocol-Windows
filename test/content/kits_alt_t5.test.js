@@ -11,6 +11,9 @@ import { getDefaultSource } from '../../server/sim/simdata.js';
 import { COLS } from '../../server/sim/constants.js';
 import { loadoutOptions } from '../../shared/protocol.js';
 import { kitCoverage } from '../../tools/kit-coverage.mjs';
+import { KITS, KITS_RHINE } from '../../server/sim/content/kits/index.js';
+import { DATA_PROFILE } from '../helpers/dataFile.mjs';
+const ACTIVE_KITS = DATA_PROFILE === 'rhine' ? KITS_RHINE : KITS;
 
 const ds = getDefaultSource();
 const raw = (id) => ds.rawChess(id);
@@ -62,8 +65,8 @@ function cast(h, u, max = 15) {
 // coverage & smoke
 
 test('tier 5: every selectable skill of every visible chess has a hand-authored spec (normal + elite)', () => {
-  const rep = kitCoverage({ tier: 5 });
-  assert.equal(rep.summary.chess, 20);
+  const rep = kitCoverage({ tier: 5, kits: ACTIVE_KITS });
+  assert.equal(rep.summary.chess, DATA_PROFILE === 'vanilla' ? 19 : 20);
   assert.equal(rep.summary.covered, rep.summary.skills, rep.chess.flatMap((r) => r.skills.filter((s) => !s.covered).map((s) => `${r.name} S${s.index + 1}`)).join(', '));
   assert.equal(rep.summary.chessFullyCovered, rep.summary.chess);
 });

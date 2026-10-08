@@ -468,13 +468,15 @@ export function createProfiledDataStore(opts = {}) {
         isReady: (...names) => readyIn(names, id),
       };
     },
-    // 上游 0.2.0 的 i18n（docs/I18N.md）：locale 是 data.js 的模块级状态，三个 store 共用同一个，
-    // 所以转发给 shared 就够；get / list / lookup 本来就是按当前档案转发到对应 store 的。
+    // 上游 0.2.0 的 i18n（docs/I18N.md）：每个 inner store 各自持有 locale/chain/overlays（闭包局部），并非模块级共享。
+    // 切语言必须三个 store（shared / rhine / vanilla）都下载并挂同一 overlay，否则按档案路由的 get/list/lookup
+    // 落到 rhine/vanilla store 时其 overlays 为空、拿不到本地化文本（config 广播模板 / choices 卡名仍是中文）。
     getRaw: (name) => storeFor(name).getRaw(name),
     lookupRaw: (name, id) => storeFor(name).lookupRaw(name, id),
     locale: () => shared.locale(),
     localeChain: () => shared.localeChain(),
-    setLocale: (...args) => shared.setLocale(...args),
+    localeName: (...args) => shared.localeName(...args),
+    setLocale: (...args) => Promise.all([shared, profiles.rhine, profiles.vanilla].map((s) => s.setLocale(...args))).then((r) => r[0]),
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 }

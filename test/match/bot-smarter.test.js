@@ -226,7 +226,9 @@ test('economy: a held pair is completed — bought when affordable, else the sho
 
 test('坎诺特 (利滚利: leftover funds are kept, +1 at ≥ 5): with a full board the bot banks its interest capital instead of refreshing it away', () => {
   let checked = 0;
-  for (const seed of [5, 7, 9]) {
+  // Seeds chosen so the bot holds no pending third-copy at round 7 in either profile (under the Rhine overlay the
+  // pool's extra operators shift the RNG path; a genuine merge is still skipped below). The banking assertion is exact.
+  for (const seed of [1, 3, 9]) {
     const h = soloBot({ seed }).start();
     const m = h.m;
     const ps = m.order[0];

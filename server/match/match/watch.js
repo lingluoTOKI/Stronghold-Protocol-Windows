@@ -194,15 +194,26 @@ export class MatchWatch {
    * The spec a spectator seat is shown: the field's own, minus the players' `contentInfo.funds` — a private number (the
    * player's funds at the battle start) that no battle effect reads, so the replica still plays the same battle. The
    * other contentInfo counters stay: battle effects read them (sim/content: handUnits, roundStats.gainedChess).
+   * Likewise the rhine `research.hand` (the undeployed research bench) is private — the battle only reads deployed board
+   * research pieces, not the bench, so dropping it from the spectator replica changes nothing on the board.
    */
   _spectatorSpec(f) {
     if (!f.spectatorSpec) {
       const s = f.spec;
       const strip = (p) => {
-        if (!p || !p.contentInfo || !Object.hasOwn(p.contentInfo, 'funds')) return p;
-        const { funds, ...contentInfo } = p.contentInfo;
-        void funds;
-        return { ...p, contentInfo };
+        if (!p) return p;
+        let out = p;
+        if (p.contentInfo && Object.hasOwn(p.contentInfo, 'funds')) {
+          const { funds, ...contentInfo } = p.contentInfo;
+          void funds;
+          out = { ...out, contentInfo };
+        }
+        if (p.research && Object.hasOwn(p.research, 'hand')) {
+          const { hand, ...research } = p.research;
+          void hand;
+          out = { ...out, research };
+        }
+        return out;
       };
       f.spectatorSpec = s && Array.isArray(s.players) ? { ...s, players: s.players.map(strip) } : s;
     }

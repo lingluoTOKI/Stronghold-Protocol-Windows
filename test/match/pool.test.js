@@ -5,15 +5,25 @@ import { GameData } from '../../server/match/gamedata.js';
 import { SharedPool, drawDisabledBonds } from '../../server/match/pool.js';
 import { createRng } from '../../server/sim/rng.js';
 import { DATA, makeMatch, give, checkInvariants, chessOfTier } from './harness.js';
+import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 
+const R = DATA_PROFILE === 'rhine';
 const gdOf = (modeId = 'mode_multi_normal') => new GameData(DATA, modeId);
+
+// Per-profile universe: vanilla is pristine 0.2.0; the Rhine overlay adds the 6 Rhine operators, 2 Rhine research
+// devices as shop items and one extra core opening ban (legacy rhine config: NORMAL+/HARD/ABYSS core 4, FUNNY core 1).
+const EXPECT_VISIBLE = R ? 118 : 112;
+const EXPECT_SHOP_ITEMS = R ? 53 : 51;
+const CORE_BAN = R ? 4 : 3;
+const FUNNY_CORE_BAN = R ? 1 : 0;
+const DRAWN_BONDS_HARD = R ? 8 : 7; // core + add-on
 
 test('pool caps follow config (12/14/18/16/8/5, 缪尔赛思 4) and only visible, unbanned chess enter', () => {
   const gd = gdOf();
   const pool = new SharedPool(gd, { banned: [] });
   const caps = { 1: 12, 2: 14, 3: 18, 4: 16, 5: 8, 6: 5 };
   assert.equal(pool.entries.size, gd.visibleChess.length);
-  assert.equal(pool.entries.size, 118);
+  assert.equal(pool.entries.size, EXPECT_VISIBLE);
   for (const [id, e] of pool.entries) {
     const expect = id === 'chess_char_6_11_a' ? 4 : caps[e.tier];
     assert.equal(e.cap, expect, id);
@@ -22,7 +32,7 @@ test('pool caps follow config (12/14/18/16/8/5, 缪尔赛思 4) and only visible
   }
   const banned = [gd.visibleChess[0], gd.visibleChess[5]];
   const p2 = new SharedPool(gd, { banned });
-  assert.equal(p2.entries.size, 110);
+  assert.equal(p2.entries.size, EXPECT_VISIBLE - 2);
   assert.ok(!p2.has(banned[0]) && p2.left(banned[0]) === 0 && p2.take(banned[0]) === 0);
 });
 
@@ -107,7 +117,7 @@ test('effect-only items are never shop items: not in shopItemsByTier, never in t
   assert.equal(DATA.items.chess_item_1_01_e_a.shopExcluded, false, 'the plain 维式重锤 is sold');
   const gd = gdOf();
   const listed = new Set(Object.values(gd.shopItemsByTier).flat());
-  assert.equal(listed.size, 53, '56 normal equipment − 5 effect-only');
+  assert.equal(listed.size, EXPECT_SHOP_ITEMS, 'normal equipment − effect-only (plus Rhine research devices under rhine)');
   for (const id of EFFECT_ONLY) assert.ok(!listed.has(id), `${id} not a shop item`);
   assert.ok(listed.has('chess_item_1_01_e_a'));
   // the shop item slot at every level
@@ -136,7 +146,7 @@ test('维多利亚 25-layer reward and 洛洛的定制品: the 4 special 维式�
 });
 
 test('per-match disabled bonds: 3 core + 4 add-on (NORMAL+), FUNNY static + 0 + 1; weight-0 never drawn; subset ban rule', () => {
-  for (const [modeId, core, addon] of [['mode_multi_hard', 3, 4], ['mode_single_abyss', 3, 4], ['mode_multi_funny', 0, 1], ['mode_single_normal', 3, 4]]) {
+  for (const [modeId, core, addon] of [['mode_multi_hard', CORE_BAN, 4], ['mode_single_abyss', CORE_BAN, 4], ['mode_multi_funny', FUNNY_CORE_BAN, 1], ['mode_single_normal', CORE_BAN, 4]]) {
     const gd = new GameData(DATA, modeId);
     for (let seed = 1; seed <= 20; seed++) {
       const { drawn, staticOff, banned } = drawDisabledBonds(gd, createRng(seed));
@@ -163,10 +173,10 @@ test('per-match disabled bonds: 3 core + 4 add-on (NORMAL+), FUNNY static + 0 + 
 test('the match pool excludes banned chess; m.public lists disabled bonds and banned chess', () => {
   const h = makeMatch({ mode: 'coop', difficulty: 'HARD', humans: 1, bots: 1, seed: 3 }).start();
   const pub = h.lastBc('m.public');
-  assert.equal(pub.drawnDisabledBonds.length, 8);
+  assert.equal(pub.drawnDisabledBonds.length, DRAWN_BONDS_HARD);
   assert.ok(pub.bannedChess.length > 0);
   for (const id of pub.bannedChess) assert.ok(!h.m.pool.has(id), `${id} should not be in the pool`);
-  assert.equal(h.m.pool.entries.size + pub.bannedChess.length, 112);
+  assert.equal(h.m.pool.entries.size + pub.bannedChess.length, EXPECT_VISIBLE);
   checkInvariants(h.m);
   h.m.dispose();
 });

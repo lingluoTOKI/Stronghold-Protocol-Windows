@@ -33,7 +33,11 @@ import { t, tc } from '../../../shared/i18n.js';
  * @returns {(null | {seat:number, playerId:any, name:string, isBot:boolean, ready:boolean, connected:boolean})[]}
  */
 export function normalizeSeats(room) {
-  const cap = room?.mode === 'solo' ? 1 : MAX_SEATS;
+  if (room?.mode === 'solo') return normalizeSeatsCap(room, 1);
+  const cap = Number.isInteger(room?.capacity) ? room.capacity : MAX_SEATS;
+  return normalizeSeatsCap(room, cap);
+}
+function normalizeSeatsCap(room, cap) {
   const src = Array.isArray(room?.seats) ? room.seats : [];
   const out = [];
   for (let i = 0; i < cap; i++) {
@@ -196,14 +200,14 @@ export function RhineToggle({ room, isHost, busy = false, online = true, onPick 
   const enabled = room?.rhineEnabled !== false;
   const disabled = !isHost || !!busy || !online || !!room?.inMatch || (!!room?.phase && room.phase !== PHASE.LOBBY);
   return html`<div class="rhine-setting" data-testid="rhine-toggle">
-    <span class="rhine-setting__label">莱茵生命扩展</span>
-    <div class="rhine-setting__choices" role="group" aria-label="莱茵生命扩展">
-      ${[[true, '开启'], [false, '原版']].map(([value, label]) => html`<button key=${label} type="button"
+    <span class="rhine-setting__label">${t('莱茵生命扩展')}</span>
+    <div class="rhine-setting__choices" role="group" aria-label=${t('莱茵生命扩展')}>
+      ${[[true, t('开启')], [false, t('原版')]].map(([value, label]) => html`<button key=${label} type="button"
         class=${`rhine-setting__option${enabled === value ? ' is-active' : ''}`} disabled=${disabled}
         data-testid=${value ? 'rhine-enabled' : 'rhine-vanilla'} aria-pressed=${enabled === value ? 'true' : 'false'}
         onClick=${() => !disabled && enabled !== value && onPick(value)}>${label}</button>`)}
     </div>
-    <span class="rhine-setting__desc">${enabled ? '科研装置 · 扩展干员 · 莱茵装备' : '官方原版干员与规则'}${isHost ? '' : ' · 由房主选择'}</span>
+    <span class="rhine-setting__desc">${enabled ? t('科研装置 · 扩展干员 · 莱茵装备') : t('官方原版干员与规则')}${isHost ? '' : t(' · 由房主选择')}</span>
   </div>`;
 }
 
@@ -287,9 +291,9 @@ export function RoomScreen() {
     : facts.spectating
       ? html`<span class="t-lo"><${Icon} name="eye" />${t('观战中 · 不占博士席位，模拟开始后可切换观看各位博士')}</span>`
     : !profileReady
-      ? html`<span class=${ui.dataError ? 't-orange' : 't-lo'} role="status">${ui.dataError || '正在载入所选模拟数据…'}</span>`
+      ? html`<span class=${ui.dataError ? 't-orange' : 't-lo'} role="status">${ui.dataError || t('正在载入所选模拟数据…')}</span>`
     : loadoutSync !== 'synced'
-      ? html`<span class="t-lo" role="status">正在同步本局干员调配…</span>`
+      ? html`<span class="t-lo" role="status">${t('正在同步本局干员调配…')}</span>`
     : !coop
       ? html`<span class="t-mint">${t('*模拟协议已就绪，准许进入模拟')}</span>`
     : facts.isHost
@@ -347,7 +351,7 @@ export function RoomScreen() {
         <span class="room-bar__label">${t('模拟难度')}<${MicroLabel}>DIFFICULTY<//></span>
         <div class="room-bar__difficulty">
           <${DifficultyPicker} room=${room} isHost=${facts.isHost} busy=${busy} onPick=${setDifficulty} />
-          ${coop ? html`<span class="room-bar__bans">${info.openingBanNote}<span class="t-dim"> · ${facts.occupied.length} 人（含 AI）</span></span>` : null}
+          ${coop ? html`<span class="room-bar__bans">${info.openingBanNote}<span class="t-dim">${t(' · {n} 人（含 AI）', { n: facts.occupied.length })}</span></span>` : null}
         </div>
       </div>
       <div class="room-bar__center">

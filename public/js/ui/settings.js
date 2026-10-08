@@ -8,8 +8,9 @@
 import { useLayoutEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Modal, Button, Icon, MicroLabel } from './components.js';
 import { createStore, useStore, loadPref, savePref } from '../store.js';
-import { sanitizeSettings, HOTKEY_ACTIONS, DEFAULT_HOTKEYS, hotkeyLabel, rebindHotkey, isDefaultHotkeys, captureHotkey } from './gameLogic.js';
+import { sanitizeSettings, HOTKEY_ACTIONS, DEFAULT_HOTKEYS, hotkeyActionsFor, defaultHotkeysFor, hotkeyLabel, rebindHotkey, isDefaultHotkeys, captureHotkey } from './gameLogic.js';
 import { audio } from '../audio.js';
+import { data } from '../data.js';
 import { openGuide } from './guide.js';
 import { detectFeatures } from './device.js';
 import { LangToggle, machineTranslationNote } from './lang.js';
@@ -17,18 +18,19 @@ import { t, tc, N_ } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
-/** Settings store: { bgm, sfx, voice, muted, damageNumbers, quality, keys }. */
-export const settingsStore = createStore(sanitizeSettings(loadPref('settings', null)));
+/** Settings store: { bgm, sfx, voice, muted, damageNumbers, quality, keys }. Fresh players get the current profile's
+ * default key map (the upstream six; buy/chat/speed added only under rhine). */
+export const settingsStore = createStore(sanitizeSettings(loadPref('settings', null), defaultHotkeysFor(data.profileId)));
 
 settingsStore.subscribe((s) => {
-  savePref('settings', sanitizeSettings(s));
+  savePref('settings', sanitizeSettings(s, defaultHotkeysFor(data.profileId)));
   audio.setVolumes(s);
 });
 audio.setVolumes(settingsStore.get());
 
 /** @param {Partial<ReturnType<typeof sanitizeSettings>>} patch */
 export function updateSettings(patch) {
-  settingsStore.set(sanitizeSettings({ ...settingsStore.get(), ...patch }));
+  settingsStore.set(sanitizeSettings({ ...settingsStore.get(), ...patch }, defaultHotkeysFor(data.profileId)));
 }
 
 /** Preact hook: current settings. */
@@ -62,7 +64,7 @@ function Toggle({ label, micro, value, onChange }) {
 const QUALITY = [['high', N_('高')], ['medium', N_('中')], ['low', N_('低')]];
 /** The rebindable shortcuts' names (msgids), by action. */
 const HOTKEY_NAMES = { refresh: N_('刷新商店'), freeze: N_('冻结 / 解冻商店'), levelUp: N_('升级调度中心'), retreat: N_('撤退选中干员'),
-  sell: N_('出售选中干员'), ready: N_('准备就绪 / 暂停（独立模拟）') };
+  sell: N_('出售选中干员'), ready: N_('准备就绪 / 暂停（独立模拟）'), buy: N_('购买干员'), chat: N_('打开聊天'), speed: N_('战斗加速') };
 
 /**
  * 快捷键: each shortcut with its key. Click its key (or Enter / Space on it) and press the new one: Esc cancels (the
@@ -75,6 +77,9 @@ const HOTKEY_NAMES = { refresh: N_('刷新商店'), freeze: N_('冻结 / 解冻�
 function HotkeySection({ keys, touchUi }) {
   const [waiting, setWaiting] = useState(null); // the action waiting for its new key
   const [note, setNote] = useState(null);       // { text, warn }: the result line
+  // The bindable actions / defaults follow the data profile: upstream six, plus buy/chat/speed only under rhine.
+  const profActions = hotkeyActionsFor(data.profileId);
+  const profDefaults = defaultHotkeysFor(data.profileId);
   // a layout effect: the key listener is on as soon as the key shows that it waits (an Esc right after the click must
   // end the wait, never reach the dialog's own Esc)
   useLayoutEffect(() => {
@@ -115,7 +120,7 @@ function HotkeySection({ keys, touchUi }) {
 
   const status = note ? note.text : waiting ? t('请按下「{action}」的新按键（Esc 取消）', { action: t(HOTKEY_NAMES[waiting]) }) : '';
   const list = html`<ul class="set-keys__list">
-    ${HOTKEY_ACTIONS.map((a) => {
+    ${profActions.map((a) => {
       const on = waiting === a;
       const label = hotkeyLabel(keys?.[a]);
       return html`<li key=${a} class="set-keys__row">
@@ -136,8 +141,8 @@ function HotkeySection({ keys, touchUi }) {
   return html`<section class="set-keys" aria-labelledby="set-keys-title">
     <div class="set-keys__head">
       <span class="set-row__label" id="set-keys-title">${t('快捷键')}<${MicroLabel}>HOTKEYS<//></span>
-      <${Button} variant="ghost" size="sm" icon="refresh" class="set-keys__reset" disabled=${isDefaultHotkeys(keys)}
-        onClick=${() => { setWaiting(null); updateSettings({ keys: DEFAULT_HOTKEYS }); setNote({ text: t('已恢复默认快捷键') }); }}>${t('恢复默认')}<//>
+      <${Button} variant="ghost" size="sm" icon="refresh" class="set-keys__reset" disabled=${isDefaultHotkeys(keys, profDefaults)}
+        onClick=${() => { setWaiting(null); updateSettings({ keys: profDefaults }); setNote({ text: t('已恢复默认快捷键') }); }}>${t('恢复默认')}<//>
     </div>
     ${touchUi ? html`<p class="set-hint">${t('快捷键需要实体键盘；触屏设备连接键盘后可用')}</p>
       <details class="set-keys__more"><summary>${t('查看 / 更改快捷键')}</summary>${list}</details>` : list}

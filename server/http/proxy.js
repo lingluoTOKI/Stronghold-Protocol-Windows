@@ -1,4 +1,5 @@
 // server/http/proxy.js — 本扩展的「联机（本机客户端）」反向代理（本扩展新增；上游没有这个概念）。
+// (i18n-ignore-file: the error pages are bilingual by design, 中文 · English — docs/I18N.md)
 //
 // 这个进程用**本机磁盘上的客户端与素材**，只把实时状态与接口转发给中心服务器：
 //   * `/ws`   → 交给远端的 Network（WebSocket 双向转发）

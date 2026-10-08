@@ -1053,7 +1053,12 @@ export function runScenario(sc) {
   return sc.kind === 'match' ? runMatch(sc) : runBattle(sc);
 }
 
-export function goldenPath(family) { return join(GOLDEN_DIR, `${family}.json`); }
+export function goldenPath(family) {
+  // Vanilla snapshots live in test/golden/<family>.json (upstream v0.2.0); rhine snapshots
+  // live in test/golden/rhine/<family>.json so the upstream baseline stays byte-identical.
+  const sub = process.env.SP_TEST_PROFILE === 'vanilla' ? '' : 'rhine';
+  return sub ? join(GOLDEN_DIR, sub, `${family}.json`) : join(GOLDEN_DIR, `${family}.json`);
+}
 
 export function loadGolden(family) {
   try { return JSON.parse(readFileSync(goldenPath(family), 'utf8')); } catch { return null; }

@@ -16,11 +16,12 @@ import { KIT_FILES, TIER_KITS, KITS, STANDIN_KIT_FILES, STANDIN_KITS, OPERATOR_K
 import { KITS as CONTENT_KITS } from '../../server/sim/content/index.js';
 import { diyRecord } from '../../shared/diy.js';
 import { normalizeChess } from '../../server/sim/simdata.js';
+import { loadDataJson as load, DATA_PROFILE } from '../helpers/dataFile.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const KIT_DIR = join(ROOT, 'server/sim/content/kits');
-const CHESS = JSON.parse(readFileSync(join(ROOT, 'data/chess.json'), 'utf8'));
-const BACKUPS = JSON.parse(readFileSync(join(ROOT, 'data/backups.json'), 'utf8'));
+const CHESS = load('chess');
+const BACKUPS = load('backups');
 const jsIn = (dir) => readdirSync(join(KIT_DIR, dir)).filter((f) => f.endsWith('.js')).sort();
 
 test('kits/index.js lists every kit file of kits/ops/ exactly once, and only those', () => {
@@ -46,8 +47,12 @@ test('a stand-in kit file standin-<codename>.js registers the kit of that stand-
 
 test('a 自选 kit file op-<codename>.js registers the kit of that owned-6★ pick (data/backups.json diy.ownedPool), every skill under `skills`', async () => {
   const pool = BACKUPS.diy.ownedPool;
+  // Upstream DIY picks that the Rhine overlay re-fields as bond pieces (伊芙利特 / 森蚺 / 多萝西): they are NOT in the
+  // Rhine diy.ownedPool, so the DIY-pick check applies to them only under the vanilla profile.
+  const RHINE_BOND_OPS = new Set(['ifrit', 'zumama', 'doroth']);
   for (const file of OPERATOR_KIT_FILES) {
     const m = /^op-([a-z0-9]+)\.js$/.exec(file);
+    if (DATA_PROFILE === 'rhine' && RHINE_BOND_OPS.has(m[1])) continue;
     assert.ok(m, `${file}: name`);
     const charId = pool.find((id) => id.replace(/^char_\d+_/, '') === m[1]);
     assert.ok(charId, `${file}: no owned-6★ pick with the code name ${m[1]}`);

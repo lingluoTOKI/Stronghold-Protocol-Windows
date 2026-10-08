@@ -9,8 +9,14 @@ import { loadoutOptions, resolveLoadout as resolveSeatLoadout } from '../../shar
 import { buildBattleSpec, createBattleFromSpec, resultDigest, withUnitLoadouts, jsonClone } from '../../server/sim/spec.js';
 import { setupUnitKit, selectSkillSpec, skillSpecSource } from '../../server/sim/content/index.js';
 import { genericKit } from '../../server/sim/content/generic.js';
+import { KITS, KITS_RHINE } from '../../server/sim/content/kits/index.js';
+import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 import { makeBattle } from '../helpers/battleHarness.js';
 import { kitCoverage } from '../../tools/kit-coverage.mjs';
+
+// Audit coverage against KITS_RHINE under the Rhine profile, else the Rhine chess look uncovered.
+const ACTIVE_KITS = DATA_PROFILE === 'rhine' ? KITS_RHINE : KITS;
+const COVERED_CHESS = DATA_PROFILE === 'vanilla' ? 112 : 118;
 
 const skip = !hasGeneratedData() && 'no generated data (run node tools/build-data.mjs)';
 const ds = getDefaultSource();
@@ -292,9 +298,9 @@ test('harness battle with injected kits: non-default skill via the view uses the
 });
 
 test('tools/kit-coverage: every visible chess and each selectable skill, defaults hand-authored', { skip }, () => {
-  const rep = kitCoverage();
-  assert.equal(rep.summary.chess, 118);
-  assert.equal(rep.chess.length, 112);
+  const rep = kitCoverage({ kits: ACTIVE_KITS });
+  assert.equal(rep.summary.chess, COVERED_CHESS);
+  assert.equal(rep.chess.length, COVERED_CHESS);
   for (const r of rep.chess) {
     const ch = loadoutOptions(C[r.chessId], C[C[r.chessId].goldenId]);
     assert.deepEqual(r.skills.map((s) => s.index), ch.skills, `${r.chessId}: selectable skills listed`);

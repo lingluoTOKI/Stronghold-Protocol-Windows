@@ -5,14 +5,15 @@
 // that slot status); the fidelity checklist of kits/README.md item by item.
 // Run: node --test test/content/op_ifrit.test.js
 
-import { test } from 'node:test';
+// Profile split: asserts the PRISTINE UPSTREAM DIY version of this operator — vanilla-only (under the Rhine profile
+// the operator is fielded only through the 莱茵生命 bond piece). Data resolves via the profile-aware helper.
+import { vanillaTest as test } from '../helpers/profile-test.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
 import { KITTED_CHARS, OPERATOR_KITS, KITS } from '../../server/sim/content/kits/index.js';
 import { diyPool, validateDiyPicks } from '../../shared/diy.js';
 
-const load = (f) => JSON.parse(readFileSync(new URL(`../../data/${f}.json`, import.meta.url), 'utf8'));
+import { loadDataJson as load } from '../helpers/dataFile.mjs';
 const CHESS = load('chess');
 const BACKUPS = load('backups');
 const IFRIT = 'char_134_ifrit';

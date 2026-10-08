@@ -13,11 +13,12 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(path.join(ROOT, p), 'utf8');
+const { DATA_DIR, DATA_PROFILE } = await import('../helpers/dataFile.mjs');
 
 globalThis.fetch = async (url) => {
   const name = String(url).split('/').pop();
   try {
-    const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
+    const body = readFileSync(path.join(DATA_DIR, name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };
   } catch {
     return { ok: false, status: 404, json: async () => ({}) };
@@ -62,7 +63,7 @@ test('matchInfoModel: the two greyed kinds, the briefing order, banned operators
   assert.equal(m.stateOf('sargonShip'), 'drawn');
   assert.equal(m.stateOf('yanShip'), null);
   // bondOrder, then identifier: 调和 (bondOrder 1) leads the add-on row as in the official briefing
-  assert.deepEqual(m.core.map((b) => b.name), ['炎', '萨尔贡', '维多利亚', '谢拉格', '拉特兰', '阿戈尔', '叙拉古', '卡西米尔']);
+  assert.deepEqual(m.core.map((b) => b.name), ['炎', '萨尔贡', '维多利亚', '谢拉格', '拉特兰', '阿戈尔', '叙拉古', '卡西米尔', ...(DATA_PROFILE === 'rhine' ? ['莱茵生命'] : [])]);
   assert.equal(m.addon[0].name, '调和');
   assert.equal(m.core.length + m.addon.length, Object.keys(DATA.bonds).length, 'every bond, once');
   assert.ok(m.core.every((b) => b.isCore) && m.addon.every((b) => !b.isCore));
@@ -160,12 +161,13 @@ test('a real 标准 match (solo and co-op): the mode\'s 10 inactive bonds are "o
     assert.equal(pub.modeId, modeId);
     const m = matchInfoModel(pub, SRC(pub.modeId));
     assert.deepEqual([...m.sets.off].sort(), [...OFF_FUNNY].sort(), `${modeId}: 标准模拟's inactiveBondIdList`);
-    assert.equal(m.sets.drawn.size, 1, '标准 draws one add-on bond');
-    assert.ok([...m.sets.drawn].every((b) => !OFF_FUNNY.includes(b) && !DATA.bonds[b].isCore));
+    assert.equal(m.sets.drawn.size, DATA_PROFILE === 'rhine' ? 2 : 1, '标准 draws one add-on bond (rhine also draws 莱茵生命)');
+    assert.ok([...m.sets.drawn].every((b) => !OFF_FUNNY.includes(b)), 'drawn bonds are not mode-inactive');
+    assert.ok([...m.sets.drawn].every((b) => DATA_PROFILE === 'rhine' || !DATA.bonds[b].isCore), 'upstream: drawn add-on bonds are non-core');
     assert.deepEqual([...m.banned].sort(), [...pub.bannedChess].sort(), 'every banned operator is known');
     assert.deepEqual(m.banned.map((id) => DATA.chess[id].tier), [...m.banned.map((id) => DATA.chess[id].tier)].sort((a, b) => a - b));
     for (const id of m.banned) assert.ok(DATA.chess[id].bonds.every((b) => m.stateOf(b)), `${id}: every bond greyed`);
-    assert.equal(m.addon.filter((b) => m.stateOf(b.bondId)).length + m.core.filter((b) => m.stateOf(b.bondId)).length, 11);
+    assert.equal(m.addon.filter((b) => m.stateOf(b.bondId)).length + m.core.filter((b) => m.stateOf(b.bondId)).length, DATA_PROFILE === 'rhine' ? 12 : 11);
     assert.match(textOf(MatchLegend({ model: m })), /或本模式禁用/);
     h.m.dispose();
   }
@@ -173,7 +175,7 @@ test('a real 标准 match (solo and co-op): the mode\'s 10 inactive bonds are "o
   const h = makeMatch({ mode: 'coop', difficulty: 'HARD', humans: 1, bots: 1, seed: 4 }).start();
   const m = matchInfoModel(h.m.publicView(), SRC('mode_multi_hard'));
   assert.equal(m.sets.off.size, 0);
-  assert.deepEqual([m.core.filter((b) => m.stateOf(b.bondId)).length, m.addon.filter((b) => m.stateOf(b.bondId)).length], [3, 4]);
+  assert.deepEqual([m.core.filter((b) => m.stateOf(b.bondId)).length, m.addon.filter((b) => m.stateOf(b.bondId)).length], DATA_PROFILE === 'rhine' ? [4, 4] : [3, 4]);
   assert.deepEqual([...m.banned].sort(), [...h.m.bannedChess].sort());
   h.m.dispose();
 });

@@ -542,6 +542,9 @@ export class DataSource {
       backups: raw.backups && typeof raw.backups === 'object' && raw.backups.units ? raw.backups : null,
     };
     this.fallback = fallback;
+    // 'rhine' | 'vanilla' — gates the kit registry (kitsFor) and Rhine-only hooks. Inherited from the fallback
+    // (research source) so a sparse overlay still reports its underlying profile.
+    this.dataProfile = raw.dataProfile ?? fallback?.dataProfile ?? null;
     this._chess = new Map();
     this._enemy = new Map();
     this._token = new Map();

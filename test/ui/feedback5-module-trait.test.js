@@ -11,10 +11,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const { DATA_DIR, loadDataJson } = await import('../helpers/dataFile.mjs');
 globalThis.fetch = async (url) => {
   const name = String(url).split('/').pop();
   try {
-    const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
+    const body = readFileSync(path.join(DATA_DIR, name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };
   } catch {
     return { ok: false, status: 404, json: async () => ({}) };
@@ -32,7 +33,7 @@ const { data } = await import('../../public/js/data.js');
 const { KITTED_CHARS } = await import('../../server/sim/content/kits/index.js');
 await data.loadAll('chess', 'bonds', 'assets', 'garrisons', 'items', 'backups');
 
-const CHESS = JSON.parse(readFileSync(path.join(ROOT, 'data/chess.json'), 'utf8'));
+const CHESS = loadDataJson('chess');
 const get = (id) => CHESS[id] ?? null;
 const elites = Object.values(CHESS).filter((c) => c.visible !== false && c.isGolden && Array.isArray(c.modules));
 const modules = elites.flatMap((g) => g.modules.map((m) => ({ g, m })));

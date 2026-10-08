@@ -18,7 +18,8 @@ import { getData } from '../../server/data.js';
 import { GEO } from '../../shared/constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const load = (f) => JSON.parse(readFileSync(path.join(ROOT, 'data', f), 'utf8'));
+const { DATA_DIR, DATA_PROFILE } = await import('../helpers/dataFile.mjs');
+const load = (f) => JSON.parse(readFileSync(path.join(DATA_DIR, f), 'utf8'));
 const chess = load('chess.json');
 const items = load('items.json');
 const bonds = load('bonds.json');
@@ -56,7 +57,7 @@ describe('变形同构体 — the client rule', () => {
   test('the client rule equals the server\'s (bondsMeta.pieceBonds) for every bond item, normal and golden', () => {
     const gd = new GameData(getData({ log: { warn() {}, error() {}, info() {} } }), 'mode_multi_hard');
     const grants = Object.values(items).filter((r) => r.giveBondId);
-    assert.equal(grants.length, 38, '18 bond items × normal / golden');
+    assert.equal(grants.length, DATA_PROFILE === 'vanilla' ? 36 : 38, `${DATA_PROFILE}: 18/19 bond items × normal / golden`);
     for (const r of grants) {
       for (const iso of [ISO, ISO_B]) {
         const p = { id: WEARER, items: [{ id: r.id }, { id: iso }] };
@@ -118,7 +119,7 @@ describe('变形同构体 — the bond popup\'s member list', () => {
 globalThis.fetch = async (url) => {
   const name = String(url).split('/').pop();
   try {
-    const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
+    const body = readFileSync(path.join(DATA_DIR, name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };
   } catch {
     return { ok: false, status: 404, json: async () => ({}) };

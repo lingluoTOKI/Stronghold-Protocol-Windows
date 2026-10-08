@@ -9,7 +9,7 @@
 // reproduce data/ byte-for-byte (catches a stale data/ after a build-script change).
 // Run: node --test test/data.test.js (build first with `node tools/build-data.mjs` if data/ is missing).
 
-import { test } from 'node:test';
+import { test, vanillaTest } from './helpers/profile-test.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -728,7 +728,7 @@ test('official spot checks (hard-coded values from the zh_CN client data)', () =
 /** Read an official cache file (only called when HAS_CACHE). */
 const raw = (rel) => JSON.parse(readFileSync(join(CACHE, rel), 'utf8'));
 
-test('independent re-derivation of every chess and enemy stat from the raw official tables', { skip: !HAS_CACHE && 'no .cache/gamedata' }, () => {
+vanillaTest('independent re-derivation of every chess and enemy stat from the raw official tables', { skip: !HAS_CACHE && 'no .cache/gamedata' }, () => {
   const act = raw('excel/activity_table.json').activity.AUTOCHESS_SEASON.act2autochess;
   const CT = raw('excel/character_table.json'), BE = raw('excel/battle_equip_table.json'), ST = raw('excel/skill_table.json');
   const PH = { PHASE_0: 0, PHASE_1: 1, PHASE_2: 2 };
@@ -816,7 +816,7 @@ test('independent re-derivation of every chess and enemy stat from the raw offic
   }
 });
 
-test('offline rebuild reproduces data/ byte-for-byte (data/ is not stale)', { skip: (!HAS_CACHE && 'no .cache/gamedata') || (process.env.DATA_DIR && 'DATA_DIR set') }, (t) => {
+vanillaTest('offline rebuild reproduces data/ byte-for-byte (data/ is not stale)', { skip: (!HAS_CACHE && 'no .cache/gamedata') || (process.env.DATA_DIR && 'DATA_DIR set') }, (t) => {
   const out = mkdtempSync(join(tmpdir(), 'sp-data-'));
   try {
     const r = spawnSync(process.execPath, [join(ROOT, 'tools', 'build-data.mjs'), '--offline', '--quiet', '--out', out, '--report', join(out, 'report.json')], { encoding: 'utf8', timeout: 120_000 });
