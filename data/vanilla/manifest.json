@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "profile": "vanilla",
   "upstreamVersion": "0.2.0",
-  "source": "1303321407f9a9b80c68e0a4d47b40871a5d06c3",
+  "source": "build-data before the Rhine overlay",
   "files": [
     {
       "path": "assets.json",
@@ -11,8 +11,8 @@
     },
     {
       "path": "backups.json",
-      "size": 1866885,
-      "sha256": "1cb7df057f1265f57216fef82d579cbaae5744e4a6812f7d36f7ee477036d106"
+      "size": 1883848,
+      "sha256": "7b528a931577556716d935d0c9509eb05c1f6a2f24464ad500ac8f2a795a806f"
     },
     {
       "path": "bands.json",
@@ -31,8 +31,8 @@
     },
     {
       "path": "chess.json",
-      "size": 1696020,
-      "sha256": "6ed8abaa098b7f546f379bc69d4497dd3b7c5a26fb3c8016eedee0e3a00deb71"
+      "size": 1712670,
+      "sha256": "34338e7cd766981ce43d3e4049d9a60b3d2aea017e00f5cfea8682bcfe54461b"
     },
     {
       "path": "choices.json",
@@ -41,8 +41,8 @@
     },
     {
       "path": "config.json",
-      "size": 63029,
-      "sha256": "54cf97d4518a03dd491cfa8bd4d271039164bd6b0ef3821342179b304226213a"
+      "size": 63217,
+      "sha256": "e25fb7e7f79aee7e349e06ab976568ec225d77b59f1dbf4ca24d1ab5787fa656"
     },
     {
       "path": "effects.json",
@@ -70,26 +70,6 @@
       "sha256": "f5b1f5558a263c95abcf36411c31e781efd3ebb1bebdced99ad1f242c2a960e3"
     },
     {
-      "path": "i18n/en.json",
-      "size": 2250794,
-      "sha256": "bdec286605d854c75ca9afb37b38ac8e810f582b76c07554ce795270be8febd1"
-    },
-    {
-      "path": "i18n/ja.json",
-      "size": 2582138,
-      "sha256": "1aeaf88840fa3ca90738994c701abc253188494689f553aa0fc0c3eb225e83cf"
-    },
-    {
-      "path": "i18n/ko.json",
-      "size": 2413225,
-      "sha256": "943be1c5e63d36cd62b2f41c116908285bc4ba96d6f69292a1271ce0f77d3d93"
-    },
-    {
-      "path": "i18n/zh-TW.json",
-      "size": 2009008,
-      "sha256": "306f7ad48a15349294c1c62db88bf785f037fdbb51ff968ba07ca371a64733b5"
-    },
-    {
       "path": "items.json",
       "size": 170806,
       "sha256": "6122a3cd75531f551a03082f000426a2d6b8028788fbd1abbaea5286592fbba4"
@@ -101,8 +81,8 @@
     },
     {
       "path": "tokens.json",
-      "size": 133722,
-      "sha256": "c2a85310c22fcc306937ac877927b660a20d481290266d307f2c8bb77c6d3636"
+      "size": 133951,
+      "sha256": "ca98a1189d62c3221e3bc9d149f8ba67d44cab5a6c5e780251fb162177d6519c"
     },
     {
       "path": "tuning.json",
