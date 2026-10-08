@@ -1382,7 +1382,7 @@ function MatchScreen() {
           }}><${Icon} name=${bondsCollapsed ? 'chevronRight' : 'chevronLeft'} /></button>
         <div id="match-bond-strip" class="gm__bond-list" hidden=${bondsCollapsed}>
           <${BondStrip} bonds=${stripBonds} layersDisabled=${layersDisabled} openId=${bondPop && bondPop.ownerId === strip.ownerId ? bondPop.bondId : null}
-            owner=${strip.name} banned=${pub?.bannedChess || []} onOpen=${(id) => openBond(id, strip.ownerId, 'strip')} />
+            owner=${strip.name} onOpen=${(id) => openBond(id, strip.ownerId, 'strip')} />
         </div>
       </div>
 

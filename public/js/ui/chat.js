@@ -29,7 +29,10 @@ export function ensureChatCss(doc = globalThis.document) {
   style.id = STYLE_ID;
   style.textContent = [
     /* 触发按钮外观直接沿用官方 .ewheel__btn（在 game.css / emotes.css 中），这里只补定位与未读点 */
-    '.chat-dock{position:relative;display:flex;align-items:flex-end;}',
+    /* 包裹层不生成盒子（display:contents）：交流按钮与弹出面板直接作为左下角 .gm__corner 的
+       子项参与原有 flex 排列，避免“盒中盒”把设置 / 玩法说明 / 全屏按钮挤错位（回合界面布局保持官方原样）。
+       面板为绝对定位、脱离文档流，不占按钮条空间；DOM 节点仍在，closest('.chat-dock') 等逻辑不受影响。 */
+    '.chat-dock{display:contents;}',
     '.chat-dock__btn{position:relative;}',
     '.chat-dock__badge{position:absolute;top:-.05rem;right:-.05rem;min-width:.18rem;height:.18rem;padding:0 .04rem;background:var(--danger,#ff5d5d);color:#fff;font-family:var(--font-mono,ui-monospace,monospace);font-size:max(.11rem,9px);font-weight:700;line-height:1.15;text;text-align:center;box-shadow:0 0 0 2px rgba(6,9,7,.92);}',
     /* 弹出面板：沿用官方 .ewheel__panel 的渐变 / 描边 / 切角(全局 clip-path) / pop-in，顶部加一条终端光条 */
