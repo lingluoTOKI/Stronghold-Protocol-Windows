@@ -67,6 +67,16 @@
   .p button:hover{background:var(--danger);color:#fff}
   .p button:disabled{opacity:.4;cursor:not-allowed}
   .empty{color:var(--dim);font-size:11px;opacity:.7;padding:6px 0}
+  /* 房间分组 */
+  .rg{background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin-bottom:8px;background:rgba(20,27,24,.4)}
+  .rg.is-match{border-color:rgba(255,184,77,.45)}
+  .rg__hd{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px}
+  .rg__tt{font-weight:600;color:var(--txt);letter-spacing:.5px}
+  .rg__tag{font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid var(--line);color:var(--dim)}
+  .rg__tag.on{color:var(--warn);border-color:rgba(255,184,77,.5);background:rgba(255,184,77,.08)}
+  .rg__cnt{color:var(--dim);font-size:11px;margin-left:auto}
+  .rg__hd .kickroom{background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:4px;padding:1px 8px;font-size:11px;cursor:pointer}
+  .rg__hd .kickroom:hover{background:var(--danger);color:#fff}
   button.primary{
     background:var(--panel2);color:var(--txt);border:1px solid var(--line);
     border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;
@@ -205,34 +215,87 @@ async function fetchPlayers(svr){
   try{
     const r = await fetch(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
     if(r.status === 403){ box.innerHTML = '<div class="empty">token 错误或服务器未配置 SP_ADMIN_TOKEN</div>'; $('s'+el+'_pcount').textContent=''; return; }
+    if(r.status === 404 || r.status === 405){ box.innerHTML = '<div class="empty">该服未开启管理接口（纯原版备用服不可踢人）</div>'; $('s'+el+'_pcount').textContent=''; return; }
     if(!r.ok) throw new Error(r.status);
     const j = await r.json();
     $('s'+el+'_pcount').textContent = j.count + ' 人';
     if(!j.players.length){ box.innerHTML = '<div class="empty">当前无在线玩家</div>'; return; }
-    box.innerHTML = j.players.map(p=>`
-      <div class="p">
-        <span class="nm" title="${esc(p.name)}">${esc(p.name)}</span>
-        <span class="rc">${p.roomCode? '房 '+p.roomCode : '大厅'}</span>
-        <span class="ip">${esc(p.addr)}${p.lastSeenAgoSec!=null? ' · '+p.lastSeenAgoSec+'s前':''}</span>
-        <button onclick="doKick('${svr.el}','${p.playerId}',${JSON.stringify(p.name).replace(/"/g,'&quot;')})">踢</button>
-      </div>`).join('');
+
+    // 按房间分组：有 roomCode 的归到各自房间，其余归到“大厅”。
+    const lobby = [];
+    const rooms = new Map();
+    for(const p of j.players){
+      if(p.roomCode){
+        if(!rooms.has(p.roomCode)) rooms.set(p.roomCode, { inMatch: !!p.inMatch, list: [] });
+        rooms.get(p.roomCode).list.push(p);
+      } else lobby.push(p);
+    }
+    let html = '';
+    for(const [code, g] of rooms){
+      html += `<div class="rg${g.inMatch?' is-match':''}">
+        <div class="rg__hd">
+          <span class="rg__tt">房间 ${esc(code)}</span>
+          <span class="rg__tag${g.inMatch?' on':''}">${g.inMatch?'对局中':'等待中'}</span>
+          <span class="rg__cnt">${g.list.length} 人</span>
+          <button class="kickroom" onclick="doKickRoom('${el}','${esc(code)}')">踢整房</button>
+        </div>
+        ${g.list.map(p=>playerRow(el,p)).join('')}
+      </div>`;
+    }
+    if(lobby.length){
+      html += `<div class="rg">
+        <div class="rg__hd"><span class="rg__tt">大厅（未进房）</span><span class="rg__cnt">${lobby.length} 人</span></div>
+        ${lobby.map(p=>playerRow(el,p)).join('')}
+      </div>`;
+    }
+    box.innerHTML = html;
   }catch(e){
-    box.innerHTML = '<div class="empty">玩家列表加载失败（CORS 或离线）</div>';
+    box.innerHTML = '<div class="empty">玩家列表加载失败（CORS / 该服未开启管理接口 / 离线）</div>';
   }
+}
+
+function playerRow(el, p){
+  return `<div class="p">
+    <span class="nm" title="${esc(p.name)}">${esc(p.name)}</span>
+    <span class="rc">${p.roomCode? ('房 '+p.roomCode) : '大厅'}</span>
+    <span class="ip">${esc(p.addr)}${p.lastSeenAgoSec!=null? ' · '+p.lastSeenAgoSec+'s前':''}</span>
+    <button onclick="doKick('${el}','${p.playerId}',${JSON.stringify(p.name).replace(/"/g,'&quot;')})">踢</button>
+  </div>`;
 }
 
 function esc(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
-async function doKick(el, playerId, name){
-  if(!confirm(`确认踢掉玩家「${name}」？\n（会强制断开其 WebSocket 连接）`)) return;
+async function kickOne(svr, playerId){
   const token = $('token').value.trim();
+  return await fetch(`${svr.base}/api/admin/kick?token=${encodeURIComponent(token)}&playerId=${encodeURIComponent(playerId)}`);
+}
+
+async function doKick(el, playerId, name){
+  if(!confirm(`确认踢掉玩家「${name}」？\n将立即断线，且 10 分钟内无法自动重连 / 刷新恢复。`)) return;
   const svr = SRVS[+el];
   try{
-    const r = await fetch(`${svr.base}/api/admin/kick?token=${encodeURIComponent(token)}&playerId=${encodeURIComponent(playerId)}`);
+    const r = await kickOne(svr, playerId);
     const j = await r.json().catch(()=>({}));
-    if(r.ok && j.ok){ alert(`已踢掉 ${name}`); tick(); }
-    else alert('踢人失败: ' + (j.error || r.status));
+    if(r.ok && j.ok){ alert(`已踢掉 ${name}（${j.banSec||600}s 内无法重连）`); tick(); }
+    else alert('踢人失败: ' + (j.error || j.detail || r.status));
   }catch(e){ alert('踢人请求失败: ' + e.message); }
+}
+
+async function doKickRoom(el, roomCode){
+  const svr = SRVS[+el];
+  const token = $('token').value.trim();
+  try{
+    const r = await fetch(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const ps = (j.players||[]).filter(p=>p.roomCode===roomCode);
+    if(!ps.length){ alert('该房间已无在线玩家'); tick(); return; }
+    if(!confirm(`确认踢掉房间 ${roomCode} 内全部 ${ps.length} 名玩家？\n将立即断线，且 10 分钟内无法重连。`)) return;
+    let ok=0, fail=0;
+    for(const p of ps){ const kr = await kickOne(svr, p.playerId); if(kr.ok) ok++; else fail++; }
+    alert(`房间 ${roomCode}：已踢 ${ok} 人` + (fail? `，失败 ${fail} 人`:''));
+    tick();
+  }catch(e){ alert('整房踢人失败: ' + e.message); }
 }
 
 async function tick(){

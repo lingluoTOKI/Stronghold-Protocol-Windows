@@ -53,6 +53,8 @@ export const CLIENT_ERR_TEXT = Object.freeze({
 export const CLOSE_REPLACED = 4001;
 /** Server close code: the socket never sent `hello` (server/net.js CLOSE.HELLO_TIMEOUT, ~30–60 s). */
 export const CLOSE_HELLO_TIMEOUT = 4002;
+/** Server close code: an admin kicked this player (server/net.js CLOSE.KICKED). Do not auto-reconnect. */
+export const CLOSE_KICKED = 4003;
 /** A pre-hello socket must have lived this long before a 4002 close is swapped quietly (no loop). */
 const QUIET_SWAP_MIN_AGE_MS = 5000;
 
@@ -312,6 +314,16 @@ export class Net {
       this.lastError = new NetError('REPLACED');
       this._setStatus('closed');
       this._emit('replaced', this.lastError);
+      return;
+    }
+    if (ev && ev.code === CLOSE_KICKED) {
+      // An admin removed this player: stop auto-reconnecting and stay closed (the server also refuses
+      // the resume for a cooldown window). The player can reopen the page manually after that.
+      this._manualClose = true;
+      this._failPending('KICKED', true);
+      this.lastError = new NetError('KICKED');
+      this._setStatus('closed');
+      this._emit('kicked', this.lastError);
       return;
     }
     if (ev && ev.code === CLOSE_HELLO_TIMEOUT && !this.name && this.status === 'connected'

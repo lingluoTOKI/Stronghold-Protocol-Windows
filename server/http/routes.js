@@ -11,8 +11,11 @@
 import { PROTOCOL_VERSION, APP_VERSION } from '../../shared/constants.js';
 import { buildTag } from './buildTag.js';
 import { setSecurityHeaders, sendError, sendJson, splitUrl } from './common.js';
+import { CLOSE } from '../net.js';
 
 const MAX_URL_LENGTH = 4096;
+// 管理员踢人后，多少毫秒内拒绝该玩家自动重连 / 刷新恢复（客户端会收到 CLOSE.KICKED 并停止重连）。
+const ADMIN_KICK_BAN_MS = 10 * 60 * 1000;
 
 /**
  * The GET /healthz body.
@@ -62,10 +65,13 @@ export function createRequestHandler({ serveStatic, health, log, proxy = null, a
       const q = new URLSearchParams(parts.query || '');
       if (q.get('token') !== ADMIN_TOKEN) { sendError(req, res, 403, 'bad admin token'); return; }
       const list = [];
+      const inMatchByCode = new Map();
+      for (const [code, r] of health.lobby.rooms) inMatchByCode.set(code, !!r.match);
       for (const s of health.registry.byPlayerId.values()) {
         if (!s.connected) continue;
         list.push({
           playerId: s.playerId, name: s.name, roomCode: s.roomCode || null,
+          inMatch: s.roomCode ? !!inMatchByCode.get(s.roomCode) : false,
           addr: s.addr || '?', lastSeenAgoSec: s.lastSeen ? Math.round((Date.now() - s.lastSeen)/1000) : null,
         });
       }
@@ -78,9 +84,12 @@ export function createRequestHandler({ serveStatic, health, log, proxy = null, a
       if (q.get('token') !== ADMIN_TOKEN) { sendError(req, res, 403, 'bad admin token'); return; }
       const pid = q.get('playerId') || '';
       const s = health.registry.byId(pid);
-      if (!s || !s.connected || !s.ws) { sendError(req, res, 404, 'player not connected'); return; }
-      try { s.ws.close(1008, 'admin-kick'); } catch {}
-      sendJson(req, res, 200, { ok: true, kicked: pid, name: s.name });
+      if (!s) { sendError(req, res, 404, 'player not found'); return; }
+      // 先加封禁再关连接：客户端收到 CLOSE.KICKED 会停止自动重连；封禁窗口内即使手动刷新 / 换标签
+      // 用同一 token 恢复也会被握手拒绝，避免“踢了秒回”。
+      health.registry.ban(pid, ADMIN_KICK_BAN_MS);
+      if (s.connected && s.ws) { try { s.ws.close(CLOSE.KICKED, 'admin-kicked'); } catch {} }
+      sendJson(req, res, 200, { ok: true, kicked: pid, name: s.name, banSec: Math.round(ADMIN_KICK_BAN_MS / 1000) });
       return;
     }
     if (proxy && parts.rawPath.startsWith('/api/')) {
