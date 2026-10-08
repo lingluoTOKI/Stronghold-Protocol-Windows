@@ -1763,7 +1763,8 @@ function lastPerfect(m, ps) {
  *     deployed operator;
  *   突变细胞 (the carrier becomes a random tier + 1 operator after the battle): cellTarget;
  *   随身身份牌 / 简易通讯机 / 寻呼模块 (act on the carrier's bonds): the operator whose bonds matter most (focus first);
- *   funds, 紧急调度券, 人事部文档 …: anyone; a bond signature item (requiresBondId): a member of that bond;
+ *   funds, 紧急调度券, 人事部文档 …: anyone, one with a free slot first (on a full carrier the item replaces one of its
+ *     items, GitHub #263); a bond signature item (requiresBondId): a member of that bond;
  *   other equipment: the strongest deployed damage dealers with a free slot (SURVIVAL items blockers first).
  */
 export function itemTarget(m, ps, item, ctx = context(m, ps)) {
@@ -1811,7 +1812,6 @@ export function itemTarget(m, ps, item, ctx = context(m, ps)) {
   }
   const consume = typeof rec.kind === 'string' && rec.kind.startsWith('consume_on_equip');
   const list = byVal(deployed);
-  if (consume) return list[0] || owned[0] || null;
   const free = (p) => (p.items || []).length < gd.equipPerChess;
   const rhineKey = itemKey(item.id);
   if (rhineKey === RE.terminal.key || rhineKey === RE.mainframe.key) {
@@ -1822,6 +1822,9 @@ export function itemTarget(m, ps, item, ctx = context(m, ps)) {
     const carrier = members.find((p) => carriesKey(p, partner)) || members[0];
     if (carrier) return carrier;
   }
+  // a consumable on a full carrier destroys one of its items (the replace rule, GitHub #263): a carrier with a free slot
+  // first — the effect is the same on anyone
+  if (consume) return list.find(free) || owned.find(free) || list[0] || owned[0] || null;
   if (rec.requiresBondId) {
     const member = list.find((p) => free(p) && (chessRec(m, p.id, ps)?.bonds || []).includes(rec.requiresBondId));
     if (member) return member;
