@@ -233,6 +233,12 @@ export class Match {
     this.broadcastFn = opts.broadcast;
     this.onEndFn = opts.onEnd;
     this.data = opts.data && typeof opts.data === 'object' ? opts.data : {};
+    // Data profile (rhine/vanilla) is fixed for the whole match and carried into every m.public, so the client keeps
+    // rendering the room's chosen ruleset in a match. Without it an absent flag defaulted to Rhine on the client and
+    // showed the Rhine bond/operators in a 原版 room's briefing.
+    this.dataProfile = typeof opts.dataProfile === 'string' ? opts.dataProfile
+      : (opts.rhineEnabled === false ? 'vanilla' : (this.data.dataProfile || 'rhine'));
+    this.rhineEnabled = this.dataProfile === 'rhine';
     this.gd = new GameData(this.data, this.modeId);
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;

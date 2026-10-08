@@ -4,7 +4,9 @@ import { dataProfileId } from '../data.js';
 /** A match's fixed profile also works when m.public arrives before the restored room.state. */
 export function profileFromState(s) {
   const pub = s?.match?.public;
-  return dataProfileId(pub && s?.room?.inMatch !== false ? pub.rhineEnabled : s?.room?.rhineEnabled);
+  // Fall back to the room flag when a match public frame omits rhineEnabled (never let an undefined default to rhine).
+  const inMatch = pub && s?.room?.inMatch !== false;
+  return dataProfileId(inMatch ? (pub.rhineEnabled ?? s?.room?.rhineEnabled) : s?.room?.rhineEnabled);
 }
 
 export function createDataProfilePreparation({ cache, target, files }) {
