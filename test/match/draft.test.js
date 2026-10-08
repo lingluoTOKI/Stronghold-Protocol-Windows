@@ -6,8 +6,6 @@ import { ERR, PHASE } from '../../shared/constants.js';
 import { DATA, makeMatch, checkInvariants } from './harness.js';
 import { BAND_TURN_SECONDS } from '../../server/match/Match.js';
 
-const awaitImport = await import('../../server/match/choices.js'); // hoisted: a test above uses applyCard (TDZ-safe under the vanilla preload)
-
 const TURN_MS = BAND_TURN_SECONDS * 1000;
 
 test('INFO_CHECK: ends when every human confirmed (bots/departed count as ready) or at the 25 s deadline', () => {
@@ -234,6 +232,8 @@ test('机变 tactic defaults: team cards reach teammates; layers / funds / free 
   checkInvariants(m);
   m.dispose();
 });
+
+const awaitImport = await import('../../server/match/choices.js');
 
 test('a single human (a 同盟 room started alone or with AI teammates only) is never timed outside battles — user playtest #4 item 3', () => {
   for (const bots of [0, 3]) {

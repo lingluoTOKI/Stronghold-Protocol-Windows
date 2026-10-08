@@ -13,21 +13,20 @@
 //      inactive bonds), on its card and in the detail pane (screens/bandDraft.js BandOffTag / BandOffNote); still selectable.
 //   (3, the bot's pick, is server-side: test/match/feedback1-gaps.test.js.)
 // On screen (headless Chrome, opt-in): test/ui/feedback1-gaps.e2e.test.js.
-import { describe } from 'node:test';
-import { test, vanillaTest } from '../helpers/profile-test.mjs';
+import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadDataJson as load, DATA_DIR, DATA_PROFILE } from '../helpers/dataFile.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const load = (f) => JSON.parse(readFileSync(path.join(ROOT, 'data', f), 'utf8'));
 
-// the browser data store reads the real data files from disk (profile-aware: data/vanilla under the vanilla profile)
+// the browser data store reads the real data files from disk
 globalThis.fetch = async (url) => {
   const name = String(url).split('/').pop();
   try {
-    const body = readFileSync(path.join(DATA_DIR, name), 'utf8');
+    const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };
   } catch {
     return { ok: false, status: 404, json: async () => ({}) };
@@ -50,9 +49,6 @@ const chess = load('chess.json');
 const config = load('config.json');
 const ITEMS = Object.values(items);
 const BONDS = Object.values(bonds);
-// Rhine adds one bond (rhineShip 实验终端) + one bond item on top of upstream's 14 bonds / 18 items.
-const BOND_BONDS = DATA_PROFILE === 'vanilla' ? 14 : 15;
-const BOND_ITEMS = DATA_PROFILE === 'vanilla' ? 18 : 19;
 
 const ISO = 'chess_item_6_09_e_a'; // 变形同构体
 const ISO_B = 'chess_item_6_09_e_b';
@@ -98,8 +94,8 @@ describe('§21.26 1 — 变形同构体: the pairing list (gameLogic morphPairin
   test('from the data: 14 bonds in bonds.json order, 18 items, the same giveBondId the server counts with', () => {
     const rows = morphPairings(ITEMS, BONDS);
     const want = expectedPairings();
-    assert.equal(rows.length, BOND_BONDS);
-    assert.equal(want.size, BOND_BONDS);
+    assert.equal(rows.length, 14);
+    assert.equal(want.size, 14);
     assert.deepEqual(rows.map((r) => r.bondId), BONDS.map((b) => b.bondId).filter((id) => want.has(id)), 'bonds.json order');
     for (const r of rows) {
       assert.equal(r.name, bonds[r.bondId].name);
@@ -108,7 +104,7 @@ describe('§21.26 1 — 变形同构体: the pairing list (gameLogic morphPairin
       assert.equal(r.off, false);
       assert.equal(r.worn, false);
     }
-    assert.equal(rows.reduce((n, r) => n + r.items.length, 0), BOND_ITEMS, `${BOND_ITEMS} bond items`);
+    assert.equal(rows.reduce((n, r) => n + r.items.length, 0), 18, '18 bond items');
     const vic = rows.find((r) => r.bondId === 'victoriaShip');
     assert.deepEqual(vic.items.map((it) => it.name), ['维式重锤', '战栗维式重锤', '坚固维式重锤', '加速维式重锤', '灼燃维式重锤'], 'by tier: the hammer series');
     assert.ok(!rows.some((r) => r.items.some((it) => items[it.id].canGiveBond)), '变形同构体 itself is no partner');
@@ -116,7 +112,7 @@ describe('§21.26 1 — 变形同构体: the pairing list (gameLogic morphPairin
     for (const r of rows) for (const it of r.items) assert.deepEqual(grantedBonds([ISO, it.id], (id) => items[id]), [r.bondId], it.name);
   });
 
-  vanillaTest('the official 天赋栏 (character_table trap_1073_acarm073) lists the same 14 pairings', { skip: !existsSync(path.join(ROOT, '.cache/gamedata/excel/character_table.json')) && 'no official cache' }, () => {
+  test('the official 天赋栏 (character_table trap_1073_acarm073) lists the same 14 pairings', { skip: !existsSync(path.join(ROOT, '.cache/gamedata/excel/character_table.json')) && 'no official cache' }, () => {
     const ct = JSON.parse(readFileSync(path.join(ROOT, '.cache/gamedata/excel/character_table.json'), 'utf8'));
     const talent = ct[items[ISO].trapId].talents[0].candidates.at(-1).description.replace(/\\n/g, '\n');
     const pairs = [...talent.matchAll(/“([^”]+)”(?:系列装备)?→【([^】]+)】盟约/g)].map(([, item, bond]) => ({ item, bond }));
@@ -166,7 +162,7 @@ describe('§21.26 1 — 变形同构体 on the cards', () => {
     assert.ok(sec, 'a 天赋 section (the item text points at its 天赋栏)');
     assert.match(textOf(v), /搭配以下装备时，携带者视为对应盟约的成员：/);
     const rows = byClass(v, 'dmorph__row');
-    assert.equal(rows.length, BOND_BONDS);
+    assert.equal(rows.length, 14);
     const off = rows.filter((r) => hasClass(r, 'is-off'));
     assert.deepEqual(off.map((r) => r.props['data-bond']), ['lateranoShip', 'egirShip', 'kazimierzShip', 'arcaneShip', 'raidShip']);
     for (const r of off) assert.match(textOf(r), /本局禁用/);
@@ -183,7 +179,7 @@ describe('§21.26 1 — 变形同构体 on the cards', () => {
     const blocks = ChessDetail({ chess: chess[WEARER], piece, editable: false, bonds: [], offBonds: funny, loadout: null });
     const equip = blocks.find((b) => b?.key === 'equip');
     const rows = byClass(equip, 'dmorph__row');
-    assert.equal(rows.length, BOND_BONDS);
+    assert.equal(rows.length, 14);
     const worn = rows.filter((r) => hasClass(r, 'is-worn'));
     assert.deepEqual(worn.map((r) => r.props['data-bond']), ['victoriaShip']);
     assert.match(textOf(worn[0]), /生效中/);

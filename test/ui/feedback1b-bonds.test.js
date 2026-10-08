@@ -14,12 +14,11 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(path.join(ROOT, p), 'utf8');
-const { DATA_DIR, DATA_PROFILE } = await import('../helpers/dataFile.mjs');
 
 globalThis.fetch = async (url) => {
   const name = String(url).split('/').pop();
   try {
-    const body = readFileSync(path.join(DATA_DIR, name), 'utf8');
+    const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };
   } catch {
     return { ok: false, status: 404, json: async () => ({}) };
@@ -60,9 +59,7 @@ test('a real 标准 match: 奥术 operators are buyable, three on the board neve
   h.toPrep(1);
   const m = h.m, ps = h.ps('p_0');
   const members = DATA.bonds.arcaneShip.visibleMembers.filter((id) => m.pool.has(id) && !m.bannedChess.includes(id));
-  assert.deepEqual(members.map((id) => DATA.chess[id].name), DATA_PROFILE === 'rhine'
-    ? ['深靛', '洛洛', '阿罗玛', '夕', '溯光星源', '伊芙利特']
-    : ['深靛', '洛洛', '阿罗玛', '夕', '圣聆初雪'], 'members kept in the pool by their other bond');
+  assert.deepEqual(members.map((id) => DATA.chess[id].name), ['深靛', '洛洛', '阿罗玛', '夕', '圣聆初雪'], 'members kept in the pool by their other bond');
   ps.board.clear();
   const used = new Set();
   for (const id of members.slice(0, 3)) { const t = legalTileFor(m, ps, id, used); used.add(tileKey(t[0], t[1])); give(m, ps, id, 'board', t); }

@@ -194,11 +194,7 @@ test('co-op spectator over websockets: watches the real match like an eliminated
   await a.waitFor('m.public', (p) => p.phase === 'PREP' && p.round === 2, 15000);
   for (const c of [s, back]) {
     assert.equal(c.log.filter((x) => x.t === 'm.private' || x.t === 'm.toast' || x.t === 'm.unitStats').length, 0, 'no private frame');
-    // b.start's spectator spec intentionally carries contentInfo counters (handUnits etc.) the battle replica reads
-    // (server/match/match/watch.js _spectatorSpec: funds stripped, other counters kept). Only flag frames that carry
-    // actual private player data beyond those known battle-spec counters.
-    const privateLeak = c.log.find((x) => x.t !== 'b.start' && /"(funds|shop|temp)":|"(hand":\s*\[[^\]]*[^\]null\s])/.test(JSON.stringify(x)));
-    assert.ok(!privateLeak, `no private player data (${privateLeak ? privateLeak.t : ''})`);
+    assert.ok(!c.log.some((x) => /"(funds|hand|shop|temp)":/.test(JSON.stringify(x))), 'no private player data');
   }
   // the last player leaves: the match ends and the room closes for its spectator
   await ok(a, { t: 'g.leave' });

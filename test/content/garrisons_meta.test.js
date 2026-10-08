@@ -6,7 +6,6 @@ import assert from 'node:assert/strict';
 import { makeMatch, give, giveItem, DATA } from '../match/harness.js';
 import { createRegistry } from '../../server/match/effectsMeta.js';
 import { triggerGainEffects } from '../../server/sim/content/garrisons.js';
-import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 
 const QUIET = { warn() {}, error() {}, info() {} };
 const REG = createRegistry({ log: QUIET });
@@ -832,22 +831,12 @@ test('塞雷娅 99 / 白面鸮 86: the copier runs the front operator\'s prep-en
     }
     cover(gid);
   }
-  if (DATA_PROFILE === 'vanilla') {
-    const w = setup();
-    give(w.m, w.ps, 'chess_char_4_21_a', 'board', [10, 3]);             // 白面鸮 → 白面鸮 (hidden 5_16) → 缄默德克萨斯
-    give(w.m, w.ps, 'chess_char_5_16_a', 'board', [10, 4]);
-    give(w.m, w.ps, 'chess_char_4_16_a', 'board', [10, 5]);
-    w.roundStart();
-    assert.equal(w.ps.shop.freeRefreshes, 3);
-  } else {
-    // Rhine overlay: the PREP_START copier trait moved from 白面鸮 (now a Rhine-research trait) to 乌啾 (wuhoo).
-    const w = setup();
-    give(w.m, w.ps, 'chess_rhine_wuhoo_a', 'board', [10, 3]);          // 乌啾 → 乌啾 → 缄默德克萨斯
-    give(w.m, w.ps, 'chess_rhine_wuhoo_a', 'board', [10, 4]);
-    give(w.m, w.ps, 'chess_char_4_16_a', 'board', [10, 5]);
-    w.roundStart();
-    assert.equal(w.ps.shop.freeRefreshes, 3);
-  }
+  const w = setup();
+  give(w.m, w.ps, 'chess_char_4_21_a', 'board', [10, 3]);             // 白面鸮 → 白面鸮 (hidden 5_16) → 缄默德克萨斯
+  give(w.m, w.ps, 'chess_char_5_16_a', 'board', [10, 4]);
+  give(w.m, w.ps, 'chess_char_4_16_a', 'board', [10, 5]);
+  w.roundStart();
+  assert.equal(w.ps.shop.freeRefreshes, 3);
 });
 
 test('triggerGainEffects export (band 铃兰): re-runs 获得时 garrisons ×投资人 and returns the effects run', () => {
@@ -868,19 +857,6 @@ test('风丸 93: only 2 copies merge into the elite', () => {
   s.acquire('chess_char_2_11_a');
   assert.ok([...s.ps.hand, ...s.ps.temp].some((p) => p && p.id === 'chess_char_2_11_b'));
   assert.equal(GR('garrison_93_a').eventType, 'IN_BATTLE');
-});
-
-test('Rhine research 白面鸮 (garrison_rhine_ptilopsis_a/b): prep-end grants rhineShip layers per on-board Rhine member', () => {
-  if (DATA_PROFILE !== 'rhine') return;
-  for (const [gid, owner, layer] of [['garrison_rhine_ptilopsis_a', 'chess_char_4_21_a', 2], ['garrison_rhine_ptilopsis_b', 'chess_char_4_21_b', 4]]) {
-    const s = setup();
-    give(s.m, s.ps, owner, 'board', [10, 4]);                       // 白面鸮 carries the research trait
-    give(s.m, s.ps, 'chess_char_2_02_a', 'board', [10, 5]);        // 赫默, another on-board Rhine member
-    s.activate('rhineShip');
-    s.prepEnd();
-    assert.equal(s.G('rhineShip'), 2 * layer, `${gid}: 2 Rhine members × ${layer} research layers`);
-    cover(gid);
-  }
 });
 
 test('every SERVER_* effectKey of the data has a registered handler', () => {

@@ -7,8 +7,6 @@ import { registerBuiltins, BUILTIN_EFFECT_KEYS } from '../../server/match/builti
 import { PHASE } from '../../shared/constants.js';
 import { DATA, makeMatch, give, giveItem, checkInvariants, chessOfTier } from './harness.js';
 
-const awaitFake = await import('./fakeBattle.js'); // hoisted: a test above uses FakeBattle (TDZ-safe under the vanilla preload)
-
 test('registry: key validation, function sugar, last registration wins, helpers', () => {
   const reg = new MetaRegistry();
   assert.throws(() => reg.register('nope', {}), TypeError);
@@ -203,6 +201,8 @@ test('onBattleStart may edit the PlayerBattleInput; onBattleResult sees the resu
   assert.deepEqual(results, [['p_0', 0, true]]);
   m.dispose();
 });
+
+const awaitFake = await import('./fakeBattle.js');
 
 test('choice:<id> handler overrides the family default, runs once, and other sources observe the pick', async () => {
   const { applyCard } = await import('../../server/match/choices.js');

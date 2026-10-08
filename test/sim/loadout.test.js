@@ -9,14 +9,8 @@ import { loadoutOptions, resolveLoadout as resolveSeatLoadout } from '../../shar
 import { buildBattleSpec, createBattleFromSpec, resultDigest, withUnitLoadouts, jsonClone } from '../../server/sim/spec.js';
 import { setupUnitKit, selectSkillSpec, skillSpecSource } from '../../server/sim/content/index.js';
 import { genericKit } from '../../server/sim/content/generic.js';
-import { KITS, KITS_RHINE } from '../../server/sim/content/kits/index.js';
-import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 import { makeBattle } from '../helpers/battleHarness.js';
 import { kitCoverage } from '../../tools/kit-coverage.mjs';
-
-// Audit coverage against KITS_RHINE under the Rhine profile, else the Rhine chess look uncovered.
-const ACTIVE_KITS = DATA_PROFILE === 'rhine' ? KITS_RHINE : KITS;
-const COVERED_CHESS = DATA_PROFILE === 'vanilla' ? 112 : 118;
 
 const skip = !hasGeneratedData() && 'no generated data (run node tools/build-data.mjs)';
 const ds = getDefaultSource();
@@ -111,9 +105,7 @@ test('getChess(id, loadout): selected skill (bb, SP, trigger) and module (stats,
   assert.equal(m3.raw.module.id, 'uniequip_003_mlyss');
   assert.equal(m3.raw.module.active, true);
   assert.equal(none.raw.module.active, false, 'no module ⇒ moduleOn(chess) false for kits');
-  // 开源节流 at full potential (runtime_cost −2; the module restates it) and the module's own data-only talents (sp_other)
-  assert.ok(m3.talents.some((t) => t.bb.runtime_cost === -2 && t.bb.cost === -2), 'module talent change applied');
-  assert.ok(m3.talents.some((t) => t.bb.sp_other === 10) && !none.talents.some((t) => t.bb.sp_other === 10), 'the module-only talent');
+  assert.ok(m3.talents.some((t) => t.bb.runtime_cost === -1 && t.bb.cost === -2), 'module talent change applied');
   assert.equal(m3.skill.id, dm.skill.id, 'a module choice keeps the skill');
   const both = d.getChess(MLYSS, { skillIndex: 0, moduleId: 'none' });
   assert.equal(both.skill.id, 'skchr_mlyss_1');
@@ -300,9 +292,9 @@ test('harness battle with injected kits: non-default skill via the view uses the
 });
 
 test('tools/kit-coverage: every visible chess and each selectable skill, defaults hand-authored', { skip }, () => {
-  const rep = kitCoverage({ kits: ACTIVE_KITS });
-  assert.equal(rep.summary.chess, COVERED_CHESS);
-  assert.equal(rep.chess.length, COVERED_CHESS);
+  const rep = kitCoverage();
+  assert.equal(rep.summary.chess, 112);
+  assert.equal(rep.chess.length, 112);
   for (const r of rep.chess) {
     const ch = loadoutOptions(C[r.chessId], C[C[r.chessId].goldenId]);
     assert.deepEqual(r.skills.map((s) => s.index), ch.skills, `${r.chessId}: selectable skills listed`);

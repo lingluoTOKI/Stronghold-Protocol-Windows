@@ -468,15 +468,13 @@ export function createProfiledDataStore(opts = {}) {
         isReady: (...names) => readyIn(names, id),
       };
     },
-    // 上游 0.2.0 的 i18n（docs/I18N.md）：每个 inner store 各自持有 locale/chain/overlays（闭包局部），并非模块级共享。
-    // 切语言必须三个 store（shared / rhine / vanilla）都下载并挂同一 overlay，否则按档案路由的 get/list/lookup
-    // 落到 rhine/vanilla store 时其 overlays 为空、拿不到本地化文本（config 广播模板 / choices 卡名仍是中文）。
+    // 上游 0.2.0 的 i18n（docs/I18N.md）：locale 是 data.js 的模块级状态，三个 store 共用同一个，
+    // 所以转发给 shared 就够；get / list / lookup 本来就是按当前档案转发到对应 store 的。
     getRaw: (name) => storeFor(name).getRaw(name),
     lookupRaw: (name, id) => storeFor(name).lookupRaw(name, id),
     locale: () => shared.locale(),
     localeChain: () => shared.localeChain(),
-    localeName: (...args) => shared.localeName(...args),
-    setLocale: (...args) => Promise.all([shared, profiles.rhine, profiles.vanilla].map((s) => s.setLocale(...args))).then((r) => r[0]),
+    setLocale: (...args) => shared.setLocale(...args),
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 }
@@ -573,10 +571,7 @@ export function useData(...names) {
   const key = names.join('|');
   useEffect(() => {
     let alive = true;
-    // PROFILE_CHANGE must also force a re-render: when the target profile is already cached, selecting it emits
-    // only '$profile' (no per-file load notification), so without this the screens keep showing the old profile's
-    // records (e.g. switching to 原版 in the lobby still rendered the Rhine bond in the briefing).
-    const unsub = data.subscribe((n) => { if (alive && (n === PROFILE_CHANGE || names.includes(n))) force(); });
+    const unsub = data.subscribe((n) => { if (alive && names.includes(n)) force(); });
     for (const n of names) data.load(n);
     return () => { alive = false; unsub(); };
   }, [key]);

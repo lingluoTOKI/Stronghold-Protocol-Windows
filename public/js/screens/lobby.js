@@ -107,7 +107,7 @@ export function difficultyInfo(roomMode, difficulty, playerCount = null) {
   const openingBans = openingBanCounts(difficulty, knownCount ?? 1, configuredBans);
   const largeRoomNotes = knownCount == null ? [5, 6].map(count => {
     const bans = openingBanCounts(difficulty, count, configuredBans);
-    return bans.core !== openingBans.core ? t('{count} 人（含 AI）时核心 {core}', { count, core: bans.core }) : '';
+    return bans.core !== openingBans.core ? `${count} 人（含 AI）时核心 ${bans.core}` : '';
   }).filter(Boolean) : [];
   const conditional = largeRoomNotes.length ? `；${largeRoomNotes.join('；')}` : '';
   return {
@@ -118,7 +118,7 @@ export function difficultyInfo(roomMode, difficulty, playerCount = null) {
     hidden: difficulty !== 'FUNNY',
     stageNote: stageNote(Array.isArray(m?.stages) && m.stages.length ? m.stages : STAGE_POOL[difficulty]),
     openingBans,
-    openingBanNote: t('开局 BAN：核心 {core} / 附加 {addon}{conditional}', { core: openingBans.core, addon: openingBans.addon, conditional }),
+    openingBanNote: `开局 BAN：核心 ${openingBans.core} / 附加 ${openingBans.addon}${conditional}`,
   };
 }
 
@@ -400,7 +400,7 @@ export function LobbyScreen() {
         <${Button} variant="ghost" size="sm" icon="chevronLeft" onClick=${backToTitle} title=${t('返回标题')}>${t('返回')}<//>
         <${BulletinButton} />
         <${PingPill} ms=${conn.ping} online=${online} />
-        <div class="online-pill" title=${onlineCount == null ? t('在线玩家数加载中…') : t('当前 {onlineCount} 位博士在线', { onlineCount })}>
+        <div class="online-pill" title=${onlineCount == null ? '在线玩家数加载中…' : `当前 ${onlineCount} 位博士在线`}>
           <${Icon} name="users" />
           <span class="num online-pill__n">${onlineCount == null ? '—' : onlineCount}</span>
           <${MicroLabel}>ONLINE<//>
@@ -450,27 +450,27 @@ export function LobbyScreen() {
         ${roomMode === 'coop'
           ? html`<div class="lobby-coop-create">
               <div class="create-box__mode">
-                <span class="create-box__mode-label">${t('建立方式')}</span>
+                <span class="create-box__mode-label">建立方式</span>
                 <div class="create-box__mode-opts">
                   <button type="button" class=${`create-box__mode-opt${coopCreate === 'direct' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('direct')} aria-pressed=${coopCreate === 'direct' ? 'true' : 'false'}>
                     <span class="create-box__mode-opt-icon"><${Icon} name="plus" /></span>
                     <span class="create-box__mode-opt-text">
-                      <span class="create-box__mode-opt-name">${t('直接建立')}</span>
-                      <span class="create-box__mode-opt-desc">${t('创建即莱茵扩展 · 房内可切回原版，邀好友/加AI')}</span>
+                      <span class="create-box__mode-opt-name">直接建立</span>
+                      <span class="create-box__mode-opt-desc">创建即莱茵扩展 · 房内可切回原版，邀好友/加AI</span>
                     </span>
                   </button>
                   <button type="button" class=${`create-box__mode-opt${coopCreate === 'match' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('match')} aria-pressed=${coopCreate === 'match' ? 'true' : 'false'}>
                     <span class="create-box__mode-opt-icon"><${Icon} name="users" /></span>
                     <span class="create-box__mode-opt-text">
-                      <span class="create-box__mode-opt-name">${t('匹配队友')}</span>
-                      <span class="create-box__mode-opt-desc">${t('原版玩法 · 进公共池，20s 满 4 自动开局')}</span>
+                      <span class="create-box__mode-opt-name">匹配队友</span>
+                      <span class="create-box__mode-opt-desc">原版玩法 · 进公共池，20s 满 4 自动开局</span>
                     </span>
                   </button>
                   <button type="button" class=${`create-box__mode-opt${coopCreate === 'rhine' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('rhine')} aria-pressed=${coopCreate === 'rhine' ? 'true' : 'false'}>
                     <span class="create-box__mode-opt-icon"><${Icon} name="robot" /></span>
                     <span class="create-box__mode-opt-text">
-                      <span class="create-box__mode-opt-name">${t('新模式匹配')}</span>
-                      <span class="create-box__mode-opt-desc">${t('莱茵扩展玩法 · 进公共池，满 4 自动开局')}</span>
+                      <span class="create-box__mode-opt-name">新模式匹配</span>
+                      <span class="create-box__mode-opt-desc">莱茵扩展玩法 · 进公共池，满 4 自动开局</span>
                     </span>
                   </button>
                 </div>
@@ -490,36 +490,36 @@ export function LobbyScreen() {
           <div class="create-box__acts">
           <${Tooltip} block=${true} text=${online ? null : t('正在连接服务器…')}>
             <${Button} variant="primary" size="xl" block=${true} iconRight=${matching ? null : 'chevrons'} loading=${busy === 'create'} disabled=${!online || matching} onClick=${create}>
-              ${roomMode === 'solo' ? t('开始独立模拟') : coopCreate === 'direct' ? t('直接建立') : coopCreate === 'rhine' ? t('新模式匹配') : t('匹配建房')}
+              ${roomMode === 'solo' ? t('开始独立模拟') : coopCreate === 'direct' ? '直接建立' : coopCreate === 'rhine' ? '新模式匹配' : '匹配建房'}
             <//>
           </div>
           <//>
           ${roomMode === 'coop' && matching
             ? (matchWait
-              ? html`<${Modal} open=${true} title=${t('等待超时')} micro="MATCHMAKING TIMEOUT" tone="mint" width="5rem" onClose=${leaveMatch}
+              ? html`<${Modal} open=${true} title="等待超时" micro="MATCHMAKING TIMEOUT" tone="mint" width="5rem" onClose=${leaveMatch}
                   actions=${html`
-                    <${Button} variant="secondary" icon="clock" onClick=${waitMore}>${t('继续等待')}<//>
-                    <${Button} variant="secondary" icon="bot" onClick=${topUp}>${t('加AI开始')}<//>
-                    <${Button} variant="primary" icon="play" onClick=${startNow}>${t('不加AI开始')}<//>
-                    <${Button} variant="ghost" icon="x" onClick=${leaveMatch}>${t('取消')}<//>
+                    <${Button} variant="secondary" icon="clock" onClick=${waitMore}>继续等待<//>
+                    <${Button} variant="secondary" icon="bot" onClick=${topUp}>加AI开始<//>
+                    <${Button} variant="primary" icon="play" onClick=${startNow}>不加AI开始<//>
+                    <${Button} variant="ghost" icon="x" onClick=${leaveMatch}>取消<//>
                   `}>
                   <div class="match-timeout__body">
-                    <span class="t-lo">${t('当前匹配到 {matchCount} 名博士', { matchCount })}</span>
+                    <span class="t-lo">当前匹配到 ${matchCount} 名博士</span>
                     <span class="num match-timeout__n">${matchCount}<span class="t-dim">/${matchTarget}</span></span>
                   </div>
                 <//>`
               : html`<div class="match-queue">
-                  <span class="t-lo">${t('正在匹配队友…（{matchTarget} 人满员即自动开局）', { matchTarget })}</span>
+                  <span class="t-lo">正在匹配队友…（${matchTarget} 人满员即自动开局）</span>
                   <span class="num match-queue__count">${matchCount}<span class="t-dim">/${matchTarget}</span></span>
-                  <${Button} variant="ghost" size="sm" icon="x" onClick=${leaveMatch}>${t('取消')}<//>
+                  <${Button} variant="ghost" size="sm" icon="x" onClick=${leaveMatch}>取消<//>
                 </div>`)
             : null}
           <div class="create-box__hint">
             ${online
               ? html`<span>${roomMode === 'solo' ? t('创建后即可开始模拟')
-                  : coopCreate === 'direct' ? t('创建即莱茵扩展，可邀请好友 / 添加 AI；房内可切回原版')
-                  : coopCreate === 'rhine' ? t('新模式匹配：进公共池，满 4 人自动开局；未满时可继续等待或加 AI')
-                  : t('原版玩法：进入公共匹配池，20 秒内满 4 人自动开局；未满时可继续等待或加 AI')}</span>`
+                  : coopCreate === 'direct' ? '创建即莱茵扩展，可邀请好友 / 添加 AI；房内可切回原版'
+                  : coopCreate === 'rhine' ? '新模式匹配：进公共池，满 4 人自动开局；未满时可继续等待或加 AI'
+                  : '原版玩法：进入公共匹配池，20 秒内满 4 人自动开局；未满时可继续等待或加 AI'}</span>`
               : html`<${Spinner} size="sm" label="CONNECTING" />`}
           </div>
         </div>

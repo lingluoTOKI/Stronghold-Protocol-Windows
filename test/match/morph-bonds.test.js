@@ -12,7 +12,6 @@ import assert from 'node:assert/strict';
 import { makeMatch, give, giveItem, DATA, legalTileFor } from './harness.js';
 import { unitBonds, isMember } from '../../server/sim/content/support/index.js';
 import { unitInfo } from '../../server/sim/snapshot.js';
-import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 
 const ISO = 'chess_item_6_09_e_a';
 const ISO_B = 'chess_item_6_09_e_b';
@@ -75,9 +74,8 @@ test('缪尔赛思 hands out 变形同构体 on purchase (garrison_76), the boug
 
 test('every pairing (18 bond items × normal / golden, both 变形同构体): the wearer counts in prep, in the views, in the battle input and in the real battle', () => {
   const grants = Object.values(DATA.items).filter((r) => r.giveBondId);
-  // upstream lists 14 bond-granting items pairings; the Rhine overlay adds the 莱茵实验终端 → rhineShip (one more item, normal + golden).
-  assert.equal(grants.length, DATA_PROFILE === 'vanilla' ? 36 : 38);
-  assert.equal(new Set(grants.map((r) => r.giveBondId)).size, DATA_PROFILE === 'vanilla' ? 14 : 15, '14 bonds upstream (+rhineShip) have a bond item');
+  assert.equal(grants.length, 36);
+  assert.equal(new Set(grants.map((r) => r.giveBondId)).size, 14, '14 bonds have a bond item (the official talent\'s list)');
   for (const r of grants) {
     const bond = r.giveBondId;
     const iso = r.isGolden ? ISO_B : ISO; // golden bond items with the golden 变形同构体, normal with normal

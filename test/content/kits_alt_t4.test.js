@@ -1,5 +1,5 @@
 // Tier-4 operator loadouts (DESIGN §16): every selectable NON-default skill of every visible tier-4 chess has a
-// hand-authored spec in its kit file (server/sim/content/kits/ops/, `skills[skillId]`), proven here by its signature effect for
+// hand-authored spec in server/sim/content/kits/tier4.js (`skills[skillId]`), proven here by its signature effect for
 // the normal (Lv4) and the elite (Lv7) chess; non-default modules (and 'none') change what their text says. Numbers
 // are read back from the data blackboards (the SELECTED skill's `bb`), real battles through the harness.
 import { test } from 'node:test';
@@ -8,14 +8,9 @@ import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.
 import { getDefaultSource } from '../../server/sim/simdata.js';
 import { loadoutOptions } from '../../shared/protocol.js';
 import { skillSpecSource } from '../../server/sim/content/index.js';
-import { KITS, KITS_RHINE } from '../../server/sim/content/kits/index.js';
-import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 import { kitCoverage } from '../../tools/kit-coverage.mjs';
 import { canTargetAlly } from '../../server/sim/targeting.js';
 import { aggregateMods } from '../../server/sim/buffs.js';
-
-// Audit coverage against KITS_RHINE under the Rhine profile, otherwise the Rhine preset chess look uncovered.
-const ACTIVE_KITS = DATA_PROFILE === 'rhine' ? KITS_RHINE : KITS;
 
 const ds = getDefaultSource();
 const C = ds.raw.chess;
@@ -45,14 +40,14 @@ function battle(units, o = {}) {
 // coverage + smoke
 
 test('tier4 loadouts: every selectable skill of every visible chess is hand-authored (normal + elite)', () => {
-  const rep = kitCoverage({ tier: 4, kits: ACTIVE_KITS });
-  assert.equal(rep.summary.chess, DATA_PROFILE === 'vanilla' ? 22 : 23);
+  const rep = kitCoverage({ tier: 4 });
+  assert.equal(rep.summary.chess, 22);
   assert.equal(rep.summary.covered, rep.summary.skills, JSON.stringify(rep.chess.flatMap((r) => r.skills.filter((s) => !s.covered).map((s) => `${r.name} S${s.index + 1}`))));
   for (const base of T4) {
     const { skills } = loadoutOptions(C[base], C[gold(base)]);
     for (const i of skills) {
       if (C[base].skills.find((s) => s.index === i).isDefault) continue;
-      for (const id of pair(base)) assert.equal(skillSpecSource(D(id, i), ACTIVE_KITS), 'skills', `${id} S${i + 1}`);
+      for (const id of pair(base)) assert.equal(skillSpecSource(D(id, i)), 'skills', `${id} S${i + 1}`);
     }
   }
 });
@@ -802,7 +797,7 @@ test('星熊 module PRO-X 护身符: DEF +20 % while blocking', () => {
   approx(def(null, true), def(null, false), 1e-9);
 });
 
-test('泥岩 S1 防御力强化·γ型 (TAKE_DAMAGE) and S3 秽壤的血脉 (闭锁: invulnerable, no attack, blocks nobody — the enemies she held walk on —, slow; then stun, buffs, hits all blocked)', () => {
+test('泥岩 S1 防御力强化·γ型 (TAKE_DAMAGE) and S3 秽壤的血脉 (dormant & invulnerable & blocking, slow; then stun, buffs, hits all blocked)', () => {
   for (const id of pair('chess_char_4_18_a')) {
     const b1 = D(id, 0).skill.bb, sk = D(id, 2).skill, b3 = sk.bb;
     let h = battle([U(id, 10, 4, 0)], { enemies: { enemy_hitter: dummy({ key: 'enemy_hitter', atk: 300, bat: 1 }) } });
@@ -817,32 +812,21 @@ test('泥岩 S1 防御力强化·γ型 (TAKE_DAMAGE) and S3 秽壤的血脉 (闭
     for (let i = 0; i < 3; i++) h.spawn('e_walk', { routeIndex: 0 });
     u = h.unit(id);
     assert.ok(h.runUntil(() => u.blocking.length === 3, 30), 'blocks three walkers');
-    const walkers = u.blocking.slice();
     const hp0 = u.hp;
     assert.ok(u.skill.activate('test', { free: true }));
     const t0 = h.b.time;
-    h.step();
-    // 闭锁 (PRTS 备注 "实际将会进入闭锁状态"; PRTS 异常效果 闭锁 = 强制缴械 + 无敌 + 不可阻挡, 不可阻挡 "无法阻挡/被阻挡，自动解除阻挡")
-    assert.ok(u.blocking.length === 0 && walkers.every((e) => e.blockedBy !== u), `${id}: 闭锁 lets go of the enemies she held`);
-    assert.ok(walkers.every((e) => e.findBuff(`mudrok:slow:${u.id}`)), 'enemies around slowed');
-    const x0 = walkers.map((e) => e.x);
-    h.run(1);
-    assert.ok(walkers.every((e, i) => e.removed || e.x < x0[i] - 0.05), `${id}: they walk on`);
-    h.run(b3.sleep - 2.5);
+    h.run(b3.sleep - 1);
     assert.equal(u.hp >= hp0 - 1e-6, true, `${id}: no damage while dormant`);
-    assert.equal(u.blocking.length, 0, `${id}: blocks nobody while dormant`);
+    assert.equal(u.blocking.length, 3, 'keeps blocking');
     assert.equal(h.hooksOf('attack').filter((c) => c.attacker === u && c.t > t0).length, 0, 'cannot act');
-    const near = [0, 1, 2].map(() => h.spawn('enemy_dummy', { pos: [9, 5] }));   // on her tile before she wakes
-    h.step();
-    assert.equal(u.blocking.length, 0, `${id}: not blocked before she wakes`);
-    assert.ok(h.runUntil(() => !!u.findBuff('mudrok:awake'), 2), 'awake');
-    h.run(0.2);
-    for (const e of near) assert.ok(e.s.flags.stun, 'ground enemies around stunned');
+    assert.ok(u.blocking.every((e) => e.findBuff(`mudrok:slow:${u.id}`)), 'enemies around slowed');
+    h.run(1.2);
+    assert.ok(u.findBuff('mudrok:awake'), 'awake');
+    for (const e of u.blocking) assert.ok(e.s.flags.stun, 'ground enemies around stunned');
     approx(u.s.atk, u.base.atk * (1 + b3.atk) * (u.findBuff('mudrok:module') ? 1 + (u.def.traitBb.atk ?? 0) : 1), 1e-6, 'ATK');
     approx(u.s.interval, (u.base.bat + b3.base_attack_time) * 100 / u.s.aspd, 1e-6, 'BAT −0.3 s');
     assert.ok(h.runUntil(() => h.hooksOf('attack').some((c) => c.attacker === u && c.t > t0), 5));
     assert.equal(h.hooksOf('attack').find((c) => c.attacker === u && c.t > t0).targets.length, 3, 'attacks every blocked enemy');
-    assert.ok(h.runUntil(() => u.blocking.length === 3, 4), `${id}: she blocks again once awake (their stun over)`);
     h.runUntil(() => !u.skill.active, sk.duration);
     assert.ok(!u.findBuff('mudrok:awake'));
     checkInvariants(h.b);

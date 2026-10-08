@@ -13,13 +13,12 @@ import {
 } from '../../public/js/ui/assetUrls.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const { loadDataJson } = await import('../helpers/dataFile.mjs');
-const load = (f) => loadDataJson(f.replace(/\.json$/, ''));
+const load = (f) => JSON.parse(readFileSync(path.join(ROOT, 'data', f), 'utf8'));
 const m = load('assets.json');
 const chess = load('chess.json');
 
 function manifestUrls(obj, out = new Set()) {
-  if (typeof obj === 'string' && (obj.startsWith('/assets/') || obj.startsWith('/art/'))) out.add(obj);
+  if (typeof obj === 'string' && obj.startsWith('/assets/')) out.add(obj);
   else if (obj && typeof obj === 'object') for (const v of Object.values(obj)) manifestUrls(v, out);
   return out;
 }

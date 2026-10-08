@@ -1,23 +1,17 @@
 # Windows 开箱即用方案（启动器 · 便携包）
 
-本文是 Windows 玩家的「零安装」指南，也说明了**本机当服务器**、**联机（本机客户端）**、**连接服务器**
-三种玩法的差别。
+本文是 Windows 玩家的「零安装」指南，也说明了**连接服务器**与**本机当服务器**两种玩法的差别。
 相关代码：`scripts/make-windows-bundle.mjs`（打包）、`scripts/launcher.mjs`（开始界面）、
 `scripts/open-browser.mjs`（用默认浏览器打开页面）、`scripts/launch.mjs`（起服务器）。
 
-## 1. 三条路，先选一条
+## 1. 两条路，先选一条
 
 | 玩法 | 谁在跑服务器 | 素材从哪来 | 适合 |
 |---|---|---|---|
 | **本机当服务器** | 这台 Windows 电脑（便携包自带 Node） | 本机 | 自己玩、或局域网里和同宿舍/同办公室的朋友玩 |
-| **联机（本机客户端）** | 别人的服务器（例如 `game.example.com`） | **本机** | 想连线上服务器，又要加载快、不费流量 |
-| **连接服务器** | 别人的服务器（例如 `game.example.com`） | 对方（就是打开对方网页） | 本机什么都不想装、不想开服务 |
+| **连接服务器** | 别人的服务器（例如 `game.example.com`） | 对方（就是打开对方网页） | 想连别人的服务器，本机什么都不用装、不用开服务 |
 
-「**联机（本机客户端）**」是便携包最划算的用法：页面与约 330 MB 素材全部从**本机磁盘**读，素材一次网络都不走；
-只有 `/ws`（联机对战）与 `/api/*`（公告、在线人数）转发给对方的服务器。所以进对局最快，也几乎不耗流量。
-对服务器来说你只是一个普通网页玩家 —— **客户端代码一行都不用改**，网页版和它永远是同一份。
-
-「**连接服务器**」不做任何花活：**用你的默认浏览器打开对方那个网址**，和你在浏览器里直接输网址是同一件事。
+「连接服务器」不做任何花活：**用你的默认浏览器打开对方那个网址**，和你在浏览器里直接输网址是同一件事。
 本机不需要跑服务、不需要素材，关掉启动器也不影响你那边的对局。
 
 开始界面（启动器菜单）长这样：
@@ -27,11 +21,10 @@
   卫戍协议：盟约 · Stronghold Protocol  启动器
   端口 3000 · 局域网共享 开
 
-   [1] 本机当服务器      在这台电脑开服，浏览器自动打开，可把局域网地址发给朋友
-   [2] 联机（本机客户端）用本机素材连别人的服务器：加载最快，素材一次网络都不走
-   [3] 连接服务器        用浏览器直接打开别人的服务器（页面与素材从对方下载）
-   [4] 设置              端口 / 局域网共享
-   [5] 查看状态
+   [1] 本机当服务器  在这台电脑开服，浏览器自动打开，可把局域网地址发给朋友
+   [2] 连接服务器    用浏览器直接打开别人的服务器（页面与素材从对方下载）
+   [3] 设置          端口 / 局域网共享
+   [4] 查看状态
    [0] 退出
 ───────────────────────────────────────────────────────────────
 ```
@@ -45,8 +38,6 @@ node scripts/make-windows-bundle.mjs --zip        # 产物默认在 <仓库上�
 node scripts/make-windows-bundle.mjs --out D:\Game --zip --force
 node scripts/make-windows-bundle.mjs --no-node    # 目标机器已装 Node 22+ 时不必带便携 Node
 node scripts/make-windows-bundle.mjs --keep-webfonts   # 保留 index.html 里的 Google Fonts 外链
-node scripts/make-windows-bundle.mjs --zip --server game.example.com
-                                                  # 把联机地址烤进包：玩家解压后双击「联机.bat」直接进线上
 ```
 
 产出的始终是 **Windows** 包（内含 win-x64 的 `node.exe`），但它**可以在 macOS / Linux 上打**：
@@ -61,8 +52,7 @@ app\                     游戏本体：代码 + 生产依赖 + public（全部�
 app\scripts\launcher.mjs 开始界面
 启动游戏.bat             双击开始（菜单）
 本机当服务器.bat         等于菜单 [1]
-联机.bat                 等于菜单 [2]（本机素材 + 远程服务器）
-连接服务器.bat           等于菜单 [3]
+连接服务器.bat           等于菜单 [2]
 README-开箱即用.md       给玩家看的说明（含非官方 / 严禁盈利声明）
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 ```
@@ -109,7 +99,6 @@ Node 版本与 sha256 **钉死在 `scripts/make-windows-bundle.mjs` 的 `NODE_PI
 node scripts/launcher.mjs                              # 菜单（开始界面）
 node scripts/launcher.mjs --mode local                 # 本机当服务器
 node scripts/launcher.mjs --mode local --port 3001 --no-open
-node scripts/launcher.mjs --mode proxy --server game.example.com    # 联机：本机素材 + 远程服务器
 node scripts/launcher.mjs --mode connect --server game.example.com
 node scripts/launcher.mjs --mode status                # 本机 + 上次连接的服务器状态
 node scripts/launcher.mjs --mode settings              # 端口 / 局域网共享
@@ -118,7 +107,7 @@ node scripts/launcher.mjs --mode settings              # 端口 / 局域网共�
 设置保存在 `app\scripts\launcher.config.json`（端口、是否局域网共享、上次连接的地址；不进版本库）。
 在源码目录里直接跑也一样：`node scripts/launcher.mjs`（此时用系统安装的 Node）。
 
-## 4. 连服务器 / 联机：地址怎么写
+## 4. 连接服务器：地址怎么写
 
 * `game.example.com`、`https://game.example.com`、`192.168.1.23:3000` 都可以；
   **没写协议时**：本机 / 内网 / 点对点地址用 `http`，其余域名默认 `https`（内网一般没有证书）。
@@ -129,26 +118,7 @@ node scripts/launcher.mjs --mode settings              # 端口 / 局域网共�
   再问你要不要用浏览器打开。连不上会直接告诉你，不会开个空白页。
 * 显式写了 `https://` 就以 https 为准。
 
-## 5. 联机（本机客户端）：本机素材 + 远程服务器
-
-菜单选 [2]（或 `联机.bat`、`--mode proxy --server <地址>`）后，启动器会：
-
-1. 先探一下那个地址能不能连上（`/api/client-config`，老服务器退回 `/healthz`）；连不上就直接告诉你，**不起服务、不开空白页**；
-2. 在本机 `127.0.0.1:<端口>` 起一个**反向代理**：页面、`/js`、`/css`、`/data`、`/vendor` 与全部素材都从本机磁盘读；
-3. 只把 `/ws`（联机对战）与 `/api/*`（公告、在线人数、房间数）转发给对方的服务器，然后打开浏览器。
-
-因此**素材一次网络都不走**，进对局最快、也几乎不耗流量；对方服务器只看到一条普通的 WebSocket 连接。
-
-几点值得知道的：
-
-* **只监听 `127.0.0.1`**，不对外开端口（这点与「本机当服务器」相反，那个才会监听局域网）。没有额外的暴露面。
-* **与网页版是同一份客户端代码**。服务器地址只来自启动器配置 / 环境变量（`SP_PROXY_TO`），**不接受 URL 参数** ——
-  会话凭证按**源**存在浏览器里，一个能被链接改写指向的主机，等于把凭证交给链接里那台机器。
-* **昵称与设置不共享**：本机客户端跑在 `http://127.0.0.1:<端口>`，网页版跑在对方域名下，浏览器按源隔离存储，两边是两套。
-* **协议版本必须一致**：服务器强制校验 `PROTOCOL_VERSION`，不一致会拒绝 `hello` —— 这通常意味着**便携包该换新版了**。
-* 上游不可达时，页面与素材照常打开，只有联机相关的接口会报错。
-
-## 6. 局域网联机（本机当服务器）
+## 5. 局域网联机（本机当服务器）
 
 1. 菜单选 [1]，等控制台出现「发给朋友」的地址（形如 `http://192.168.1.23:3000`）。
 2. Windows 防火墙弹窗勾选**允许专用网络**；漏点了就运行 `node tools/doctor.mjs`（或看
@@ -159,7 +129,7 @@ node scripts/launcher.mjs --mode settings              # 端口 / 局域网共�
 的 TUN 地址（198.18.x.x，RFC 2544 基准测试段）也不会作为「公网 IP」列出来；Tailscale / ZeroTier / Radmin VPN
 之类的点对点地址会标成 VPN（只有装了同一 VPN 的人能用）。
 
-## 7. 常见问题
+## 6. 常见问题
 
 | 症状 | 处理 |
 |---|---|
@@ -169,13 +139,11 @@ node scripts/launcher.mjs --mode settings              # 端口 / 局域网共�
 | 浏览器没自动打开 | 手动访问 `http://127.0.0.1:<端口>`；`--no-open` / `SP_NO_BROWSER=1` 会禁用自动打开；想指定浏览器就设 `SP_BROWSER`（如 `SP_BROWSER="C:\Program Files\Mozilla Firefox\firefox.exe"`） |
 | 打开时弹出 Edge「现有实例正在以提升的权限运行」 | 启动器把地址交给 shell（`explorer.exe <url>`）转发给**默认浏览器**，不会再把浏览器拉成提权；但如果你之前已经用管理员身份开过 Edge，它自己还会拦一次 —— 在任务管理器里彻底结束 `msedge` 再打开，或答「是」让它以普通权限重启即可 |
 | 连接服务器时连不上 | 检查地址与协议（见第 4 节）；对方服务器没在跑时启动器已经会提示 |
-| 联机（本机客户端）连不上 | 同上；启动器会在**起本机服务之前**先探活，失败就直接返回，不会开个空白页 |
-| 联机时提示协议版本不一致 | 服务端换过 `PROTOCOL_VERSION`，便携包需要换新版（网页版刷新即可） |
 | 朋友连不上 | 防火墙专用网络未放行、或不在同一网段；用 `node tools/doctor.mjs` 诊断 |
 | 进游戏时弹出「下载文件信息」 | 那是 IDM / 迅雷这类下载管理器在嗅探音频地址，不是游戏在下载：游戏只用 `fetch` + Web Audio 播放，音频走的是无扩展名的 `/media/…` 路由（源码 `server/index.js` 的 `serveMedia`、前端 `public/js/media.js`）。仍被拦住就在下载器里加例外（如 `http://127.0.0.1:3000/*`）或玩游戏时退出它 |
 | 首次进游戏很慢 | 每位玩家要下载几十 MB 素材，之后走浏览器缓存 |
 
-## 8. 安全与体积说明
+## 7. 安全与体积说明
 
 * 便携包里的 `node.exe` 来自 nodejs.org 官方发行版，**按仓库里钉死的 sha256 校验**后才复制，未做任何修改；
   同时取出同一个归档里的 `LICENSE` 作为 `node\LICENSE-node.txt` 一起发出去。

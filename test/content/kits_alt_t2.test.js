@@ -1,4 +1,4 @@
-// Operator loadouts (DESIGN §16) for the tier-2 kits (server/sim/content/kits/ops/): every selectable NON-default
+// Operator loadouts (DESIGN §16) for the tier-2 kits (server/sim/content/kits/tier2.js): every selectable NON-default
 // skill of every visible tier-2 chess is hand-authored (tools/kit-coverage.mjs) and shows its signature effect for the
 // normal (Lv4) and the elite (Lv7) chess — numbers from the selected skill's blackboard (data/chess.json skills[]) —
 // and the elite's module choice ('none' instead of the default module) changes what the kit / profile does.
@@ -7,14 +7,9 @@ import assert from 'node:assert/strict';
 import { makeBattle, enemyRec, chessRec, checkInvariants } from '../helpers/battleHarness.js';
 import { getDefaultSource } from '../../server/sim/simdata.js';
 import { KITS, skillSpecSource } from '../../server/sim/content/index.js';
-import { KITS_RHINE } from '../../server/sim/content/kits/index.js';
-import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 import { kitCoverage } from '../../tools/kit-coverage.mjs';
 
 const ds = getDefaultSource();
-// kitCoverage / skillSpecSource default to the pristine upstream KITS; under the Rhine profile audit KITS_RHINE so the
-// Rhine preset chess (chess_rhine_*) resolve to their Rhine-authored skills.
-const ACTIVE_KITS = DATA_PROFILE === 'rhine' ? KITS_RHINE : KITS;
 const raw = (id) => ds.rawChess(id);
 /** The selectable non-default SkillRecord of a chess (tier 2 chess are E1: one alternative). */
 const alt = (id) => raw(id).skills.find((s) => !s.isDefault);
@@ -56,8 +51,8 @@ const plain = (id, o = {}) => chessRec({ id, skill: null, ...o });
 // coverage
 
 test('kit coverage: every selectable skill of every visible tier-2 chess is hand-authored (normal + elite)', () => {
-  const rep = kitCoverage({ tier: 2, kits: ACTIVE_KITS });
-  assert.equal(rep.summary.chess, DATA_PROFILE === 'vanilla' ? 17 : 18);
+  const rep = kitCoverage({ tier: 2 });
+  assert.equal(rep.summary.chess, 17);
   assert.equal(rep.summary.covered, rep.summary.skills, JSON.stringify(rep.chess.filter((r) => r.skills.some((s) => !s.covered)).map((r) => r.name)));
   for (const r of rep.chess) {
     for (const s of r.skills.filter((x) => !x.isDefault)) {
@@ -67,7 +62,7 @@ test('kit coverage: every selectable skill of every visible tier-2 chess is hand
         for (const moduleId of [null, 'none']) {
           const def = ds.getChess(id, { skillIndex: s.index, moduleId });
           assert.equal(def.skill.id, s.skillId);
-          assert.equal(skillSpecSource(def, ACTIVE_KITS), 'skills', `${id} ${s.skillId} module ${moduleId}`);
+          assert.equal(skillSpecSource(def, KITS), 'skills', `${id} ${s.skillId} module ${moduleId}`);
         }
       }
     }
@@ -365,18 +360,16 @@ test('2_12 砾 S1 影袭: at deployment DEF +def decaying to 0 over `duration` s
   }
 });
 
-test('2_13 蒂比 S1 专业喷绘技巧: ACTIVE_RANGE trigger (an enemy in its 2-3 only), takes off (skill range, ATK +atk, blocks flyers), single shots; hits never set it off', () => {
+test('2_13 蒂比 S1 专业喷绘技巧: DEFAULT trigger, takes off (skill range, ATK +atk, blocks flyers), single shots; hits never set it off', () => {
   for (const id of both('chess_char_2_13')) {
     const bb = bbAlt(id);
-    // (10,5) = [1,0]: inside S1's 2-3, outside her own 2-2 — the owner's rule of 2026-10-05 (data trigger ACTIVE_RANGE)
-    const h = run({ defs: { enemies: { e: dummy('e'), f: dummy('f', { motion: 'FLY' }) } }, units: [U(id, 9, 5, { carryState: READY })], enemies: [{ key: 'e', pos: [10, 5] }] });
+    const h = run({ defs: { enemies: { e: dummy('e'), f: dummy('f', { motion: 'FLY' }) } }, units: [U(id, 9, 5, { carryState: READY })], enemies: [{ key: 'e', pos: [9, 6] }] });
     const u = h.unit(id);
     usesAlt(u, id);
     h.step();
     const range0 = u.baseRangeKeys.length;
-    assert.ok(!u.baseRangeKeys.includes(h.b.grid.key(10, 5)), 'the enemy is outside her own range');
     h.runUntil(() => u.skill.active, 3);
-    assert.equal(started(h, u)[0].reason, 'ACTIVE_RANGE');
+    assert.equal(started(h, u)[0].reason, 'DEFAULT');
     assert.equal(u.s.flags.liftoff, true, 'airborne (起飞)');
     assert.equal(u.ground, true, 'still a ground unit on her low tile');
     approx(u.s.atk, u.base.atk * (1 + bb.atk));
@@ -747,9 +740,7 @@ test('modules: removing the elite module changes the trait / talent behaviour th
 // smoke: every loadout of every tier-2 chess fights without content errors
 
 test('every tier-2 loadout (skill × module, normal & elite) fights 30 s with its authored kit and no content errors', () => {
-  // Upstream tier-2 loadouts only: the Rhine preset chess (chess_rhine_*) are audited in the coverage test above and
-  // follow Rhine's own kit conventions (their default skill is hand-authored, unlike the upstream generic default).
-  const bases = Object.values(ds.raw.chess).filter((c) => c.tier === 2 && c.visible && !c.isGolden && /^chess_char_2_/.test(c.chessId));
+  const bases = Object.values(ds.raw.chess).filter((c) => c.tier === 2 && c.visible && !c.isGolden);
   for (const base of bases) {
     for (const id of [base.chessId, base.goldenId].filter(Boolean)) {
       const r = raw(id);

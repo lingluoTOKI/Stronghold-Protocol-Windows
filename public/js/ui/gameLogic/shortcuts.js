@@ -6,35 +6,12 @@ import { isObj } from './shared.js';
 
 // ---- the key map ------------------------------------------------------------------------------------------------
 
-/** The rebindable shortcuts in the settings' order — the UPSTREAM 0.2.0 baseline (the ready key also pauses / resumes a
- * solo battle). Anything that does not specify a profile sees exactly these six (vanilla == upstream 1303321). */
-export const HOTKEY_ACTIONS = Object.freeze(['refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'ready']);
+/** The rebindable shortcuts in the settings' order (the ready key also pauses / resumes a solo battle). Esc is fixed. */
+export const HOTKEY_ACTIONS = Object.freeze(['refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'buy', 'chat', 'speed', 'ready']);
 
-/** Default key of each upstream action (a KeyboardEvent.code): the keys of 0.1.4, so nothing changes for a player who
- * never rebinds. */
-export const DEFAULT_HOTKEYS = Object.freeze({ refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' });
-
-// Rhine-only extensions (the owner's fan build; legacy has no shortcuts file): buy / chat / battle speed. Gated to the
-// rhine profile — never present upstream, so KeyE stays idle and Space stays the only ready key under vanilla.
-export const RHINE_EXTRA_ACTIONS = Object.freeze(['buy', 'chat', 'speed']);
-export const RHINE_EXTRA_HOTKEYS = Object.freeze({ buy: 'KeyB', chat: 'KeyE', speed: 'KeyV' });
-
-/** The bindable actions for a data profile: upstream six, plus buy/chat/speed only under rhine (the extras slot in
- * before `ready`, matching the original nine-key layout). */
-export const hotkeyActionsFor = (profile) => {
-  if (profile !== 'rhine') return [...HOTKEY_ACTIONS];
-  const out = [];
-  for (const a of HOTKEY_ACTIONS) { if (a === 'ready') out.push(...RHINE_EXTRA_ACTIONS); out.push(a); }
-  return out;
-};
-
-/** The default key map for a data profile: upstream six, with buy/chat/speed added only under rhine. */
-export const defaultHotkeysFor = (profile) => (profile === 'rhine' ? { ...DEFAULT_HOTKEYS, ...RHINE_EXTRA_HOTKEYS } : { ...DEFAULT_HOTKEYS });
-
-/** The actions a given key map actually carries (its own keys) — so a 6-key upstream map never resolves buy/chat/speed
- * and a 9-key rhine map does, without the caller knowing the profile. */
-const actionsOf = (keys) => Object.keys(keys || {});
-
+/** Default key of each action (a KeyboardEvent.code): the keys of 0.1.4, so nothing changes for a player who never rebinds. */
+// 本扩展新增 buy（购买）/ chat（聊天）/ speed（战斗加速）；上游的 0.1.4 默认键位保持不变。
+export const DEFAULT_HOTKEYS = Object.freeze({ refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', buy: 'KeyB', chat: 'KeyE', speed: 'KeyV', ready: 'Space' });
 
 // The keys a shortcut may use → the `key` value each types on a US layout (lower case): letters, digits, Space, the
 // punctuation keys, and six named keys whose `key` equals their `code`. Everything else stays with the interface: Esc
@@ -75,17 +52,15 @@ export function hotkeyLabel(code) {
 
 /**
  * Sanitize a persisted key map: each action keeps a saved key that may be a shortcut, else gets its default; a map in
- * which two actions would share a key is bad data — the defaults instead. The action set and defaults come from
- * `defaults` (the upstream six by default; the nine-key rhine map under rhine), so vanilla stays byte-identical.
+ * which two actions would share a key is bad data — the defaults instead.
  * @param {any} raw
- * @param {Record<string,string>} [defaults]
- * @returns {Record<string, string>}
+ * @returns {Record<'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready', string>}
  */
-export function sanitizeHotkeys(raw, defaults = DEFAULT_HOTKEYS) {
+export function sanitizeHotkeys(raw) {
   const r = isObj(raw) && !Array.isArray(raw) ? raw : {};
   const out = {};
-  for (const a of actionsOf(defaults)) out[a] = Object.hasOwn(r, a) && isBindableCode(r[a]) ? r[a] : defaults[a];
-  return new Set(Object.values(out)).size === actionsOf(defaults).length ? out : { ...defaults };
+  for (const a of HOTKEY_ACTIONS) out[a] = Object.hasOwn(r, a) && isBindableCode(r[a]) ? r[a] : DEFAULT_HOTKEYS[a];
+  return new Set(Object.values(out)).size === HOTKEY_ACTIONS.length ? out : { ...DEFAULT_HOTKEYS };
 }
 
 /**
@@ -97,18 +72,18 @@ export function sanitizeHotkeys(raw, defaults = DEFAULT_HOTKEYS) {
  * @returns {{ keys: Record<string, string>, changed: boolean, swapped: string|null }} swapped: the action that took the old key
  */
 export function rebindHotkey(keys, action, code) {
-  const cur = { ...(isObj(keys) && !Array.isArray(keys) ? keys : DEFAULT_HOTKEYS) };
-  if (!actionsOf(cur).includes(action) || !isBindableCode(code) || cur[action] === code) return { keys: cur, changed: false, swapped: null };
-  const swapped = actionsOf(cur).find((a) => cur[a] === code) ?? null;
+  const cur = sanitizeHotkeys(keys);
+  if (!HOTKEY_ACTIONS.includes(action) || !isBindableCode(code) || cur[action] === code) return { keys: cur, changed: false, swapped: null };
+  const swapped = HOTKEY_ACTIONS.find((a) => cur[a] === code) ?? null;
   const next = { ...cur, [action]: code };
   if (swapped) next[swapped] = cur[action];
   return { keys: next, changed: true, swapped };
 }
 
-/** Whether a map is the default one (its own default set). @param {any} keys @param {Record<string,string>} [defaults] */
-export const isDefaultHotkeys = (keys, defaults = DEFAULT_HOTKEYS) => {
-  const k = sanitizeHotkeys(keys, defaults);
-  return actionsOf(defaults).every((a) => k[a] === defaults[a]);
+/** Whether a map is the default one. @param {any} keys */
+export const isDefaultHotkeys = (keys) => {
+  const k = sanitizeHotkeys(keys);
+  return HOTKEY_ACTIONS.every((a) => k[a] === DEFAULT_HOTKEYS[a]);
 };
 
 /**
@@ -132,10 +107,8 @@ export function hotkeyOf(e) {
  * @returns {'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready'|null}
  */
 export function actionForKey(e, keys = DEFAULT_HOTKEYS) {
-  // A saved map is valid when every action has exactly one distinct key; a corrupt one (two actions on one key) acts as
-  // the upstream defaults, never resolving the doubled key.
-  const clean = (keys && Object.keys(keys).length && new Set(Object.values(keys)).size === Object.keys(keys).length) ? keys : DEFAULT_HOTKEYS;
-  const find = (code) => (code ? actionsOf(clean).find((a) => clean[a] === code) ?? null : null);
+  const map = keys === DEFAULT_HOTKEYS ? keys : sanitizeHotkeys(keys);
+  const find = (code) => (code ? HOTKEY_ACTIONS.find((a) => map[a] === code) ?? null : null);
   return find(CODE_OF.get(keyValue(e))) ?? find(typeof e?.code === 'string' ? e.code : null);
 }
 

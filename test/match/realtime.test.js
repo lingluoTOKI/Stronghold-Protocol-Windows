@@ -14,7 +14,6 @@ import { TestClient } from '../helpers/wsClient.js';
 import { attachWsSimClient } from './simClient.js';
 import { DataSource } from '../../server/sim/simdata.js';
 import { getData } from '../../server/data.js';
-import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 
 const DS = new DataSource(getData({ log: { warn() {}, error() {}, info() {} } }), null);
 
@@ -164,7 +163,7 @@ test('real-time co-op over websockets with the real simulation: 2 humans + 2 AI 
   srv = await startServer({ port: 0, host: '127.0.0.1', log, MatchClass: RealtimeMatch, seedFn: () => 20260928 });
   const a = await player('Alpha');
   const b = await player('Bravo');
-  assert.equal((await a.request({ t: 'room.create', mode: 'coop', difficulty: 'NORMAL', rhineEnabled: DATA_PROFILE === 'rhine' })).t, 'ok');
+  assert.equal((await a.request({ t: 'room.create', mode: 'coop', difficulty: 'NORMAL' })).t, 'ok');
   const st = await a.waitFor('room.state');
   assert.equal((await b.request({ t: 'room.join', code: st.code })).t, 'ok');
   assert.equal((await a.request({ t: 'room.addBot' })).t, 'ok');
@@ -230,8 +229,6 @@ test('real-time co-op over websockets with the real simulation: 2 humans + 2 AI 
   for (const ps of m.order.filter((p) => p.isBot && p.alive)) assert.ok(ps.deployCount >= 3, `${ps.playerId} deployed ${ps.deployCount}`);
 
   // both humans leave: the match ends as abandoned exactly once and the room returns to the lobby
-  // (let the per-connection request bucket refill first — rhine's prep loop drains it closer to the burst cap)
-  await delay(500);
   assert.equal((await a.request({ t: 'g.leave' })).t, 'ok');
   assert.equal((await b.request({ t: 'g.leave' })).t, 'ok');
   await delay(50);

@@ -8,7 +8,6 @@ import { makeMatch, give, giveItem, DATA, legalTileFor } from '../match/harness.
 import { createRegistry } from '../../server/match/effectsMeta.js';
 import { lendItemEffects, itemGrants, PRIO_REVIVE } from '../../server/sim/content/items/battle.js';
 import { unitBonds } from '../../server/sim/content/support/index.js';
-import { DATA_PROFILE } from '../helpers/dataFile.mjs';
 
 const QUIET = { warn() {}, error() {}, info() {} };
 const REG = createRegistry({ log: QUIET });
@@ -684,10 +683,10 @@ test('变形同构体: carrier counts as a member of the other item\'s giveBondI
   assert.deepEqual([...unitBonds(h.unit('t_op'))], ['lateranoShip']);
   const h2 = fight({ units: [{ chessId: 't_op', row: 10, col: 4, items: [A('4_08')] }] });
   assert.deepEqual([...unitBonds(h2.unit('t_op'))], [], 'the bond item alone grants nothing');
-  // every giveBondId item grants its bond (14 bonds upstream; the Rhine overlay adds one more item + bond)
+  // every giveBondId item grants its bond (14 bonds)
   const grants = Object.values(DATA.items).filter((r) => r.giveBondId && !r.isGolden);
-  assert.equal(grants.length, DATA_PROFILE === 'vanilla' ? 18 : 19);
-  assert.equal(new Set(grants.map((r) => r.giveBondId)).size, DATA_PROFILE === 'vanilla' ? 14 : 15);
+  assert.equal(grants.length, 18);
+  assert.equal(new Set(grants.map((r) => r.giveBondId)).size, 14);
   for (const r of grants) {
     const hh = fight({ units: [{ chessId: 't_op', row: 10, col: 4, items: [r.id, A('6_09')] }] });
     assert.ok(unitBonds(hh.unit('t_op')).includes(r.giveBondId), r.id);
@@ -945,49 +944,6 @@ test('拟态物质: owning 2 copies gives the 3rd (→ elite); otherwise a rando
   cover(A('5_05'), B('5_05'));
 });
 
-test('拟态物质 with 2 copies owned and none left in the pool gives nothing — never a same-bond operator; with copies left the 3rd still merges (GitHub #207)', () => {
-  // the report: an elite 溯光星源 (3 of the Ⅵ阶's 5 copies) and 2 normal ones — the pool is empty, the item text's 否则
-  // (a random same-bond operator) is only for fewer than 2 owned
-  const cid = 'chess_char_6_16_a';
-  const elite = DATA.chess[cid].goldenId;
-  const chessIn = (ps) => [...ps.board.values(), ...ps.hand, ...ps.temp].filter((p) => p && p.kind === 'chess').map((p) => p.id).sort();
-  for (const item of [A('5_05'), B('5_05')]) {
-    const { m, ps, equip } = setup({ seed: 9 });
-    give(m, ps, elite, 'hand');
-    const t = give(m, ps, cid, 'hand');
-    give(m, ps, cid, 'hand');
-    assert.equal(m.pool.left(cid), 0, 'elite 3 + 2 normal = the pool cap 5');
-    const before = chessIn(ps);
-    const got = spyGrants(ps);
-    const it = giveItem(m, ps, item);
-    assert.deepEqual(equip(it, t), OK, item);
-    assert.deepEqual(got, [], `${item}: nothing granted`);
-    assert.deepEqual(chessIn(ps), before, `${item}: no other operator, no second elite`);
-    assert.ok(!ps.find(it.uid), `${item}: consumed`);
-  }
-  // 2 normal copies, no elite, the pool drained by other players: nothing either
-  {
-    const { m, ps, equip } = setup({ seed: 9 });
-    const t = give(m, ps, cid, 'hand');
-    give(m, ps, cid, 'hand');
-    m.pool.take(cid, m.pool.left(cid));
-    const got = spyGrants(ps);
-    assert.deepEqual(equip(giveItem(m, ps, A('5_05')), t), OK);
-    assert.deepEqual(got, []);
-    assert.deepEqual(chessIn(ps), [cid, cid]);
-  }
-  // 2 normal copies with copies left: the 3rd merges into the elite
-  {
-    const { m, ps, equip } = setup({ seed: 9 });
-    const t = give(m, ps, cid, 'hand');
-    give(m, ps, cid, 'hand');
-    assert.equal(m.pool.left(cid), 3);
-    assert.deepEqual(equip(giveItem(m, ps, A('5_05')), t), OK);
-    assert.deepEqual(chessIn(ps), [elite]);
-    assert.equal(m.pool.left(cid), 2, 'the elite holds 3 copies');
-  }
-});
-
 test('博士投影: golden promotes at once; normal stays equipped and promotes at the next round start', () => {
   const { h, m, ps, equip } = setup();
   const cid = plain((c) => c.tier === 2)[0];
@@ -1181,10 +1137,6 @@ test('merging: two identical normal items become the golden one (upgradeNum 2); 
 test('coverage: every equipment (normal + golden) and every Art is exercised by a test above', () => {
   // items whose numbers are asserted in the stat table, the proc tests or the meta tests
   const missing = Object.keys(DATA.items).filter((id) => !COVER.has(id)).sort();
-  // the 4 Rhine overlay research-device items (科研装置 mainframe/terminal a/b) are exercised by the Rhine-specific
-  // item tests, not this upstream-coverage file.
-  assert.deepEqual(missing, DATA_PROFILE === 'vanilla'
-    ? []
-    : ['chess_item_rhine_mainframe_a', 'chess_item_rhine_mainframe_b', 'chess_item_rhine_terminal_a', 'chess_item_rhine_terminal_b']);
-  assert.equal(Object.keys(DATA.items).length, DATA_PROFILE === 'vanilla' ? 115 : 119);
+  assert.deepEqual(missing, []);
+  assert.equal(Object.keys(DATA.items).length, 115);
 });

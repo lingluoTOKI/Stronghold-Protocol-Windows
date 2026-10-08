@@ -51,10 +51,6 @@ export class MatchViews {
       serverNow: this.sched.now(),
       modeId: this.modeId,
       difficulty: this.difficulty,
-      // The room's fixed ruleset: the client selects its data profile from this on every m.public (an absent flag
-      // otherwise defaulted to Rhine and rendered the Rhine bond in a 原版 room's briefing).
-      rhineEnabled: this.rhineEnabled !== false,
-      dataProfile: this.dataProfile || (this.rhineEnabled === false ? 'vanilla' : 'rhine'),
       stageId: this.stageId,
       factions: this.factions.slice(),
       disabledBonds: [...new Set([...this.disabledBonds, ...this.staticInactiveBonds])].sort(),

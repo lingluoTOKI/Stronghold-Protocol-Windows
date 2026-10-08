@@ -235,9 +235,7 @@ function wireNet() {
   net.on('m.public', (msg) => {
     matchAt = Date.now();
     publicOrder = ++pushOrder;
-    // Fall back to the room's flag: an older/partial m.public without rhineEnabled must not reset the client to the
-    // Rhine profile (dataProfileId(undefined) defaults to rhine).
-    void prepareDataProfile(msg.rhineEnabled ?? store.get().room?.rhineEnabled);
+    void prepareDataProfile(msg.rhineEnabled);
     store.patch('match', { public: payload(msg) });
     maybeFinishRestore();
   });
@@ -311,7 +309,7 @@ function App() {
     <div class="app-bg" aria-hidden="true"></div>
     ${error ? html`<${ScreenCrashed} error=${error} reset=${resetError} />`
       : route === 'game' && !dataReady ? html`<div class="screen gload"><${Spinner} size="lg" label="LOADING DATA" />
-          <p class="t-lo" role="status">${dataError || t('正在载入本局模拟数据…')}</p></div>`
+          <p class="t-lo" role="status">${dataError || '正在载入本局模拟数据…'}</p></div>`
       : html`<${Screen} key=${route} />`}
     <${ConnectionBanner} />
     <${ToastHost} />

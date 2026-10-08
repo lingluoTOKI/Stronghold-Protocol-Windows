@@ -260,16 +260,13 @@
 .gm__bonds .bslot, .gm__bonds .bstrip__more { pointer-events: auto; }
 .gm__bond-list { min-width: 0; }
 /* The hidden list leaves no hit area over the board; only this compact tab can reopen it (GitHub #142). */
-/* A bare arrow (the owner's request after 0.2.0: the boxed 「收起」 tab looked heavy): transparent, half-visible until
-   hovered or focused; the 44 × 44 touch target stays (an invisible hit area), the name is the aria-label. */
 .gm__bonds .bonds-toggle { pointer-events: auto; flex: none; display: inline-flex; align-items: center; justify-content: center;
-.gm__bonds .bonds-toggle { pointer-events: auto; flex: none; display: inline-flex; align-items: center; justify-content: center;
-  min-width: 44px; min-height: 44px; padding: 0; color: var(--text-hi); background: transparent; border: 0; cursor: pointer;
-  opacity: .55; transition: opacity var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out); line-height: 1; }
-.bonds-toggle .icon { width: max(.22rem, 18px); height: max(.22rem, 18px); filter: drop-shadow(0 0 2px rgba(0, 0, 0, .85)); }
-.bonds-toggle[aria-expanded="false"] { opacity: .8; }
-.bonds-toggle:hover, .bonds-toggle:focus-visible { opacity: 1; color: var(--mint-500); }
-.bonds-toggle:focus-visible { outline: 2px solid var(--mint-500); outline-offset: -4px; }
+  gap: max(.03rem, 2px); min-width: 44px; min-height: 44px; padding: .06rem .08rem;
+  color: var(--text-hi); background: var(--bg-1); border: 1px solid var(--line-2); cursor: pointer;
+  font-size: max(.14rem, 11px); line-height: 1; }
+.bonds-toggle .icon { width: max(.18rem, 14px); height: max(.18rem, 14px); }
+.bonds-toggle:hover { color: var(--mint-500); border-color: var(--mint-500); }
+.bonds-toggle:focus-visible { outline: 2px solid var(--mint-500); outline-offset: 2px; }
 /* Only the bond discs (and the +N chip) take the pointer: the strip's box spans the width under the top bar, where the
    top board row's units stand (row 12 at 16:9 / 21:9 / 720p / phones, the boss field's row 5 in a boss prep) — it used
    to swallow the taps and drags on them (review of user playtest #2 item 8: every own unit reachable). */
@@ -312,6 +309,17 @@
   position: static; margin-top: .02rem; font-size: .11rem; font-weight: 500; color: var(--text-dim); white-space: nowrap;
   background: rgba(8, 11, 10, .85); border: 1px dashed rgba(255, 255, 255, .25);
 }
+/* a bond whose members include disabled chess (bannedPerBond over m.public.bannedChess): a red user badge top-right */
+.bslot__ban {
+  position: absolute; top: .02rem; right: .02rem; z-index: 3;
+  display: inline-flex; align-items: center; gap: .02rem;
+  font-size: .11rem; font-weight: 700; line-height: 1; color: #fff;
+  background: rgba(255, 84, 84, .95); border: 1px solid rgba(255, 180, 180, .6);
+  padding: .02rem .04rem; border-radius: .06rem; box-shadow: 0 0 .08rem rgba(0, 0, 0, .55);
+  pointer-events: auto;
+}
+.bslot__ban .icon { width: .12rem; height: .12rem; }
+.bslot__ban b { font-family: var(--font-num); }
 
 /* ---- team panel ------------------------------------------------------------------------------------------- */
 .team { position: absolute; left: .22rem; top: 2.36rem; display: flex; flex-direction: column; gap: .14rem; pointer-events: none; }

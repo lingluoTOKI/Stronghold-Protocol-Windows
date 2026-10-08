@@ -261,7 +261,7 @@ export function createFallbackView(host, opts = {}) {
         onPointerDown=${(e) => { if (e.button === 0) emit('pieceClick', { unitId: id, uid: info.uid ?? null, unit: info, button: 0, clientX: e.clientX, clientY: e.clientY }); }}
         onContextMenu=${(e) => { e.preventDefault(); emit('pieceClick', { unitId: id, uid: info.uid ?? null, unit: info, button: 2, clientX: e.clientX, clientY: e.clientY }); }}>
       <div class="ff-unit__art">${src ? html`<img src=${src} alt="" draggable=${false} />` : html`<span>${[...(info.name || '?')][0]}</span>`}</div>
-      <div class="ff-unit__bars"><i class="hp" style=${`width:${hpPct}%`}></i>${!enemy && spMax > 0 ? html`<i class="sp" role=${device?.key === 'energy' ? 'progressbar' : undefined} aria-label=${device?.key === 'energy' ? t('科研装置充能') : undefined} aria-valuenow=${device?.key === 'energy' ? sp : undefined} aria-valuemin=${device?.key === 'energy' ? 0 : undefined} aria-valuemax=${device?.key === 'energy' ? spMax : undefined} style=${`width:${spPct}%`}></i>` : null}</div>
+      <div class="ff-unit__bars"><i class="hp" style=${`width:${hpPct}%`}></i>${!enemy && spMax > 0 ? html`<i class="sp" role=${device?.key === 'energy' ? 'progressbar' : undefined} aria-label=${device?.key === 'energy' ? '科研装置充能' : undefined} aria-valuenow=${device?.key === 'energy' ? sp : undefined} aria-valuemin=${device?.key === 'energy' ? 0 : undefined} aria-valuemax=${device?.key === 'energy' ? spMax : undefined} style=${`width:${spPct}%`}></i>` : null}</div>
     </div>`;
   }
 

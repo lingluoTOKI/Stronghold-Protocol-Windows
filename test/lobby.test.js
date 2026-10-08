@@ -19,13 +19,7 @@ import { sanitizeName, TokenBucket, SessionRegistry, clientAddress, normalizeIp,
 import { StubMatch as Match } from '../server/match/StubMatch.js';
 import { Match as RealMatch } from '../server/match/Match.js';
 import { TestClient } from './helpers/wsClient.js';
-import { DATA_PROFILE } from './helpers/dataFile.mjs';
 import { ERR, MAX_SEATS, MAX_SPECTATORS, PHASE, EMOTES } from '../shared/constants.js';
-
-// rhine rooms expand to MAX_SEATS (6); vanilla rooms stay at the upstream v0.2.0 cap of 4.
-// The test's room.create matches the active profile so both suites run against the right seat count.
-const ROOM_RHINE = DATA_PROFILE === 'rhine';
-const EXPECTED_SEATS = ROOM_RHINE ? MAX_SEATS : 4;
 
 const CODE_RE = new RegExp(`^[${CODE_ALPHABET}]{4}$`);
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -74,7 +68,7 @@ function clientPool(getUrl) {
 }
 
 async function createRoom(c, mode = 'coop', difficulty = 'NORMAL') {
-  const r = await c.request({ t: 'room.create', mode, difficulty, rhineEnabled: ROOM_RHINE });
+  const r = await c.request({ t: 'room.create', mode, difficulty });
   assert.equal(r.t, 'ok', JSON.stringify(r));
   return c.waitFor('room.state', (s) => s.hostId === c.id && s.mode === mode);
 }
@@ -548,9 +542,9 @@ describe('websocket lobby', () => {
     assert.equal(st.mode, 'coop');
     assert.equal(st.difficulty, 'HARD');
     assert.equal(st.inMatch, false);
-    assert.equal(st.seats.length, EXPECTED_SEATS);
+    assert.equal(st.seats.length, MAX_SEATS);
     assert.deepEqual(st.seats[0], { seat: 0, playerId: host.id, name: 'Host', isBot: false, ready: false, connected: true });
-    assert.deepEqual(st.seats.slice(1), Array(EXPECTED_SEATS - 1).fill(null));
+    assert.deepEqual(st.seats.slice(1), [null, null, null]);
 
     const guest = await pool.player('Guest');
     const joined = await joinRoom(guest, st.code.toLowerCase());
@@ -599,14 +593,8 @@ describe('websocket lobby', () => {
       await joinRoom(g, st.code);
       guests.push(g);
     }
-    // fill the rest of the seats with bots until the room is full (MAX_SEATS total)
-    while (true) {
-      const r = await host.request({ t: 'room.addBot' });
-      if (r.t === 'error') { assert.equal(r.code, ERR.ROOM_FULL); break; }
-      assert.equal(r.t, 'ok');
-    }
-    const full = await host.waitFor('room.state', (s) => s.seats.every(Boolean));
-    assert.equal(full.seats.length, EXPECTED_SEATS);
+    await expectOk(host, { t: 'room.addBot' });
+    await host.waitFor('room.state', (s) => s.seats.every(Boolean));
     const late = await pool.player('Late');
     await expectError(late, { t: 'room.join', code: st.code }, ERR.ROOM_FULL);
     await expectError(host, { t: 'room.addBot' }, ERR.ROOM_FULL);
@@ -646,12 +634,7 @@ describe('websocket lobby', () => {
     const s3 = await pool.player('Watcher3');
     await expectError(s3, { t: 'room.spectate', code: st.code }, ERR.ROOM_FULL);
     await joinRoom(s3, st.code);
-    // fill remaining seats with bots until the room is full
-    while (true) {
-      const r = await host.request({ t: 'room.addBot' });
-      if (r.t === 'error') { assert.equal(r.code, ERR.ROOM_FULL); break; }
-      assert.equal(r.t, 'ok');
-    }
+    await expectOk(host, { t: 'room.addBot' });
     const full = await host.waitFor('room.state', (s) => s.seats.every(Boolean));
     assert.equal(full.spectators.length, 2);
     await expectOk(s3, { t: 'room.ready', ready: true });

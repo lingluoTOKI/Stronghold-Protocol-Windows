@@ -8,7 +8,6 @@ import { ERR, PHASE } from '../../shared/constants.js';
 import { validateC2S, checkLoadout, loadoutOptions, resolveLoadout, isLoadoutEntries, MODULE_NONE, LOADOUT_LIMITS } from '../../shared/protocol.js';
 import { buildBattleSpec } from '../../server/sim/spec.js';
 import { DATA, makeMatch } from './harness.js';
-const { DATA_PROFILE } = await import('../helpers/dataFile.mjs');
 
 const chess = (id) => (Object.hasOwn(DATA.chess, id) ? DATA.chess[id] : null);
 const visible = Object.values(DATA.chess).filter((c) => !c.isGolden && c.visible && !c.isHidden && !c.isDiy);
@@ -34,7 +33,7 @@ function place(m, ps, chessId, row, col) {
 // ---- shared checks -------------------------------------------------------------------------------------------------
 
 test('data carries the §16 choices every visible chess needs (skills at both statuses, elite modules + none)', () => {
-  assert.equal(visible.length, DATA_PROFILE === 'rhine' ? 118 : 112);
+  assert.equal(visible.length, 112);
   for (const c of visible) {
     const g = chess(c.goldenId);
     const o = loadoutOptions(c, g);

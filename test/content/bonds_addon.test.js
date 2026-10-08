@@ -100,10 +100,8 @@ test('迅捷 / 不屈 proc chances: p = min(1, base + per·L) at each layer coun
   close(procChance(sw, 228), 0.20 + 0.0035 * 228);
   close(procChance(sw, 229), 1, 'swift reaches 100 % at 229');
   close(procChance(ind, 0), 0.18);
-  const indPer = Number(ind.prob_per_stack);
-  close(procChance(ind, 50), 0.18 + indPer * 50);
-  const indL = Math.ceil((1 - 0.18) / indPer);                 // vanilla 0.004 → 205; rhine playtest 0.0041 → 200
-  close(procChance(ind, indL), 1, `indom reaches 100 % at ${indL} (叠满必复活)`);
+  close(procChance(ind, 50), 0.18 + 0.0041 * 50);
+  close(procChance(ind, 200), 1, 'indom reaches 100 % at 200 (200-202 叠满必复活, playtest 2026-10-05)');
   close(procChance(ind, 1000), 1, 'capped');
 });
 
@@ -543,75 +541,6 @@ test('突袭 #51: the most advanced enemy out of reach → the jump goes to the 
   const dt = h.b.time - last;
   assert.ok(dt >= idle - 1e-6 && dt <= idle + 0.25 + 1e-6, `${dt.toFixed(2)} s after its last attack`);
   assert.ok(inRange(u, e3), 'the new enemy in range');
-  checkInvariants(h.b);
-});
-
-// GitHub #49: skills.js `ready` is false for every passive skill, so a passive 突袭 member (缄默德克萨斯, 宴 …) only jumped on
-// the 10 s idle trigger; the reporter's footage of the official game shows 缄默德克萨斯 jumping within her passive's 10 s.
-// raidPoll (only there) counts a passive skill that is on as 技能就绪, and — since #109 made her skills deploy-timed
-// duration skills — a deploy-timed skill while its window runs; the landing rule (#51) still keeps it from hopping.
-test('突袭 #49: a passive skill that is on, or a deploy-timed skill while it runs (#109), counts as 技能就绪 — 缄默德克萨斯 jumps within a few seconds, then stays while her enemy is in range', () => {
-  const tex = 'chess_char_4_16_a';
-  const h = makeBattle({
-    defs: { enemies: DUMMY }, bonds: { raidShip: bond(1, 10) }, enemies: [{ key: 'enemy_addon_dummy', pos: [9, 8] }],
-    units: [{ chessId: tex, row: 12, col: 3 }], hooks: ['deploy', 'death'], autoFinish: false, timeLimit: 60,
-  });
-  h.step();
-  const u = h.unit(tex), e = h.enemy('enemy_addon_dummy');
-  assert.deepEqual([u.skill.kind, !!u.skill.spec.activateOnDeploy, u.skill.ready, u.skill.active], ['duration', true, false, true], 'her deploy-timed skill (#109): on, and the global `ready` false');
-  assert.ok(!inRange(u, e), 'nothing in her range');
-  assert.ok(h.runUntil(() => raidJumps(h).length > 0, 3), 'jumped within 3 s (no 10 s idle wait)');
-  assert.ok(h.b.time < bondBb('raidShip').no_attack_duration - 5, `at ${h.b.time.toFixed(2)} s`);
-  assert.ok(inRange(u, e), `landed (${u.tileR},${u.tileC}) with the enemy in range`);
-  h.run(8);
-  assert.equal(raidJumps(h).length, 1, 'busy there: no further jump (no hopping)');
-  checkInvariants(h.b);
-});
-
-test('突袭 #49 with #109: a deploy-timed skill counts only while its window runs — once it has ended, only the idle trigger is left', () => {
-  const tex = 'chess_char_4_16_a';
-  const idle = bondBb('raidShip').no_attack_duration;
-  const h = makeBattle({
-    defs: { enemies: DUMMY }, bonds: { raidShip: bond(1, 10) }, enemies: [{ key: 'enemy_addon_dummy', pos: [9, 8] }],
-    units: [{ chessId: tex, row: 12, col: 3 }], hooks: ['deploy', 'death'], autoFinish: false, timeLimit: 60,
-  });
-  h.step();
-  const u = h.unit(tex);
-  u.skill.end('duration'); // her window over before the first poll, as after its duration
-  assert.deepEqual([u.skill.active, u.skill.ready], [false, false], 'ended: no charge until the next deployment');
-  h.run(3);
-  assert.equal(raidJumps(h).length, 0, 'no 技能就绪 jump once the window has ended');
-  assert.ok(h.runUntil(() => raidJumps(h).length > 0, idle + 1), 'the idle trigger');
-  assert.ok(h.b.time >= idle - 1e-6, `at ${h.b.time.toFixed(2)} s`);
-  assert.ok(u.skill.active, 'the landing is a new deployment: a new window');
-  checkInvariants(h.b);
-});
-
-test('突袭 #49: non-passive members unchanged — a charged skill jumps at once, an uncharged one waits for the idle time; a passive one jumps at once', () => {
-  const idle = bondBb('raidShip').no_attack_duration;
-  const defs = {
-    chess: {
-      r_s: chessRec({ id: 'r_s', bonds: ['raidShip'], skill: { spCost: 10, initSp: 10 } }),
-      r_u: chessRec({ id: 'r_u', bonds: ['raidShip'], skill: { spCost: 100, initSp: 0, spType: 'INCREASE_WHEN_ATTACK' } }),
-      r_p: chessRec({ id: 'r_p', bonds: ['raidShip'], skill: { skillType: 'PASSIVE', spCost: 0, duration: -1, spType: 8 } }),
-    },
-    enemies: DUMMY,
-  };
-  const h = makeBattle({
-    defs, bonds: { raidShip: bond(1, 10, 3) }, enemies: [{ key: 'enemy_addon_dummy', pos: [9, 8] }, { key: 'enemy_addon_dummy', pos: [12, 9] }],
-    units: [{ chessId: 'r_s', row: 12, col: 3 }, { chessId: 'r_u', row: 11, col: 3 }, { chessId: 'r_p', row: 10, col: 3 }], hooks: ['deploy', 'death'],
-    autoFinish: false, timeLimit: 60,
-  });
-  h.step();
-  const s = h.unit('r_s'), un = h.unit('r_u'), p = h.unit('r_p');
-  assert.deepEqual([s.skill.ready, un.skill.ready, p.skill.kind, p.skill.ready], [true, false, 'passive', false]);
-  h.run(1);
-  const jumped = (u) => raidJumps(h).filter((c) => c.unit === u);
-  assert.equal(jumped(s).length, 1, 'charged: at once');
-  assert.equal(jumped(p).length, 1, 'passive: at once');
-  assert.equal(jumped(un).length, 0, 'uncharged: not yet');
-  assert.ok(h.runUntil(() => jumped(un).length > 0, idle + 1), 'uncharged: after the idle time');
-  assert.ok(h.b.time >= idle - 1e-6, `at ${h.b.time.toFixed(2)} s`);
   checkInvariants(h.b);
 });
 
