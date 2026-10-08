@@ -102,7 +102,8 @@ export class Battle {
     const tl = Number(opts.timeLimit);
     this.timeLimit = opts.timeLimit == null || !(tl > 0) ? (bossLike ? Infinity : 60) : tl;
     // startOpCooldown: the operation cooldown of the battle-start deployment (skills.js AUTO_OP_COOLDOWN)
-    this.flags = { layerGainsEnabled: this.kind === 'normal', ...DP_DEFAULTS, startOpCooldown: AUTO_OP_COOLDOWN, ...(opts.flags || {}) };
+    // 改编版：所有战斗种类默认允许战斗中盟约叠层（上游仅 kind === 'normal'）；具体 spec 仍可用 flags 覆盖。
+    this.flags = { layerGainsEnabled: true, ...DP_DEFAULTS, startOpCooldown: AUTO_OP_COOLDOWN, ...(opts.flags || {}) };
     const soc = Number(this.flags.startOpCooldown);
     this.flags.startOpCooldown = this.flags.startOpCooldown != null && Number.isFinite(soc) && soc >= 0 ? soc : AUTO_OP_COOLDOWN;
     // DP knobs may arrive as undefined/null/strings (e.g. a template without `dp`): never let them poison DP with NaN.

@@ -100,7 +100,8 @@ export class MatchBoss {
         routes: wave.routes,
         sharedBoss: this.bossPool,
         // the round's enemy effects for the leaders' mid-fight summons (server/sim/content/bosses.js summonMods)
-        flags: { layerGainsEnabled: false, ...this.gd.dp, enemyScale: this.gd.enemyScale(this.round) },
+        // 改编版：BOSS 回合也允许战斗中盟约叠层（上游默认 false）。
+        flags: { layerGainsEnabled: true, ...this.gd.dp, enemyScale: this.gd.enemyScale(this.round) },
         fieldId,
         enemyOverrides: wave.overrides,
         waveId: wave.templateId,

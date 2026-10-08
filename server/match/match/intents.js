@@ -121,13 +121,11 @@ export class MatchIntents {
     const cached = this._unitStatsCache.get(ps);
     if (key && cached && cached.key === key) return cached.units;
     const units = [];
-    // the flags of the battle it previews: a normal round gains IN_BATTLE layers from its start (a <战斗开始时> layer gain
-    // raises bond stats at t = 0 there too); the Final Assault / Hidden Core fight without (previewed as a normal field)
-    const bossRound = this.round === this.gd.bossRound || this.round === this.gd.hiddenRound;
+    // 改编版：意图预览战斗也允许战斗中盟约叠层（含 BOSS/隐藏回合预览）。
     const b = this.newBattle({
       seed: deriveSeed(this.seed, `preview:${this.round}:${ps.seat}`), kind: 'normal', modeId: this.modeId, round: this.round,
       stageId: this.stageId, rect: { ...GEO.NORMAL_RECT }, timeLimit: 60, players, spawns: [], routes: this.wave ? this.wave.routes : [],
-      sharedBoss: null, flags: { layerGainsEnabled: !bossRound, ...this.gd.dp }, fieldId: `n:${ps.playerId}`, recordEvents: false,
+      sharedBoss: null, flags: { layerGainsEnabled: true, ...this.gd.dp }, fieldId: `n:${ps.playerId}`, recordEvents: false,
     });
     try {
       if (typeof b.start === 'function') b.start();

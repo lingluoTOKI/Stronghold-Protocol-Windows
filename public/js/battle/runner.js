@@ -155,8 +155,8 @@ function deepFreeze(root) {
  * content bug that writes into a record fails identically on both sides).
  */
 export async function loadBrowserSim({ base = '/sim/', rhineEnabled = true, dataBase = rhineEnabled ? '/data/' : '/data/vanilla/', fetchFn = (...a) => globalThis.fetch(...a) } = {}) {
-  const [spec, simdata] = await Promise.all([
-    import(`${base}spec.js`), import(`${base}simdata.js`),
+  const [spec, simdata, support] = await Promise.all([
+    import(`${base}spec.js`), import(`${base}simdata.js`), import(`${base}content/support/index.js`),
   ]);
   const fetchOnce = async (n) => {
     try {
@@ -171,8 +171,18 @@ export async function loadBrowserSim({ base = '/sim/', rhineEnabled = true, data
   if (missing.length) throw new Error(`simulation data unavailable: ${missing.join(', ')}`);
   const raw = {};
   SIM_DATA_FILES.forEach((n, i) => { raw[n] = deepFreeze(files[i]); });
+  // The sim's content modules read global game data through content/support gameData(); without setSimData the browser
+  // global is an empty {} — every bond's bb (bondBb) and the core-bond table come back empty/missing, which silently
+  // breaks in-battle bond mechanics (阿戈尔 devour, 拉特兰 ammo install throws on `bb.base_ammo_percent`, …). This was
+  // dropped during the vanilla/rhine split. applyProfile() re-applies it before EVERY battle so a cached other-profile
+  // sim can never leave the global pointing at the wrong data set.
+  const applyProfile = () => {
+    simdata.setSimData(raw);
+    if (support && typeof support.setGameData === 'function') support.setGameData(null); // re-read through injected data
+  };
+  applyProfile();
   // Each battle owns its data. Loading another room's profile must never replace a running battle's content.
-  return { spec, ds: new simdata.DataSource(raw, null) };
+  return { spec, simdata, support, raw, applyProfile, ds: new simdata.DataSource(raw, null) };
 }
 
 /** Battle logger: content errors are isolated by the sim; report them as warnings (the server logs its own). */
@@ -774,6 +784,9 @@ export function createBattleRunner(deps) {
     if (seq !== startSeq) return; // superseded by a newer b.start
     let battle;
     try {
+      // Re-point the sim's global game data at THIS battle's profile before construction/install, even when the sim for
+      // this profile was cached from an earlier room (otherwise a vanilla battle after a rhine one reads rhine globals).
+      if (typeof sim.applyProfile === 'function') sim.applyProfile();
       battle = sim.spec.createBattleFromSpec(msg.spec, sim.ds, { logger });
     } catch (err) {
       console.warn('[runner] battle construction failed', err);

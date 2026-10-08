@@ -101,10 +101,14 @@ const ITEM_HANDLERS = {
     onEquip(ctx, ev) {
       const n = Math.max(1, int(paramsOf(ctx, ev.item).count, 1));
       const bonds = ctx.pieceBonds(ev.target.uid);
+      let granted = 0;
       for (let k = 0; k < n; k++) {
         const id = rollSameBond(ctx, bonds, ctx.shopLevel());
-        if (id) ctx.grantChess(id);
+        if (id) { ctx.grantChess(id); granted++; }
       }
+      // 目标干员的盟约在当前商店等级下没有可招募的同盟约干员（如低等级时给高星莱茵干员用）：
+      // 不吞物品，让它留在身上，等等级高了再用。
+      if (granted === 0) { ev.keep = true; }
     },
   },
   use_equip_gain_coin_when_next_round_start: {
@@ -142,6 +146,7 @@ const ITEM_HANDLERS = {
       if (owned >= 2) { ctx.grantChess(base); return; }
       const id = rollSameBond(ctx, ctx.pieceBonds(ev.target.uid), 6);
       if (id) ctx.grantChess(id);
+      else ev.keep = true; // 低等级给高星盟约干员用时不吞物品
     },
   },
   use_equip_reward_special_goods_char_chess: {
@@ -152,6 +157,8 @@ const ITEM_HANDLERS = {
       // a pick-one offer never shows one operator twice (user playtest #6 item 19); fewer cards when the pool runs out
       for (let k = 0; k < n; k++) { const id = rollSameBond(ctx, bonds, ctx.shopLevel(), ids); if (id) ids.push(id); }
       if (ids.length) ctx.offerChess(ids, { source: 'item' });
+      // 低等级给高星盟约干员用（如梅尔在 4 级商店）：roll 不到可选项时不吞物品。
+      else { ev.keep = true; }
     },
   },
   // 信标 (act2autochess eff_acarm109 / eff_acgarm109 "装备时，目标干员和本装备销毁并进行一次特殊刷新，出现两名与携带者同等阶的

@@ -49,8 +49,40 @@ export function createRequestHandler({ serveStatic, health, log, proxy = null, a
       sendError(req, res, 405, '不支持的请求方法 · Method not allowed');
       return;
     }
+    // 大屏监控需要跨域读取 /healthz 与 admin 接口（监控页面从别的 origin 打开）。
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    // admin token：环境变量 SP_ADMIN_TOKEN；未设置时 admin 接口一律 403。
+    const ADMIN_TOKEN = process.env.SP_ADMIN_TOKEN || '';
     // 本扩展：反向代理模式 —— /api/* 一律转发给中心服务器（在线人数、房间数、公告都以那边为准）。
     // 注意放在 /healthz 之前、方法闸之后：只转发 GET / HEAD，healthz 始终由本机回答。
+    // admin 接口放在代理之前：代理模式下也能本机管理当前进程的连接。
+    if (parts.rawPath === '/api/admin/players') {
+      if (!ADMIN_TOKEN) { sendError(req, res, 403, 'admin token not configured'); return; }
+      const q = new URLSearchParams(parts.query || '');
+      if (q.get('token') !== ADMIN_TOKEN) { sendError(req, res, 403, 'bad admin token'); return; }
+      const list = [];
+      for (const s of health.registry.byPlayerId.values()) {
+        if (!s.connected) continue;
+        list.push({
+          playerId: s.playerId, name: s.name, roomCode: s.roomCode || null,
+          addr: s.addr || '?', lastSeenAgoSec: s.lastSeen ? Math.round((Date.now() - s.lastSeen)/1000) : null,
+        });
+      }
+      sendJson(req, res, 200, { ok: true, count: list.length, players: list });
+      return;
+    }
+    if (parts.rawPath === '/api/admin/kick') {
+      if (!ADMIN_TOKEN) { sendError(req, res, 403, 'admin token not configured'); return; }
+      const q = new URLSearchParams(parts.query || '');
+      if (q.get('token') !== ADMIN_TOKEN) { sendError(req, res, 403, 'bad admin token'); return; }
+      const pid = q.get('playerId') || '';
+      const s = health.registry.byId(pid);
+      if (!s || !s.connected || !s.ws) { sendError(req, res, 404, 'player not connected'); return; }
+      try { s.ws.close(1008, 'admin-kick'); } catch {}
+      sendJson(req, res, 200, { ok: true, kicked: pid, name: s.name });
+      return;
+    }
     if (proxy && parts.rawPath.startsWith('/api/')) {
       proxy.proxyHttp(req, res);
       return;

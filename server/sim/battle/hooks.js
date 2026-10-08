@@ -5,6 +5,7 @@
 // Installed on Battle.prototype by server/sim/Battle.js (a method container: never instantiated; `this` is the battle).
 
 import { TICK, MAX_INTERNAL_ERRORS, MAX_HOOK_DEPTH } from '../constants.js';
+import { withGameData } from '../content/support/dataScope.js';
 
 let hookSeq = 0;
 
@@ -54,6 +55,18 @@ export class BattleHooks {
 
   hasHook(name) { return !!this._hooks[name]; }
 
+  /**
+   * Run a content callback with THIS battle's data profile as the content/support global gameData() scope. The sim is
+   * shared by the vanilla/rhine split; without this, in-battle content hooks (bond install/battleStart/death/skill,
+   * timers) read the process-global data — lazily loaded from data/ (rhine) — even for a vanilla server-run field
+   * (client takeover / bot rehearsal / verification), which empties bondBb/coreBondIds and breaks bond mechanics.
+   * Nested hooks save/restore the scope in withGameData; a battle without data runs the callback unchanged.
+   */
+  _withData(fn) {
+    const data = this.data;
+    return data ? withGameData(data, fn) : fn();
+  }
+
   emit(name, ctx) {
     const list = this._hooks[name];
     if (!list) return ctx;
@@ -71,7 +84,7 @@ export class BattleHooks {
         if (h.removed) continue;
         this._frameName[d] = name;
         this._frameOwner[d] = h.owner;
-        try { h.fn(ctx, this); } catch (e) { this._handlerError(`hook:${name}`, h.owner, e); }
+        try { this._withData(() => h.fn(ctx, this)); } catch (e) { this._handlerError(`hook:${name}`, h.owner, e); }
         if (h.once) this.off(h);
         if (ctx && ctx.stopPropagation) break;
       }
@@ -161,7 +174,7 @@ export class BattleHooks {
     this._frameName[d] = label;
     this._frameOwner[d] = owner;
     this._frameCtx[d] = null;
-    try { return fn(); } catch (e) { this._handlerError(label, owner, e); return undefined; } finally { this._emitDepth--; }
+    try { return this._withData(fn); } catch (e) { this._handlerError(label, owner, e); return undefined; } finally { this._emitDepth--; }
   }
 
   _handlerError(label, owner, e, internal = false) {

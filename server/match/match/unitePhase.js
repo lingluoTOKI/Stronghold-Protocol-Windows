@@ -59,7 +59,8 @@ export class MatchUnite {
       spawns: this._sanitizeSpawns(wave.spawns),
       routes: wave.routes,
       sharedBoss: null,
-      flags: { layerGainsEnabled: false, ...this.gd.dp },
+      // 改编版：联合作战也允许战斗中盟约叠层（上游默认 false）。dp 参数仍可覆盖，但默认开启。
+      flags: { layerGainsEnabled: true, ...this.gd.dp },
       fieldId: 'u',
       // leaked enemies re-enter with the stats they had: the round template's stat overrides apply again
       enemyOverrides: this.wave && this.wave.overrides ? this.wave.overrides : {},

@@ -28,6 +28,7 @@
 
 import { genericKit, genericTalents } from './generic.js';
 import { withUnitLoadouts } from '../simdata.js';
+import { withGameData } from './support/dataScope.js';
 
 // Content files are loaded with guarded dynamic imports: a module that fails to load (syntax error, throwing
 // top-level code, missing file) is logged and replaced by an empty module instead of breaking the server.
@@ -257,6 +258,10 @@ export function skillSpecSource(def, kits = KITS) {
  * and every other id-only lookup resolve the owner's selected skill / module there too (DESIGN §16).
  */
 export function installContent(battle, { mode = 'full', extra = null } = {}) {
+  // Scope the content/support global gameData() to THIS battle's profile for the whole install: bond installers read
+  // bondBb/coreBondIds synchronously here, and a server-run vanilla field must not resolve them from the process-global
+  // data/ (rhine). Registered hooks are re-scoped per-emit in battle/hooks.js.
+  withGameData(battle.data, () => {
   try {
     const view = withUnitLoadouts(battle.data, (battle.players || []).map((p) => p && p.input));
     if (view && view !== battle.data) battle.data = view;
@@ -274,6 +279,7 @@ export function installContent(battle, { mode = 'full', extra = null } = {}) {
   for (const m of extra || []) {
     try { (typeof m === 'function' ? m : m.install)?.(battle); } catch (e) { battle._handlerError('content:extra', null, e); }
   }
+  });
 }
 
 /** Prep-side registration of every domain module (server boot). */
