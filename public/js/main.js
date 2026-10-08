@@ -235,7 +235,9 @@ function wireNet() {
   net.on('m.public', (msg) => {
     matchAt = Date.now();
     publicOrder = ++pushOrder;
-    void prepareDataProfile(msg.rhineEnabled);
+    // Fall back to the room's flag: an older/partial m.public without rhineEnabled must not reset the client to the
+    // Rhine profile (dataProfileId(undefined) defaults to rhine).
+    void prepareDataProfile(msg.rhineEnabled ?? store.get().room?.rhineEnabled);
     store.patch('match', { public: payload(msg) });
     maybeFinishRestore();
   });

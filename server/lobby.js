@@ -903,12 +903,14 @@ export class Lobby {
    * (see the header). A running match never takes it: it keeps the list its seat had at its start.
    */
   ownership(session, { notOwned }) {
-    const data = this.safeData();
+    // Validate against the room's own profile (a 原版 room must not be checked against the Rhine chess table).
+    const room = this.roomOf(session);
+    let data;
+    try { data = room ? this.roomData(room) : this.safeData(); } catch (e) { return fail(ERR.INTERNAL, e.message); }
     const res = checkNotOwned(notOwned, (id) => lookup('chess', id, data));
     if (!res || res.error) return fail(ERR.BAD_MSG, res && res.detail);
     const list = Object.freeze(res.notOwned.slice());
     session.notOwned = list;
-    const room = this.roomOf(session);
     if (!room) return OK;
     const seat = room.seatOf(session.playerId);
     if (seat) seat.notOwned = list;
@@ -922,11 +924,14 @@ export class Lobby {
    * start.
    */
   diy(session, { picks }) {
-    const res = checkDiyPicks(picks, { data: this.safeData(), kitted: KITTED_CHARS });
+    // Check the picks against the room's own profile data (a 原版 room validates against the vanilla chess table).
+    const room = this.roomOf(session);
+    let data;
+    try { data = room ? this.roomData(room) : this.safeData(); } catch (e) { return fail(ERR.INTERNAL, e.message); }
+    const res = checkDiyPicks(picks, { data, kitted: KITTED_CHARS });
     if (!res || !('ok' in res)) return fail(ERR.BAD_MSG, res && res.detail);
     const kept = freezeDiy(res.picks);
     session.diy = kept;
-    const room = this.roomOf(session);
     if (!room) return OK;
     const seat = room.seatOf(session.playerId);
     if (seat) seat.diy = kept;

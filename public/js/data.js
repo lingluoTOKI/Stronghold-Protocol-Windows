@@ -573,7 +573,10 @@ export function useData(...names) {
   const key = names.join('|');
   useEffect(() => {
     let alive = true;
-    const unsub = data.subscribe((n) => { if (alive && names.includes(n)) force(); });
+    // PROFILE_CHANGE must also force a re-render: when the target profile is already cached, selecting it emits
+    // only '$profile' (no per-file load notification), so without this the screens keep showing the old profile's
+    // records (e.g. switching to 原版 in the lobby still rendered the Rhine bond in the briefing).
+    const unsub = data.subscribe((n) => { if (alive && (n === PROFILE_CHANGE || names.includes(n))) force(); });
     for (const n of names) data.load(n);
     return () => { alive = false; unsub(); };
   }, [key]);
