@@ -157,6 +157,7 @@ export class SpineActor {
      */
     this.clipPerAttack = false;
     this.wound = false;           // clipPerAttack: wound up for the coming attack (windUp → attack)
+    this.runMode = false;         // move on the model's own Run cycle (setRunMode)
     this._play(this._idleName(), true);
   }
 
@@ -183,6 +184,16 @@ export class SpineActor {
     const anims = this.entry?.anims || {};
     const clip = Number.isInteger(index) && anims.skills ? anims.skills[String(index)] : null;
     this.roles = this.baseRoles = clip ? { ...anims, skill: clip } : anims;
+  }
+
+  /** Fast-move mode: play the model's own Run cycle instead of the base walk/idle loop. */
+  setRunMode(on) {
+    this.runMode = !!on;
+    const anims = this.entry?.anims || {};
+    if (anims && anims.run) {
+      const base = this.baseRoles || anims;
+      this.roles = on ? { ...base, move: anims.run } : base;
+    }
   }
 
   /** The unit's own roles: the manifest's with its equipped skill's clip (setSkillIndex) — what a form ends in. */

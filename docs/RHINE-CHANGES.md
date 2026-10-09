@@ -1,5 +1,14 @@
 # 莱茵扩展变更记录
 
+## 2026-10-09 · 渲染启动崩溃修复 · v0.2.2-rhine.2
+
+- 修复 WebGL 渲染引擎无法启动、所有玩家被迫降级 2D 简化视图的崩溃：`render/app.js` 在取 PIXI 时写成 `withTimeout(ensurePixi(), null, signal)`，而 `host.js` 的 `withTimeout` 把第二个参数当 `setTimeout` 延迟——传 `null` 等于 0ms 立刻触发，`Promise.race` 在 PIXI 脚本还没加载完就 resolve 出 `undefined`，下一步 `new P.Application()` 抛 `Cannot read properties of undefined (reading 'Application')`。改为直接 `await ensurePixi()`，PIXI 加载完才继续。
+- 修复血条颜色 `undefined` 导致的 PixiJS 崩溃：上游 0.2.2 的 `units.js` 引用了 `COLORS.hpNeg`（斩业星熊我执负值血池）、`COLORS.ammo`（弹药条）、`COLORS.wolf`（伺夜狼影）三个新颜色，但同步时 `render/style.js` 的 COLORS 对象漏了这三个键，运行时 `undefined` 传给 `bar()` 的 `tint`，抛 `Unable to convert color undefined`。已从上游补回准确色值（`hpNeg:0xff4b3e`、`ammo:0xffd04a`、`wolf:0xe8f0ff`）。
+- 修复 Spine 骨骼动画构建失败警告 `actor.setRunMode is not a function`：`units.js` 在创建 Spine 模型时调用 `actor.setRunMode(moveFast)`，但同步 0.2.2 时 `SpineActor` 类漏了这个方法（快速移动敌人应播放 Run 循环动画）。已补 `runMode` 字段与 `setRunMode(on)` 方法，有 `anims.run` 的模型切到 Run 动画。
+- 效果：进对局恢复完整 3D/WebGL 渲染（不再弹「已切换为简化视图」），血条/弹药条/狼影颜色正常，史莱姆、火鸟、vendla 等单位骨骼动画不再构建失败。
+
+验证：`/healthz` 200、`app=0.2.2`；浏览器 Console 不再出现 `reading 'Application'`、`color undefined`、`setRunMode is not a function`。
+
 ## 2026-10-09 · 同步上游 0.2.2 · v0.2.2-rhine.1
 
 - 基线从上游 `0.2.1`（`c2a2ef7`）升级到 `0.2.2`（`62eb1134`），139 个上游提交逐系列 cherry-pick 合入；原版档严格对齐上游，莱茵扩展作为独立 overlay 保留，两套档案互不串档。
