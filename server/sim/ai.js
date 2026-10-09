@@ -663,6 +663,7 @@ function advanceRoute(b, e, dt, R, standing = false) {
       continue;
     }
     if (leg.t === 'disappear') {
+      b._cutAttackStand(e);
       b._setHidden(e, true);
       e.atkStandUntil = -Infinity; standing = false;   // off the field: its attack clip is over
       R.legIdx++; R.pts = null;
