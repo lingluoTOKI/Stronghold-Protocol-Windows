@@ -8,7 +8,7 @@
 
 import { boardOrder, pieceDir } from '../board.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
-import { RHINE_BOND, RHINE_BALANCE, RHINE_DEVICES, rhineCapacity, rhineDevice, rhineStage, advanceRhineResearch } from '../../../shared/rhineResearch.js';   // 本扩展
+import { RHINE_BOND, RHINE_BALANCE, RHINE_DEVICES, rhineCapacity, rhineDevice, rhineDeviceUnlocked, rhineStage, advanceRhineResearch } from '../../../shared/rhineResearch.js';   // 本扩展
 
 export class PlayerRound {
   startRound(r) {
@@ -88,15 +88,20 @@ export class PlayerRound {
 
   // ---- 本扩展：莱茵科研装置 --------------------------------------------------
 
-  /** 科研容量即三人莱茵生命盟约解锁的装置上限；解锁时发放固定槽位的装置，容量变小就收回超出的。 */
+  /** 科研容量即三人莱茵生命盟约解锁的装置上限；每台装置按自身 minCount（莱茵人数）逐个解锁进备牌区。 */
   _syncResearch() {
-    const cap = this.alive ? rhineCapacity(this.bonds[RHINE_BOND]) : 0;
-    if (cap && !this.research.unlocked) {
-      this.research.unlocked = true;
-      for (const [idx, d] of RHINE_DEVICES.entries()) {
-        this.research.points[d.key] = 0;
-        this.research.stages[d.key] = 0;
+    const bond = this.bonds[RHINE_BOND];
+    const cap = this.alive ? rhineCapacity(bond) : 0;
+    this.research.unlocked = cap > 0;
+    for (const [idx, d] of RHINE_DEVICES.entries()) {
+      const shouldHave = this.alive && rhineDeviceUnlocked(d, bond);
+      const has = !!this.research.hand[idx];
+      if (shouldHave && !has) {
+        this.research.points[d.key] = this.research.points[d.key] || 0;
+        this.research.stages[d.key] = this.research.stages[d.key] || 0;
         this.research.hand[idx] = this.newPiece('token', d.tokenId, { research: true, researchKey: d.key, ownerUid: null });
+      } else if (!shouldHave && has) {
+        this.research.hand[idx] = null;
       }
     }
     let kept = 0;

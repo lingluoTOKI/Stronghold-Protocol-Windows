@@ -1,5 +1,14 @@
 # 莱茵扩展变更记录
 
+## 2026-10-09 · 装置按人数逐个解锁 + 召唤物 Spine 补全 · v0.2.2-rhine.3
+
+- 科研装置改为按莱茵生命人数逐个解锁（对齐上游参考版 `rhineDeviceUnlocked`）：medical / energy 需 3 名莱茵干员，ecology 需 6 名。之前是「人数够 1 个就一次性发全部 3 台进备牌区」，改为每台装置独立判断 `bond.count >= minCount`，不够的装置备牌区留空、不硬发空槽——修了「装置根本不进科研备牌区（dock 空）」的问题。
+- `shared/rhineResearch.js`：三装置各加 `minCount` 字段（medical=3、energy=3、ecology=6），新增 `rhineDeviceUnlocked(device, bond)` 共享判断函数；`server/match/player/round.js` 的 `_syncResearch` 重写为按装置逐个解锁/收回。
+- 补全 39 个召唤物 Spine 战斗模型：卡尔西 Mon3tr、令的 3 个分身、温迪巨炮、各类无人机/装置/棱镜塔等，从旧版 `public/assets/local/spine/token/` 搬回（这些模型任何 web dump 都没有，上游设计就是从本地客户端 extract.py 提取），三件套 `.skel/.atlas/.png` 齐全；`data/local-assets.json` 的 groups 从 17 合并到 62。之前这些召唤物在场上只能显示静态图，现在有骨骼动画。
+- 渲染修复延续上一条（v0.2.2-rhine.2）：WebGL 启动、血条颜色、SpineActor.setRunMode。
+
+验证：`shared/rhineResearch.js`、`server/match/player/round.js` Node 语法检查通过；39 个召唤物模型磁盘文件与 manifest 核对一致。对局实测由维护者进行。
+
 ## 2026-10-09 · 渲染启动崩溃修复 · v0.2.2-rhine.2
 
 - 修复 WebGL 渲染引擎无法启动、所有玩家被迫降级 2D 简化视图的崩溃：`render/app.js` 在取 PIXI 时写成 `withTimeout(ensurePixi(), null, signal)`，而 `host.js` 的 `withTimeout` 把第二个参数当 `setTimeout` 延迟——传 `null` 等于 0ms 立刻触发，`Promise.race` 在 PIXI 脚本还没加载完就 resolve 出 `undefined`，下一步 `new P.Application()` 抛 `Cannot read properties of undefined (reading 'Application')`。改为直接 `await ensurePixi()`，PIXI 加载完才继续。
