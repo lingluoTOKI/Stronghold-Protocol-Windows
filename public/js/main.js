@@ -41,7 +41,7 @@ import { store, useStore, emptyMatch, selectRoute, sessionResetNotice, isSpectat
 import { data, CORE_DATA_FILES } from './data.js';
 import { createDataProfilePreparation, profileFromState } from './ui/dataProfile.js';
 import { GAME_FILES } from './ui/gameComponents.js';
-import { TitleScreen, sanitizeName } from './screens/title.js';
+import { TitleScreen, sanitizeName, UrgentNoticeHost } from './screens/title.js';
 import { LobbyScreen, rememberRoom, parseRoomParam } from './screens/lobby.js';
 import { RoomScreen } from './screens/room.js';
 import { GameScreen } from './screens/game.js';
@@ -318,6 +318,7 @@ function App() {
     <${UiHosts} />
     <${GuideHost} />
     <${LoadoutHost} />
+    <${UrgentNoticeHost} />
   </div>`;
 }
 

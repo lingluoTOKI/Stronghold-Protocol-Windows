@@ -240,3 +240,9 @@ export const emoteArtGroup = (id) => { const e = emoteInfo(id); return e ? `emot
 export const emoteArtPath = (id) => { const e = emoteInfo(id); return e ? `/assets/local/emoticon/${e.dir}/${e.picId}.png` : null; };
 export const EMOTE_COOLDOWN_MS = 1000; // activity_table autoChessData.constData.chatCD (s)
 export const EMOTE_BUBBLE_MS = 3000;   // constData.chatTime (s): how long a bubble stays up
+
+// === rhine fork: matchmaking + chat ===
+export const MATCH_TARGET = 6;
+export const MATCH_TIMEOUT_MS = 30000;
+export const CHAT_COOLDOWN_MS = 1000;
+export const CHAT_MAX_LEN = 200;

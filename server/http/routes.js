@@ -38,10 +38,12 @@ export function healthReport({ startedAt, network, registry, lobby }) {
  *             rawPath: string, query: string) => Promise<void>,
  *           health: Parameters<typeof healthReport>[0], log: object,
  *           proxy?: ReturnType<import('./proxy.js').createProxy> | null,
- *           announcements?: (() => object) | null }} deps
+ *           announcements?: (() => object) | null,
+ *           announcePublish?: ((title: string, content: string) => { ok: boolean, error?: string }) | null,
+ *           announceClear?: (() => { ok: boolean, error?: string }) | null }} deps
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, proxy = null, announcements = null }) {
+export function createRequestHandler({ serveStatic, health, log, proxy = null, announcements = null, announcePublish = null, announceClear = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
@@ -90,6 +92,76 @@ export function createRequestHandler({ serveStatic, health, log, proxy = null, a
       health.registry.ban(pid, ADMIN_KICK_BAN_MS);
       if (s.connected && s.ws) { try { s.ws.close(CLOSE.KICKED, 'admin-kicked'); } catch {} }
       sendJson(req, res, 200, { ok: true, kicked: pid, name: s.name, banSec: Math.round(ADMIN_KICK_BAN_MS / 1000) });
+      return;
+    }
+    // 本扩展：一键踢走当前进程内所有在线连接，统一封禁 10 分钟（复用单踢的封禁窗口）。
+    if (parts.rawPath === '/api/admin/kickall') {
+      if (!ADMIN_TOKEN) { sendError(req, res, 403, 'admin token not configured'); return; }
+      const q = new URLSearchParams(parts.query || '');
+      if (q.get('token') !== ADMIN_TOKEN) { sendError(req, res, 403, 'bad admin token'); return; }
+      let kicked = 0;
+      for (const s of health.registry.byPlayerId.values()) {
+        if (!s.connected || !s.ws) continue;
+        health.registry.ban(s.playerId, ADMIN_KICK_BAN_MS);
+        try { s.ws.close(CLOSE.KICKED, 'admin-kickall'); } catch {}
+        kicked++;
+      }
+      sendJson(req, res, 200, { ok: true, kicked, banSec: Math.round(ADMIN_KICK_BAN_MS / 1000) });
+      return;
+    }
+    // 本扩展：房间对局进程——返回每个房间的实时对局阶段 / 回合 / 人数 / 档案，供监控大屏展示。
+    if (parts.rawPath === '/api/admin/rooms') {
+      if (!ADMIN_TOKEN) { sendError(req, res, 403, 'admin token not configured'); return; }
+      const q = new URLSearchParams(parts.query || '');
+      if (q.get('token') !== ADMIN_TOKEN) { sendError(req, res, 403, 'bad admin token'); return; }
+      const rooms = [];
+      for (const [code, r] of health.lobby.rooms) {
+        const m = r.match;
+        rooms.push({
+          code, mode: r.mode, difficulty: r.difficulty, rhine: !!r.rhineEnabled,
+          inMatch: !!m, matchNo: r.matchCount || 0,
+          phase: m ? m.phase : null, round: m ? m.round : 0,
+          seatCount: (r.seats || []).filter(Boolean).length,
+          humanCount: typeof r.activeHumans === 'function' ? r.activeHumans().length : 0,
+          hostId: r.hostId || null,
+        });
+      }
+      sendJson(req, res, 200, { ok: true, count: rooms.length, rooms });
+      return;
+    }
+    // 本扩展：发布「服务器更新强制公告」——在 announcements.json 顶部插入一条 force 公告，客户端进游戏即强制弹窗。
+    if (parts.rawPath === '/api/admin/announce') {
+      if (!ADMIN_TOKEN) { sendError(req, res, 403, 'admin token not configured'); return; }
+      const q = new URLSearchParams(parts.query || '');
+      if (q.get('token') !== ADMIN_TOKEN) { sendError(req, res, 403, 'bad admin token'); return; }
+      if (!announcePublish) { sendError(req, res, 501, 'server does not support force announce'); return; }
+      const title = (q.get('title') || '').trim() || '服务器更新公告';
+      const content = (q.get('content') || '').trim();
+      if (!content) { sendError(req, res, 400, 'content required'); return; }
+      // 上架 / 下架时间（可选）：epoch 毫秒。上架前不显示、下架后自动隐藏；缺省则立即上架、永久显示。
+      const startAt = q.get('startAt');
+      const expireAt = q.get('expireAt');
+      // force：缺省 true（强制弹窗）；显式传 false / 0 则作为普通公告发布（进公告栏、不弹窗）。
+      const forceRaw = q.get('force');
+      const force = forceRaw !== 'false' && forceRaw !== '0';
+      const r = announcePublish(title, content, {
+        force,
+        startAt: (startAt && /^\d+$/.test(startAt)) ? Number(startAt) : undefined,
+        expireAt: (expireAt && /^\d+$/.test(expireAt)) ? Number(expireAt) : undefined,
+      });
+      if (!r.ok) { sendError(req, res, 500, r.error || 'announce write failed'); return; }
+      sendJson(req, res, 200, { ok: true, updatedAt: r.updatedAt, forceId: r.forceId });
+      return;
+    }
+    // 本扩展：撤回全部强制公告——删除 announcements.json 里所有 force 项（普通公告保留）。
+    if (parts.rawPath === '/api/admin/announce-clear') {
+      if (!ADMIN_TOKEN) { sendError(req, res, 403, 'admin token not configured'); return; }
+      const q = new URLSearchParams(parts.query || '');
+      if (q.get('token') !== ADMIN_TOKEN) { sendError(req, res, 403, 'bad admin token'); return; }
+      if (!announceClear) { sendError(req, res, 501, 'server does not support clearing force announce'); return; }
+      const r = announceClear();
+      if (!r.ok) { sendError(req, res, 500, r.error || 'announce clear failed'); return; }
+      sendJson(req, res, 200, { ok: true, updatedAt: r.updatedAt, removed: r.removed });
       return;
     }
     if (proxy && parts.rawPath.startsWith('/api/')) {

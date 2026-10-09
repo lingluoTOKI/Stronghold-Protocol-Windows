@@ -185,6 +185,63 @@ const STATUS_TEXT = {
   online: N_('已连接服务器'), reconnecting: N_('连接中断，正在重连'), closed: N_('连接已关闭'),
 };
 
+// 上架 / 下架时间过滤：startAt 之前不显示、expireAt 之后自动隐藏（缺省不限）。
+function inSchedule(it) {
+  const now = Date.now();
+  if (it.startAt && now < Number(it.startAt)) return false;
+  if (it.expireAt && now > Number(it.expireAt)) return false;
+  return true;
+}
+
+/** 全局紧急公告宿主：挂载在应用根，**任何界面（标题 / 房间 / 对局…）都会轮询**，
+ *  一旦管理员发布「强制弹窗」紧急公告，就立刻弹出独立的 URGENT NOTICE 弹窗。
+ *  与公告栏（更新日志）分离；弹过一次的 forceId 会记住，不再重复弹。 */
+export function UrgentNoticeHost() {
+  const FORCE_SEEN_KEY = 'sp.bulletinForceSeen';
+  const readForceSeen = () => { try { return JSON.parse(localStorage.getItem(FORCE_SEEN_KEY) || '[]'); } catch { return []; } };
+  const [urgentOpen, setUrgentOpen] = useState(false);
+  const [urgent, setUrgent] = useState(null);
+  useEffect(() => {
+    let dead = false;
+    const load = () => {
+      fetch('/api/announcements', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (dead || !d || !Array.isArray(d.items)) return;
+          // 存在已上架、force:true 且尚未弹过的项 → 立即弹出紧急公告。
+          const forced = d.items.filter(inSchedule).find((it) => it.force && it.forceId && !readForceSeen().includes(it.forceId));
+          if (forced) { setUrgent(forced); setUrgentOpen(true); }
+        })
+        .catch(() => { /* 拉不到就不弹，静默重试 */ });
+    };
+    load();
+    // 尽量接近「实时」：HTTP 无推送，靠短轮询（公告接口很轻，10s 一次）。
+    const iv = setInterval(load, 10000);
+    return () => { dead = true; clearInterval(iv); };
+  }, []);
+  const closeUrgent = () => {
+    setUrgentOpen(false);
+    if (urgent && urgent.forceId) {
+      const list = readForceSeen();
+      if (!list.includes(urgent.forceId)) { list.push(urgent.forceId); localStorage.setItem(FORCE_SEEN_KEY, JSON.stringify(list)); }
+    }
+    setUrgent(null);
+  };
+  // 全局浮层：挂在应用根，任何界面（标题 / 房间 / 对局…）都会实时显示，样式为轻量的顶部警示条。
+  return html`${urgentOpen && urgent ? html`
+    <div class="urgent-toast" role="alert">
+      <div class="urgent-toast__head">
+        <span class="urgent-toast__tag">注意</span>
+        ${urgent.time ? html`<span class="urgent-toast__time">${urgent.time}</span>` : null}
+        <button class="urgent-toast__close" aria-label="关闭" onClick=${closeUrgent}>×</button>
+      </div>
+      <div class="urgent-toast__title">${urgent.title || '紧急公告'}</div>
+      <div class="urgent-toast__content">${urgent.content || ''}</div>
+    </div>` : null}`;
+}
+
+/** 公告栏按钮（更新日志）：只在标题 / 房间界面显示一个邮件图标，玩家手动点开查看普通公告；
+ *  不再负责紧急公告弹窗（那由全局 UrgentNoticeHost 处理，任何界面都弹）。 */
 export function BulletinButton() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
@@ -209,21 +266,25 @@ export function BulletinButton() {
     return () => { dead = true; clearInterval(iv); };
   }, []);
   const markSeen = () => { if (data && data.updatedAt) { localStorage.setItem(SEEN_KEY, data.updatedAt); setHasNew(false); } };
+  const closeModal = () => { setOpen(false); markSeen(); };
   // 公告按时间从近到远显示（最新的排在最上面）。
   //
   // 排序放在这里，而不是依赖 announcements.json 的书写顺序：那份文件被「把最新一条插到最前面」和
   // 「追加到末尾」两种方式交替维护过，顺序已经不可信（最旧的一条曾排在最新的前面）。`time` 是
   // `YYYY-MM-DD`，按字符串比较即等于按日期比较；同一天的多条保持它们在文件里的相对次序
   //（Array#sort 自 ES2019 起是稳定的）。test/announcements.test.js 守住 JSON 的降序约定。
+  // 公告栏只当「更新日志」：仅展示普通公告（force 紧急公告走全局独立弹窗，不混进日志）。
   const items = (data && Array.isArray(data.items) ? data.items : [])
     .slice()
+    .filter(inSchedule)
+    .filter((it) => !it.force)
     .sort((a, b) => String((b && b.time) || '').localeCompare(String((a && a.time) || '')));
   return html`<span class="bulletin-btn">
     <${Button} variant="ghost" size="sm" icon="mail" class=${`bulletin-btn__icon${hasNew ? ' has-new' : ''}`}
       title="服务器更新公告" aria-label="服务器更新公告"
       onClick=${() => { const n = !open; setOpen(n); if (n) markSeen(); }} aria-expanded=${open}>
     <//>
-    <${Modal} open=${open} onClose=${() => setOpen(false)} title="服务器更新公告"
+    <${Modal} open=${open} onClose=${closeModal} title="服务器更新公告"
       micro="SERVER BULLETIN" class="bulletin-modal-box">
       ${failed ? html`<div class="bulletin-modal__empty">暂无法连接公告服务</div>` : null}
       ${!failed && !data ? html`<div class="bulletin-modal__empty">加载中…</div>` : null}

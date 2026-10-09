@@ -23,6 +23,7 @@
 // The server only auto-listens when this file is the process entry point.
 
 import http from 'node:http';
+import fs from 'node:fs';
 import path from 'node:path';
 import { getData, loadData } from './data.js';
 import { ROOT, listenAddress, serveDirs, makeLogger, parseTrustProxy } from './http/config.js';
@@ -79,12 +80,47 @@ export async function startServer(opts = {}) {
   const proxy = proxyOrigin ? createProxy({ origin: proxyOrigin, log, maxPayload: WS_MAX_PAYLOAD }) : null;
   // 本扩展：服务器公告栏（服务端根目录的 announcements.json，mtime 热更新）。
   const announcements = createAnnouncements(path.join(ROOT, 'announcements.json'));
+  // 本扩展：发布 / 撤回「强制公告」——往 announcements.json 顶部插入 force 公告，或清掉所有 force 公告。
+  // 写文件后 mtime 变化，上面的 createAnnouncements 缓存会失效，客户端下一次轮询即拿到最新结果（无需重启）。
+  const announceApi = (() => {
+    const file = path.join(ROOT, 'announcements.json');
+    const ymd = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+    const read = () => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* 缺失/损坏 → 空列表 */ return { updatedAt: null, items: [] }; } };
+    const write = (items) => { const next = { updatedAt: new Date().toISOString(), items }; fs.writeFileSync(file, JSON.stringify(next, null, 2) + '\n', 'utf8'); return next; };
+    return {
+      publish: (title, content, opts = {}) => {
+        try {
+          const cur = read();
+          const items = Array.isArray(cur.items) ? cur.items : [];
+          const forceId = String(Date.now());
+          const item = { time: ymd(), title, content };
+          // force 缺省 true：加 force 标记触发客户端强制弹窗；显式 false 作为普通公告（进公告栏、不弹窗）。
+          if (opts.force !== false) { item.force = true; item.forceId = forceId; }
+          // 上架 / 下架时间（epoch ms）：上架前客户端不显示、下架后自动隐藏。
+          if (typeof opts.startAt === 'number') item.startAt = opts.startAt;
+          if (typeof opts.expireAt === 'number') item.expireAt = opts.expireAt;
+          items.unshift(item);
+          const next = write(items);
+          return { ok: true, updatedAt: next.updatedAt, forceId: item.forceId || null };
+        } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+      },
+      clear: () => {
+        try {
+          const cur = read();
+          const items = Array.isArray(cur.items) ? cur.items : [];
+          const kept = items.filter((it) => !it.force);
+          const next = write(kept);
+          return { ok: true, updatedAt: next.updatedAt, removed: items.length - kept.length };
+        } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+      },
+    };
+  })();
   const startedAt = Date.now();
   // The tag is per process (see buildTag): read the browser runtime once, here, not on every /healthz.
   resetBuildTag();
   buildTag();
 
-  const server = http.createServer(createRequestHandler({ serveStatic, health: { startedAt, network, registry, lobby }, log, proxy, announcements }));
+  const server = http.createServer(createRequestHandler({ serveStatic, health: { startedAt, network, registry, lobby }, log, proxy, announcements, announcePublish: announceApi.publish, announceClear: announceApi.clear }));
   server.on('clientError', answerClientError);
   const wss = attachWebSocket(server, { network, log, proxy });
 

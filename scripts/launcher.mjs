@@ -235,6 +235,12 @@ async function connect(cfg, rawAddr, { open = true, yes = false } = {}) {
   return 0;
 }
 
+/** 预设服务器列表（快速选择，不用手输地址）。 */
+const PRESET_SERVERS = [
+  { name: '主服（推荐）', addr: 'game.lingluotoki.dpdns.org' },
+  { name: '备用服（主服卡顿时用）', addr: '116.62.39.28:3000' },
+];
+
 /**
  * 模式 2：联机（本机客户端）——本机素材 + 远程服务器的联机。
  *
@@ -246,7 +252,24 @@ async function connect(cfg, rawAddr, { open = true, yes = false } = {}) {
  * 上游地址只来自这里的输入与启动器配置，**不走 URL 参数**，理由见 server/index.js 里 proxyTo 那段注释。
  */
 async function runProxy(cfg, rawAddr, { open = true, yes = false } = {}) {
-  const input = rawAddr || await ask('要联机的服务器地址（例如 game.example.com）', cfg.lastName);
+  let input = rawAddr;
+  // 没指定地址时：弹快捷服务器选择（主服/备用服/手动输入）
+  if (!input) {
+    console.log(`\n  ${c.bold('选择服务器：')}`);
+    PRESET_SERVERS.forEach((s, i) => {
+      console.log(`   ${c.cyan(`[${i + 1}]`)} ${s.name}  ${c.dim(s.addr)}`);
+    });
+    console.log(`   ${c.cyan('[0]')} 手动输入其他地址`);
+    const pick = await ask('输入序号', '1');
+    const idx = Number(pick) - 1;
+    if (pick === '0') {
+      input = await ask('服务器地址（例如 game.example.com）', cfg.lastName);
+    } else if (idx >= 0 && idx < PRESET_SERVERS.length) {
+      input = PRESET_SERVERS[idx].addr;
+    } else {
+      console.log(`${err} 无效选择`); return 1;
+    }
+  }
   if (!input) return 1;
   const parsed = parseServer(input);
   if (!parsed) { console.log(`${err} 地址无效：${input}`); return 1; }
