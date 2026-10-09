@@ -1169,5 +1169,6 @@
   "清空本机的统计数据": "Clear the statistics stored on this device",
   "本机数据：只保存在这个浏览器里，不会上传到服务器；同盟对局里队友的代号也会存在本机（导出文件里也有）。": "Local data: kept only in this browser, never uploaded to the server. Teammates' names from Team Simulations are stored here too (and appear in an export file).",
   "本机保存的统计数据无法读取，已另存为备份，从现在起重新记录。": "The stats stored on this device could not be read. They were set aside as a backup and recording starts afresh.",
-  "有 {n} 条记录已损坏，已忽略。": "{n} damaged {n|record was|records were} ignored."
+  "有 {n} 条记录已损坏，已忽略。": "{n} damaged {n|record was|records were} ignored.",
+  "潜能取你自己的潜能；练度是自持有加成（已持有的同名干员的养成，攻击 / 防御 / 生命单独乘算）。未持有的特许干员按潜能1、未精英化。": "Potential is your own; development is the owned-operator bonus (your training of the same Operator: ATK / DEF / HP, a separate multiplier). A licensed Operator you do not own fights at Potential 1, Non-Elite."
 }
