@@ -143,6 +143,7 @@ const speedControllable = (e) => !!e && e.authoritative !== false && !!e.own && 
  * What the runner compares between two looks at a 联防 battle (noteUniteLeft) before it reads the leakers' enemies still
  * standing again: a knock-out, a leak, a spawn, the end. `total` stands for the spawns no longer — a split child or a summon
  * is outside the capsule's denominator (DESIGN §14 顶栏胶囊) — so the length of the enemy list does.
+ * @param {any} b the battle
  */
 export const uniteLeftMark = (b) => `${Number(b.killed) || 0}:${Number(b.leakedCount) || 0}:${Number(b.total) || 0}:${Array.isArray(b.enemies) ? b.enemies.length : 0}:${b.finished ? 1 : 0}`;
 

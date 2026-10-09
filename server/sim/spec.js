@@ -263,7 +263,8 @@ export function uniteLeft(battle) {
 }
 
 /**
- * Progress numbers of a battle for b.progress / the teammates' waiting UI: game time, kills, total, counted leaks
+ * Progress numbers of a battle for b.progress / the teammates' waiting UI: game time, kills, total, the capsule's
+ * `resolved` (this field's own scheduled enemies knocked out or leaked — Battle.resolved), counted leaks
  * (normal / unite), the boss pool damage of this field, `leaksBy` of a boss / hidden field — per player, the LP the
  * enemies that reached its goal cost (every leak entry the result will show, × its `lpr`; the field's LP meter minus
  * their sum is the leader's own "扣除目标生命" effects) — and, unite fields, `left` (uniteLeft: each leaker's enemies
