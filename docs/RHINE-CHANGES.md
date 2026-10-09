@@ -2,8 +2,8 @@
 
 ## 2026-10-09 · 装置按人数逐个解锁 + 召唤物 Spine 补全 · v0.2.2-rhine.3
 
-- 科研装置改为按莱茵生命人数逐个解锁（对齐上游参考版 `rhineDeviceUnlocked`）：medical / energy 需 3 名莱茵干员，ecology 需 6 名。之前是「人数够 1 个就一次性发全部 3 台进备牌区」，改为每台装置独立判断 `bond.count >= minCount`，不够的装置备牌区留空、不硬发空槽——修了「装置根本不进科研备牌区（dock 空）」的问题。
-- `shared/rhineResearch.js`：三装置各加 `minCount` 字段（medical=3、energy=3、ecology=6），新增 `rhineDeviceUnlocked(device, bond)` 共享判断函数；`server/match/player/round.js` 的 `_syncResearch` 重写为按装置逐个解锁/收回。
+- 科研装置改为按莱茵生命人数逐个解锁（对齐官方描述「3人1台 / 6人2台 / 9人3台」与上游参考版 `rhineDeviceUnlocked`）：medical 需 3 名莱茵干员，energy 需 6 名，ecology 需 9 名。之前是「人数够 1 个就一次性发全部 3 台进备牌区」，改为每台装置独立判断 `bond.count >= minCount`，不够的装置备牌区留空、不硬发空槽——修了「装置根本不进科研备牌区（dock 空）」的问题。
+- `shared/rhineResearch.js`：三装置各加 `minCount` 字段（medical=3、energy=6、ecology=9），新增 `rhineDeviceUnlocked(device, bond)` 共享判断函数；`server/match/player/round.js` 的 `_syncResearch` 重写为按装置逐个解锁/收回。人数掉到 minCount 以下时，除按容量回收外，还按 `rhineDeviceUnlocked` 把不再满足门槛的已部署装置一并收回。
 - 补全 39 个召唤物 Spine 战斗模型：卡尔西 Mon3tr、令的 3 个分身、温迪巨炮、各类无人机/装置/棱镜塔等，从旧版 `public/assets/local/spine/token/` 搬回（这些模型任何 web dump 都没有，上游设计就是从本地客户端 extract.py 提取），三件套 `.skel/.atlas/.png` 齐全；`data/local-assets.json` 的 groups 从 17 合并到 62。之前这些召唤物在场上只能显示静态图，现在有骨骼动画。
 - 渲染修复延续上一条（v0.2.2-rhine.2）：WebGL 启动、血条颜色、SpineActor.setRunMode。
 

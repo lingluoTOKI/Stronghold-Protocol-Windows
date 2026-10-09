@@ -107,7 +107,11 @@ export class PlayerRound {
     let kept = 0;
     for (const [key, p] of this.board) {
       if (!p.research) continue;
-      if (kept++ < cap) continue;
+      // 回收条件：超容量（kept ≥ cap），或这台装置的人数门槛已不满足（rhineDeviceUnlocked 为 false）。
+      // 后者是「人数掉到 minCount 以下」那条补救：只按 cap 数数的话，6 莱茵只摆了生态调控器、
+      // 死一人后 cap 变 1 而场上恰只有 1 台，会漏收这台本应在 <6 人时失效的装置。
+      const underMin = !rhineDeviceUnlocked(p.id, bond);
+      if (kept++ < cap && !underMin) continue;
       this.board.delete(key);
       this._returnResearch(p);
     }
