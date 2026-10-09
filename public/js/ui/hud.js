@@ -23,15 +23,9 @@
 // 准备就绪 is refused while the temp overflow row (临时整备区) holds pieces: the reason shows under the button
 // (user playtest #3 item 3; the row's own label is ui/underframe.js TempRowNotice).
 
-<<<<<<< HEAD
-import { useRef, useState, useEffect } from '../../vendor/hooks.module.js';
-import { PHASE } from '../../../shared/constants.js';
-import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, useTicker, hasDeadline } from './components.js';
-=======
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { PHASE } from '../../../shared/constants.js';
-import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, Modal, useTicker } from './components.js';
->>>>>>> d7c665db (feedback7 UIBACK: the match's top bar lists the spectator seats — a 观战席 capsule (eye + count) beside the latency opens the roster, the host removes a spectator with its ✕ while the match runs (PR #120 by @salt-fishes, the part the owner accepted: the cap stays 2, no per-room spectator option); the server already took room.removeSpectator at any time — test/match/lobby-integration.test.js now covers the host removing one mid-match (room.closed kicked, the other spectator and the host told, no frame after it, the seat refilled), test/ui/spectator-roster.e2e.test.js the capsule; one new UI string in the four packs; the dev mock seats spectators on ?variant=spectators; golden: unchanged (client only))
+import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, Modal, useTicker, hasDeadline } from './components.js';
 import { Sprite, LpTower, GIcon, LocalSprite } from './gameComponents.js';
 import { localAsset } from '../data.js';
 import { serverNow } from '../store.js';
@@ -82,6 +76,7 @@ export function SpectatorPill({ spectators, myId, isHost, onRemove }) {
       <p class="spec__hint t-lo">${t('观战者不占博士席位，只能观看；创建者可以把观战者移出，被移出的人不再收到战场画面。')}</p>
     <//>` : null}`;
 }
+
 
 /**
  * Phase capsule: prep label, kills n/m (combat/unite), kills + boss HP bar (boss rounds).
@@ -434,26 +429,18 @@ function useBattleCountdown(speed) {
  *   onReady:(r:boolean)=>void, readyBusy?:boolean, readyCount?:number, playerCount?:number,
  *   pen?:boolean, penAvail?:boolean, onPen?:(on:boolean)=>void, config?: any, frozenAt?: number|null,
  *   pause?: { show: boolean, paused: boolean, busy?: boolean, onToggle: () => void } | null,
-<<<<<<< HEAD
- *   speed?: { show: boolean, value: number, onCycle: () => void } | null,
+ *   speed?: { show: boolean, value: number, onCycle: () => void, clock?: () => number|null } | null,
  *   skip?: { show: boolean, ready?: boolean, onSkip: () => void } | null,
- *   live?: { pending: number, unite: boolean, left?: number|null } | null }} props
-=======
  *   live?: { pending: number, unite: boolean, left?: number|null } | null,
  *   spectators?: any[]|null, myId?: any, isHost?: boolean, onRemoveSpectator?: ((playerId: any) => any)|null }} props
  *   spectators: the room's spectator seats (room.state) — the 观战席 capsule beside the latency (SpectatorPill; the host removes)
->>>>>>> d7c665db (feedback7 UIBACK: the match's top bar lists the spectator seats — a 观战席 capsule (eye + count) beside the latency opens the roster, the host removes a spectator with its ✕ while the match runs (PR #120 by @salt-fishes, the part the owner accepted: the cap stays 2, no per-room spectator option); the server already took room.removeSpectator at any time — test/match/lobby-integration.test.js now covers the host removing one mid-match (room.closed kicked, the other spectator and the host told, no frame after it, the seat refilled), test/ui/spectator-roster.e2e.test.js the capsule; one new UI string in the four packs; the dev mock seats spectators on ?variant=spectators; golden: unchanged (client only))
  *   frozenAt: the server time every clock shows while the solo match is paused (null = live)
  *   live: the own battle's pending LP loss (liveLp): the tower shows lp − pending in red with a −N tick, 联防中 during 联防;
  *     `left` (a leaker in 联防): its enemies still standing — the capsule's ×N tag
  */
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
-<<<<<<< HEAD
-  config = null, frozenAt = null, pause = null, speed = null, skip = null, live = null, spectator = false }) {
-=======
-  config = null, frozenAt = null, pause = null, live = null, spectator = false,
+  config = null, frozenAt = null, pause = null, speed = null, skip = null, live = null, spectator = false,
   spectators = null, myId = null, isHost = false, onRemoveSpectator = null }) {
->>>>>>> d7c665db (feedback7 UIBACK: the match's top bar lists the spectator seats — a 观战席 capsule (eye + count) beside the latency opens the roster, the host removes a spectator with its ✕ while the match runs (PR #120 by @salt-fishes, the part the owner accepted: the cap stays 2, no per-room spectator option); the server already took room.removeSpectator at any time — test/match/lobby-integration.test.js now covers the host removing one mid-match (room.closed kicked, the other spectator and the host told, no frame after it, the seat refilled), test/ui/spectator-roster.e2e.test.js the capsule; one new UI string in the four packs; the dev mock seats spectators on ?variant=spectators; golden: unchanged (client only))
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
