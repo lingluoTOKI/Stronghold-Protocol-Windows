@@ -31,8 +31,6 @@
 
 import { itemKeyOf, isCoreBond } from '../support/index.js';
 import { metaBonds } from '../support/meta.js';
-import { RHINE_BOND } from '../../../../shared/rhineResearch.js';
-import { msg, dn } from '../../../../shared/i18n.js';
 
 const int = (v, d = 0) => (Number.isFinite(v) ? Math.trunc(v) : d);
 
@@ -87,21 +85,12 @@ export function registerMeta(registry) {
     },
   }));
 
-  // Bonds the pager/phone may search for mates. The Rhine research bond (rhineShip) grows by research, not by
-  // recruitment pager — community #45 (2026-10-06): on 缪尔赛思 (maniShip + rhineShip) the pager must see only 调和,
-  // so below shop level 6 there is no mate and the item is used up with nothing. (No-op in vanilla: rhineShip absent.)
-  const pagerBonds = (ctx, targetUid) => {
-    const b = new Set(ctx.pieceBonds(targetUid));
-    b.delete(RHINE_BOND);
-    return b;
-  };
-
   // 寻呼模块 — use_equip_reward_special_goods_char_chess {refresh_cnt, choice_cnt}
   wrap(registry, 'chess_item_4_01_e', () => ({
     onEquip(ctx, ev) {
       const p = buffP(ctx, ev.item && ev.item.id, 'use_equip_reward_special_goods_char_chess') || {};
       const n = Math.max(1, int(p.refresh_cnt, 3));
-      const bonds = pagerBonds(ctx, ev.target.uid);
+      const bonds = new Set(ctx.pieceBonds(ev.target.uid));
       const maxTier = ctx.shopLevel();
       const shares = (id) => { const c = ctx.gd.chess(id); return !!(c && Array.isArray(c.bonds) && c.bonds.some((b) => bonds.has(b))); };
       const ids = [];
@@ -111,23 +100,6 @@ export function registerMeta(registry) {
         if (id) ids.push(id);
       }
       if (ids.length) ctx.offerChess(ids, { source: 'item' });
-      // nothing to offer (e.g. 缪尔赛思's 调和 below shop level 6): still destroyed — say why (GitHub #401, builtinMeta toastNothing)
-      else ctx.toast(msg('{who}：没有可获得的同盟约干员', { who: dn(ctx.gd.item(ev.item?.id)?.name || '') }), 'warn');
-    },
-  }));
-
-  // 简易通讯机 — use_equip_reward_char_chess_with_same_bond {count}: grant `count` mates directly (same rhineShip exclusion).
-  wrap(registry, 'chess_item_2_06_e', () => ({
-    onEquip(ctx, ev) {
-      const p = buffP(ctx, ev.item && ev.item.id, 'use_equip_reward_char_chess_with_same_bond') || {};
-      const n = Math.max(1, int(p.count, 1));
-      const bonds = pagerBonds(ctx, ev.target.uid);
-      const maxTier = ctx.shopLevel();
-      const shares = (id) => { const c = ctx.gd.chess(id); return !!(c && Array.isArray(c.bonds) && c.bonds.some((b) => bonds.has(b))); };
-      for (let k = 0; k < n; k++) {
-        const id = ctx.rollChess({ maxTier, filter: (x) => shares(x) });
-        if (id) ctx.grantChess(id);
-      }
     },
   }));
 
@@ -144,22 +116,25 @@ export function registerMeta(registry) {
     }));
   }
 
-  // 画卷 — trap_copy_front_char: copy the operator in range (elite status included) with its equipment. A copied
-  // normal item that completes a pair with an owned one merges at once and the golden stays in the hand (research 04
-  // addendum "两个同名道具（无论是否被装备）会自动合并…并自动返回整备区"); the built-in equipped that golden on the copy.
+  // 画卷 — trap_copy_front_char: copy the operator in range (elite status included) and its equipment. The copied items
+  // are gained unequipped, like any gained item — the hand, overflow temp, destroyed with the usual toast when both are
+  // full — never put on the copy (PRTS 画卷 备注 "使用后销毁，获得的装备为未装备状态"; until 0.2.2 a copied item that did
+  // not merge was equipped onto the copy). A copied normal item that completes a pair with an owned one merges at once,
+  // the golden in the hand (research 04 addendum "两个同名道具（无论是否被装备）会自动合并…并自动返回整备区"). A copy that
+  // completes a three-copy merge (GitHub #389, PR #390): the promotion returns the copies' equipment to the hand too
+  // (PRTS 帮助 "在失去该干员（…合并等）…时自动卸除"), so the elite wears nothing and a copied normal item merges with the
+  // returned original.
   wrap(registry, 'chess_item_6_02_m', () => ({
     onArt(ctx, ev) {
       const target = (ev.targets || []).find((p) => p && p.kind === 'chess');
       if (!target) { ev.error = 'BAD_TARGET'; ev.detail = 'no operator in range'; return; }
+      // snapshot before the gain: a gain that completes a merge consumes the target and empties `target.items`, and an
+      // item merge detaches the original's copy from `target.items` while we iterate (the built-in's live loop then
+      // skipped the next item)
+      const itemIds = (target.items || []).map((it) => it.id);
       const copy = ctx.grantChess(target.id, { requirePool: false, source: 'item:chess_item_6_02_m' });
       if (!copy) { ev.error = 'HAND_FULL'; return; }
-      // snapshot first: a merge detaches the original's copy of the item from `target.items` while we iterate
-      // (the built-in's live loop then skipped the next item)
-      for (const itemId of (target.items || []).map((it) => it.id)) {
-        const got = ctx.grantItem(itemId, { source: 'item:chess_item_6_02_m' });
-        const holder = got ? ctx.piece(copy.uid) : null;
-        if (got && got.id === itemId && holder && holder.kind === 'chess') ctx.equipDirect(got.uid, holder.uid);
-      }
+      for (const itemId of itemIds) ctx.grantItem(itemId, { source: 'item:chess_item_6_02_m' });
     },
   }));
 
