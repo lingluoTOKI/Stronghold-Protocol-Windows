@@ -695,12 +695,20 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     // (a teammate's 自选 row hands its unit's pick on, `target.diy`: their operator, not the empty 甄选干员 slot — 0.2.1)
     const mate = foreign && c && target.diy && typeof target.diy === 'object' ? diyRecordFor(c, target.diy, dd) : null;
     const d = mate ? { chess: mate, diy: target.diy } : foreign ? null : ownDiy(c);
+<<<<<<< HEAD
     // 0.2.2: a teammate's member card reads its unit's 潜能 / 练度 when the row hands it on (`target.cultivation`), else
     // the defaults (never the viewer's own settings)
     const cv = foreign ? (target.cultivation !== undefined ? { cultivation: target.cultivation } : { ops: null }) : null;
     if (d) return { type: 'chess', chess: d.chess, hint: target.hint || null, standIn: null, diy: d.diy, ...(items.length ? { unitItems: items } : {}), ...(cv ? { cultOpts: cv } : {}) };
     const si = !c ? null : foreign ? (typeof target.standInFor === 'string' && target.standInFor ? standInOf(c, backups) : null) : ownSi(c);
     return c ? { type: 'chess', chess: c, hint: target.hint || null, standIn: si, ...(items.length ? { unitItems: items } : {}), ...(cv ? { cultOpts: cv } : {}) } : null;
+=======
+    // `tap`: which card tap opened it (game.js numbers every shop / reward card it opens) — selectVoiceKey
+    const tap = target.tap != null ? { tap: target.tap } : null;
+    if (d) return { type: 'chess', chess: d.chess, hint: target.hint || null, standIn: null, diy: d.diy, ...(items.length ? { unitItems: items } : {}), ...tap };
+    const si = !c ? null : foreign ? (typeof target.standInFor === 'string' && target.standInFor ? standInOf(c, backups) : null) : ownSi(c);
+    return c ? { type: 'chess', chess: c, hint: target.hint || null, standIn: si, ...(items.length ? { unitItems: items } : {}), ...tap } : null;
+>>>>>>> bcee737f (feedback7 R22-VOICES: review fixes — a 选中 tap no longer restarts the battle-voice gap, and the second shop / reward card of one operator says its 选中 line too; the package switch's comment quotes the measured JP size; golden: unchanged)
   }
   if (target.kind === 'item') { const it = data.lookup('items', target.id); return it ? { type: 'item', item: it } : null; }
   if (target.kind === 'enemy') { const en = data.lookup('enemies', target.id); return en ? { type: 'enemy', enemy: en, count: target.count } : null; }
@@ -735,6 +743,18 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
 }
 
 /**
+ * The 选中干员 key of a resolved detail (null: nothing to say). The panel says the line once per opened operator and stays
+ * mounted while its target changes, so the key carries what identifies the opening: the chess record, the piece / battle
+ * unit, and the card tap (`tap`, game.js) — two shop / reward cards of one operator (the pool deals duplicates) carry the
+ * same chess id and no piece, so without it the second card's tap said nothing, nor replaced the first one's line.
+ * @param {any} detail resolveDetail's result
+ * @returns {string|null}
+ */
+export function selectVoiceKey(detail) {
+  return detail?.type === 'chess' ? `${detail.chess?.chessId || ''}:${detail.unitId ?? detail.piece?.uid ?? ''}:${detail.tap ?? ''}` : null;
+}
+
+/**
  * The panel.
  * @param {{ detail:any, editable:boolean, snapHp?:{hp:number,max:number}|null, onClose:Function, onSell:(piece:any)=>void, onDestroy:(piece:any)=>void,
  *   bonds?: any[], offBonds?: Set<string>|null, loadout?: any, onBond?: (bondId:string)=>void, side?: 'left'|'right', shopOpen?: boolean }} props
@@ -757,8 +777,8 @@ export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestr
   const getter = typeof live === 'function' ? live : null;
   useTicker(detail && getter ? 250 : 0);
   // 选中干员 voice (audio.voice 'select'): once per opened operator — the panel stays mounted while the target changes,
-  // so the key carries what identifies it (its chess record and its piece / battle unit id)
-  const selectKey = voice && detail?.type === 'chess' ? `${detail.chess?.chessId || ''}:${detail.unitId ?? detail.piece?.uid ?? ''}` : null;
+  // so the key carries what identifies it (its chess record, its piece / battle unit id, the card tap: selectVoiceKey)
+  const selectKey = voice && detail?.type === 'chess' ? selectVoiceKey(detail) : null;
   // 0.2.0 补位: a chess fielded as its stand-in is spoken for by the stand-in (the operator on the field, whose model, name
   // and battle lines the card and audio.js show), never by the operator it replaces; a 自选 record is already the pick's
   const selectChar = voice && detail?.type === 'chess' ? detail.standIn?.charId || detail.chess?.charId || null : null;
