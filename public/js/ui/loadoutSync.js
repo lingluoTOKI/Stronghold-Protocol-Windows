@@ -40,6 +40,9 @@ function readStored(profileId = data.profileId) {
 function readStoredOps() {
   try { return parseStoredOps(loadPref(LOADOUT_PREF, null)); } catch { return {}; }
 }
+function readStoredOps() {
+  try { return parseStoredOps(loadPref(LOADOUT_PREF, null)); } catch { return {}; }
+}
 function readStoredOwnership() {
   try { return parseStoredOwnership(loadPref(OWNERSHIP_PREF, null)); } catch { return []; }
 }
