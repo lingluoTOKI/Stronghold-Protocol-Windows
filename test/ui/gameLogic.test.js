@@ -521,8 +521,18 @@ describe('keyboard & settings', () => {
   test('sanitizeSettings', () => {
     assert.deepEqual(sanitizeSettings(null), { ...DEFAULT_SETTINGS });
     assert.deepEqual(sanitizeSettings({ bgm: 3, sfx: -1, voice: 2, muted: 'yes', damageNumbers: false, quality: 'ultra' }),
+<<<<<<< HEAD
       { bgm: 1, sfx: 0, voice: 1, muted: false, damageNumbers: false, quality: 'high' });
+=======
+      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', muted: false, damageNumbers: false, quality: 'high', keys: { ...DEFAULT_SETTINGS.keys } },
+      'a saved profile without `keys` (before 0.2.0) gets the default key map (test/ui/feedback5-hotkeys.test.js)');
+>>>>>>> ddf8c39e (feedback7 R22-VOICES: the Japanese voice dub as a second tree beside the Chinese one — audio.voiceJp (the same slots and file names from ArknightsAssets2 voice/: 2674 files, 89.4 MB, for the 191 voiced operators), 设置 → 语音语言 中文 / 日本語 (default 中文, not tied to the interface language), a JP line the manifest or the host lacks plays the Chinese one; the full zip ships both dubs (one switch, tools/package.mjs FULL_ZIP_JP_VOICE), the lite zip stays art-free (the owner's request of 2026-10-08 「全套的日配语音」); golden: unchanged)
     assert.equal(sanitizeSettings({ bgm: 0.5 }).voice, DEFAULT_SETTINGS.voice, 'a saved profile without `voice` gets the default');
+    // 语音语言 (0.2.2): 中文 by default — a profile saved before it, or any other value, plays the Chinese dub
+    assert.equal(DEFAULT_SETTINGS.voiceLang, 'cn');
+    assert.equal(sanitizeSettings({ bgm: 0.5 }).voiceLang, 'cn');
+    assert.equal(sanitizeSettings({ voiceLang: 'jp' }).voiceLang, 'jp');
+    for (const bad of ['en', 'kr', 'JP', 'ja', 1, null]) assert.equal(sanitizeSettings({ voiceLang: bad }).voiceLang, 'cn', String(bad));
     assert.equal(sanitizeSettings({ bgm: 0.333 }).bgm, 0.33);
     assert.equal(sanitizeSettings({ quality: 'low' }).quality, 'low');
   });
