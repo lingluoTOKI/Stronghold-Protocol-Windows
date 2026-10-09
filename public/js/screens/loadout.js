@@ -26,7 +26,7 @@ import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.
 import { html, Icon, MicroLabel, Button, TierChip, TextField, Countdown, Spinner, confirmDialog, hasDeadline, Modal, Fragment } from '../ui/components.js';
 import { Img, RichText, UnitThumb } from '../ui/gameComponents.js';
 import { chessAvatarUrl, chessPortraitUrl, subProfIconUrl, bondIconUrl, moduleTypeIconUrl } from '../ui/assetUrls.js';
-import { chessStatsBlock, traitText, chessTalents } from '../ui/detailPanel.js';
+import { chessStatsBlock, traitText, chessTalents, GarrisonBlock } from '../ui/detailPanel.js';
 import { chessLoadout } from '../ui/gameLogic.js';
 import { data, useData, localAsset, DATA_FILES } from '../data.js';
 import { useStore } from '../store.js';
@@ -230,6 +230,14 @@ export function RosterRow({ m, chess, golden, entries, ops = {}, selected, onPic
 
 // ---- detail --------------------------------------------------------------------------------------------------------------
 
+/** The same attribute records and rich-text renderer as the in-match card, including literal trigger markers. */
+export function LoadoutGarrisons({ chess, m }) {
+  const records = (chess?.garrisonIds || []).map((id) => data.lookup('garrisons', id)).filter(Boolean);
+  return records.length ? html`<section class="lo-garrisons" data-variant=${chess.isGolden ? 'elite' : 'normal'}>
+    ${records.map((garrison) => html`<${GarrisonBlock} key=${garrison.garrisonId} garrison=${garrison} m=${m} />`)}
+  </section>` : null;
+}
+
 function SkillOption({ m, opt, on, level, onPick }) {
   const rec = level === 'elite' ? opt.elite || opt.normal : opt.normal || opt.elite;
   const tags = skillTags(rec);
@@ -380,11 +388,7 @@ function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset,
       <${Button} variant="ghost" size="sm" icon="refresh" class="lo-dhead__reset" disabled=${!changed} onClick=${onReset}>${t('恢复默认')}<//>
     </div>
     <div class="lo-detail__body" ref=${bodyRef}>
-<<<<<<< HEAD
-=======
-      <${CultivationSection} charId=${chess.charId} ops=${ops} onSet=${onOps} standIn=${notOwned} />
       <${LoadoutGarrisons} chess=${level === 'elite' && golden ? golden : chess} m=${m} />
->>>>>>> dc336f24 (feedback7 R22-LOADOUT: 干员调配's roster is one list — a row per operator with the quick skill / module choices and the 潜能 / 练度 selects in aligned columns — and the detail opens with 潜能与练度; golden: unchanged)
       <section class="lo-sec">
         <header class="lo-sec__head">
           <h3>${t('技能')}<${MicroLabel}>SKILL<//></h3>
@@ -508,12 +512,8 @@ export function DataMissing({ files }) {
 
 /** The overlay screen. */
 function LoadoutScreen({ st }) {
-<<<<<<< HEAD
-  const settled = useData('chess', 'bonds', 'assets', 'local', 'backups');
+  const settled = useData('chess', 'bonds', 'assets', 'local', 'backups', 'garrisons');
   const ready = settled && data.isReady('chess', 'bonds');
-=======
-  const ready = useData('chess', 'bonds', 'assets', 'local', 'backups', 'garrisons', 'effects');
->>>>>>> dc336f24 (feedback7 R22-LOADOUT: 干员调配's roster is one list — a row per operator with the quick skill / module choices and the 潜能 / 练度 selects in aligned columns — and the detail opens with 潜能与练度; golden: unchanged)
   const phase = useStore((s) => s.match?.public?.phase || null);
   const inMatch = useStore((s) => !!s.room?.inMatch);
   // co-op briefing (INFO_CHECK, 25 s): the overlay covers the briefing's own countdown, so it shows the time left — the

@@ -40,9 +40,6 @@ function readStored(profileId = data.profileId) {
 function readStoredOps() {
   try { return parseStoredOps(loadPref(LOADOUT_PREF, null)); } catch { return {}; }
 }
-function readStoredOps() {
-  try { return parseStoredOps(loadPref(LOADOUT_PREF, null)); } catch { return {}; }
-}
 function readStoredOwnership() {
   try { return parseStoredOwnership(loadPref(OWNERSHIP_PREF, null)); } catch { return []; }
 }
@@ -164,6 +161,7 @@ export function openLoadout(from = 'lobby', sel = null, tab = null) {
   data.load('local');
   data.load('backups');
   data.load('effects'); // 0.2.2: the 练度 multipliers of the 局内数值 (effects.json CHAR_MAP)
+  data.load('garrisons'); // the 特质 at the top of the detail (PR #301)
   loadoutStore.set({ open: true, from, ...(sel ? { sel } : {}), ...(tab === 'loadout' || tab === 'ownership' || tab === 'diy' ? { tab } : {}) });
 }
 export const closeLoadout = () => loadoutStore.set({ open: false });
