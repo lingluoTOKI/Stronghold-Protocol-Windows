@@ -11,8 +11,8 @@
     },
     {
       "path": "backups.json",
-      "size": 1883848,
-      "sha256": "7b528a931577556716d935d0c9509eb05c1f6a2f24464ad500ac8f2a795a806f"
+      "size": 2054458,
+      "sha256": "02211c0bdcaea3e511b2f89442fffd47f407ca9c3a630ca9ee93b979e3f0deb9"
     },
     {
       "path": "bands.json",
@@ -21,8 +21,8 @@
     },
     {
       "path": "bonds.json",
-      "size": 85693,
-      "sha256": "53a22f4724771b6ff40041635e907c0af39790731f661b0439fc593f5a91c94c"
+      "size": 85077,
+      "sha256": "e852b6aabbf25f48be4f786d3c709e4012f7ce1dec1bee92f204473419916f08"
     },
     {
       "path": "bosses.json",
@@ -31,8 +31,8 @@
     },
     {
       "path": "chess.json",
-      "size": 1712670,
-      "sha256": "34338e7cd766981ce43d3e4049d9a60b3d2aea017e00f5cfea8682bcfe54461b"
+      "size": 1875334,
+      "sha256": "ba7d338b3940fc123c9834a888a9cea1b9b14ee0c756d27463c68ca62f005437"
     },
     {
       "path": "choices.json",
@@ -81,8 +81,8 @@
     },
     {
       "path": "tokens.json",
-      "size": 133951,
-      "sha256": "ca98a1189d62c3221e3bc9d149f8ba67d44cab5a6c5e780251fb162177d6519c"
+      "size": 137892,
+      "sha256": "81739c67e38ad882fdc7640f07ffbf7d82d9c2a1176287ff2dd2e071cb83163b"
     },
     {
       "path": "tuning.json",
