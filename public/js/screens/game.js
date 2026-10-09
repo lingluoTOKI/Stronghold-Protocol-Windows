@@ -1105,15 +1105,6 @@ function MatchScreen() {
   const selEntry = sel ? placeCtx.pieces.get(sel.uid) || null : null;
   live.current.showPrep = showPrep;
   useEffect(() => { if (sel && (!selEntry || !editable || !showPrep)) setSel(null); }, [sel, selEntry, editable, showPrep]);
-<<<<<<< HEAD
-  const selRangeKey = selEntry && selEntry.area === 'board' ? `${selEntry.piece.uid}:${selEntry.row},${selEntry.col}:${pieceDir(selEntry.piece)}:${researchRange(selEntry.piece)?.radius ?? ''}` : '';
-  useEffect(() => {
-    if (!view || !selRangeKey) return undefined;
-    showRange(view, previewGrid(lookups, selEntry.piece), selEntry.row, selEntry.col, pieceDir(selEntry.piece), SEL_RANGE, researchRange(selEntry.piece)?.radius);
-    return () => showRange(view, null, 0, 0, null, SEL_RANGE);
-  }, [view, selRangeKey]);
-=======
->>>>>>> 0ca2a9c2 (feedback7 R22-LATE: an open detail card draws its field unit's current attack range — own board pieces in prep, any ally operator / summon in battle or on a scouted board; golden: unchanged)
   // the selected piece's underframe on screen: the detail card docks on the side away from it (user playtest #2
   // item 8 — at some aspect ratios a bench unit's 出售 sat under the left card); the underframe is drawn above every
   // panel anyway (css z-index), this keeps it visible too
@@ -1408,11 +1399,8 @@ function MatchScreen() {
 <<<<<<< HEAD
         speed=${canSpeed ? { show: true, value: speedValue, onCycle: cycleSpeed, clock: () => (battleRunner?.battleClock?.() ?? null) } : null}
         skip=${canSkip ? { show: true, ready: skipReady, onSkip: skipBattleCb } : null}
-        live=${liveLpNow} spectator=${spectator} />
-=======
         live=${liveLpNow} spectator=${spectator}
         spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} />
->>>>>>> d7c665db (feedback7 UIBACK: the match's top bar lists the spectator seats — a 观战席 capsule (eye + count) beside the latency opens the roster, the host removes a spectator with its ✕ while the match runs (PR #120 by @salt-fishes, the part the owner accepted: the cap stays 2, no per-room spectator option); the server already took room.removeSpectator at any time — test/match/lobby-integration.test.js now covers the host removing one mid-match (room.closed kicked, the other spectator and the host told, no frame after it, the seat refilled), test/ui/spectator-roster.e2e.test.js the capsule; one new UI string in the four packs; the dev mock seats spectators on ?variant=spectators; golden: unchanged (client only))
 
       <div class="gm__bonds">
         <button type="button" class="bonds-toggle" aria-expanded=${!bondsCollapsed} aria-controls="match-bond-strip"
@@ -1491,7 +1479,8 @@ function MatchScreen() {
         onClose=${() => setBondOpen(null)} onMember=${(id, items, standInFor, diy) => setDetail({ kind: 'chess', id, owner: bondPop.ownerId, items: items || null, standInFor: standInFor || null, diy: diy || null })} />` : null}
 
       ${resolved ? html`<${DetailPanel} detail=${resolved} snapHp=${snapHp} onClose=${() => { setDetail(null); setSel(null); }}
-        bonds=${detailBonds} offBonds=${offBonds} loadout=${detailLoadout} ops=${priv?.ops ?? null} side=${dSide} shopOpen=${shopOpen} live=${liveStats} voice=${combat}
+<<<<<<< HEAD
+        bonds=${detailBonds} offBonds=${offBonds} loadout=${detailLoadout} ops=${priv?.ops ?? null} side=${dSide} shopOpen=${shopOpen} live=${liveStats} voice=${true}
         onBond=${(id) => openBond(id, detailOwner, 'detail')} />` : null}
 
       ${selEntry && editable && !facing && !drag && showPrep ? html`<${Underframe} key=${sel.uid} view=${view} uid=${sel.uid}

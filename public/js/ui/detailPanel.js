@@ -745,6 +745,13 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
  *   resolved as another player's carries its own, `detail.cultOpts`)
  *   live: the unit's live stats (unitStatsEntry + src 'battle' | 'prep') — an object, or a getter the panel re-reads 4×
  *   a second (the battle's own sim, battle/runner.js unitStats); null ⇒ the record's numbers
+<<<<<<< HEAD
+=======
+ *   voice: whether the panel may speak — 选中干员 (audio.voice 'select') when it opens on an operator the player tapped:
+ *   a piece on the field or in the hand, a shop / reward card, a bond member. The game screen passes true in every phase
+ *   (the owner's request of 2026-10-08 「添加一下干员点击上去的语气一样的语音」 lifted 2026-10-03's 「整备阶段不需要干员语音」
+ *   for this line only; [ASSUMED] the official prep tap says 选中干员 like the battle's FOCUS_CHAR)
+>>>>>>> cb8865d9 (feedback7 R22-VOICES: a tap on an operator says its 选中干员 line in every phase — the prep, the shop and the hand too, not only while a battle runs (the owner's request of 2026-10-08 「添加一下干员点击上去的语气一样的语音」, lifting 2026-10-03's 「整备阶段不需要干员语音」 for this line only; [ASSUMED] the official prep tap = the battle's FOCUS_CHAR); golden: unchanged)
  */
 export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestroy, bonds = [], offBonds = null, loadout = null, ops = null, onBond = null, side = 'left', shopOpen = false, live = null, voice = false }) {
   const getter = typeof live === 'function' ? live : null;
