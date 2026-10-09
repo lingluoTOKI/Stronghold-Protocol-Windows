@@ -35,6 +35,8 @@
 //        pieceDragStart { uid, piece, from } · pieceDrop { uid, piece, from, target } · pieceDragEnd {uid, dropped}
 //        pieceClick { uid, piece, button, detail, clientX, clientY } (battle units: { unitId, uid, unit, … })
 //        pieceDetail (right-click / long-press) · pieceHover { uid } | { uid: null } (battle: + unitId, unit)
+//        tileClick { row, col, x, y } — the ground itself was tapped and nothing stands there (GitHub issue #184:
+//        a special terrain tile's own tip; the screen resolves it with gameLogic.terrainInfo)
 //        tileHover { row, col, area, idx } | null (while dragging: the drop target — the tile under the pointer)
 //   view.pieceScreenRect(uid) → { left, top, right, bottom, width, height, x, y } (client px: the drawn body) | null
 // Picking (user playtest #4 item 1: the ground is drawn as tiles — a press on a tile is a press on the unit standing
@@ -115,7 +117,7 @@ import { fxForm } from '../../../shared/protocol.js';
 import { Camera, presetCamera, lerpCamera, easeInOutCubic, pickTile, normRect } from './projection.js';
 import { SnapshotBuffer, frameTime } from './interp.js';
 import { TileField } from './tiles.js';
-import { UnitView, ItemView, DeviceView, FORMS } from './units.js';
+import { UnitView, ItemView, DeviceView, FORMS, syncView } from './units.js';
 import { FxSystem, ensureDamageFonts } from './fx.js';
 import { createDragController, pieceTile } from './drag.js';
 import { backdropTextures, shadowTexture, refreshTierChips, silhouetteTexture } from './textures.js';
@@ -126,8 +128,8 @@ import { loadThree, loadBoardPack, webgl2Available, boardArtListed } from './boa
 import { BoardScene } from './board3d/scene.js';
 import { unionAreas } from './board3d/layout.js';
 import { layoutPen, penSignature } from './pen.js';
-import { IDENTITY, bossPrepField, tilesToDisp, circleToDisp, leaderStand } from './prepfield.js';
-import { pickOnTile, pickBattle, hitRectAt, hitTiles } from './pick.js';
+import { IDENTITY, bossPrepField, tilesToDisp, leaderStand } from './prepfield.js';
+import { pickOnTile, pickBattle, hitTiles } from './pick.js';
 import { promotionsOf } from './promote.js';
 import { ensurePixi } from './app/pixi.js';
 import { pieceDirOf, pickUnitOf } from './app/pick.js';
@@ -146,14 +148,17 @@ export { releaseGl } from './app/host.js';
 /**
  * Create the battlefield view inside `host` (an element sized by CSS; the canvas fills it).
  * @param {HTMLElement} host
- * @param {{ data?: any, assets?: any, audio?: any, settings?: { damageNumbers?: boolean, quality?: string },
+ * @param {{ data?: any, assets?: any, audio?: any, settings?: { damageNumbers?: boolean, quality?: string }, signal?: AbortSignal,
  *           padding?: object|((kind:string, size:{width:number,height:number}) => object),
  *           hud?: {top:number,bottom:number}|((kind:'prep'|'bossPrep', size:{width:number,height:number}, o:{shop:boolean}) => {top:number,bottom:number}|null) }} [opts]
  */
 export async function createFieldView(host, options = {}) {
   if (!host || typeof host.appendChild !== 'function') throw new TypeError('createFieldView: host element required');
   const opts = options && typeof options === 'object' ? options : {};
-  const P = await ensurePixi();
+  const signal = opts.signal;
+  signal?.throwIfAborted();
+  const P = await withTimeout(ensurePixi(), null, signal);
+  signal?.throwIfAborted();
   const assets = resolveAssets(opts.assets);
   const data = makeData(opts.data);
   const settings = { damageNumbers: true, quality: 'high', ...(opts.settings || {}) };
@@ -162,19 +167,28 @@ export async function createFieldView(host, options = {}) {
   const want3d = boardPref !== '2d' && webgl2Available(boardPref === '3d');
   // three.js (~2 MB) is fetched only when the local-art manifest lists the board atlas (in parallel with the art)
   const artListed = want3d ? boardArtListed(assets).catch(() => false) : Promise.resolve(false);
-  const threePromise = artListed.then((ok) => (ok ? loadThree() : null));
-  const packPromise = artListed.then((ok) => (ok ? Promise.resolve(assets.ready ? assets.ready() : null).catch(() => null).then(() => loadBoardPack(assets)) : null));
+  const threePromise = artListed.then((ok) => (ok ? loadThree() : null)).catch(() => null);
+  const packPromise = artListed.then((ok) => (ok ? Promise.resolve(assets.ready ? assets.ready() : null).catch(() => null).then(() => loadBoardPack(assets)) : null)).catch(() => null);
   // the manifest, and the optional local-art manifest in parallel: unit views pick an enemy's local-client model by it
   // (assets.js spineEntry, DESIGN §13 — 灼热源石虫 / 炽焰源石虫); absent or slow, they draw the web models
   await withTimeout(Promise.all([assets.ready ? assets.ready() : null, assets.local ? assets.local() : null]
-    .map((p) => Promise.resolve(p).catch(() => {}))), 4000);
+    .map((p) => Promise.resolve(p).catch(() => {}))), 4000, signal);
+  signal?.throwIfAborted();
   // web fonts for the bitmap damage numbers / tier chips (never block long)
-  try { if (document.fonts?.load) await withTimeout(Promise.all([document.fonts.load('700 40px Bender'), document.fonts.load('700 40px Oxanium')]), 1500); } catch { /* ignore */ }
+  try { if (document.fonts?.load) await withTimeout(Promise.all([document.fonts.load('700 40px Bender'), document.fonts.load('700 40px Oxanium')]), 1500, signal); } catch { /* optional fonts */ }
+  signal?.throwIfAborted();
 
   const size = () => ({ width: Math.max(1, host.clientWidth || 1), height: Math.max(1, host.clientHeight || 1) });
   const dpr = () => Math.min(globalThis.devicePixelRatio || 1, QUALITY_RES[settings.quality] || 2);
   const boardDpr = () => Math.min(globalThis.devicePixelRatio || 1, BOARD_RES[settings.quality] || 2);
   const s0 = size();
+  // Construction is synchronous until the complete view can own cancellation. If setup throws,
+  // dispose only the resources acquired by this attempt, never another view's host contents.
+  const setupCleanup = [];
+  let destroyed = false;
+  let view = null;
+  let onAbort;
+  try {
   const app = new P.Application({
     // MSAA only where it pays: dense (DPR ≥ 1.5) screens are sharp enough without it and it would cost 4× the fill
     // transparent: the 3D board canvas shows through (the 2D board paints an opaque backdrop itself)
@@ -182,6 +196,11 @@ export async function createFieldView(host, options = {}) {
     resolution: dpr(), autoDensity: true, powerPreference: 'high-performance',
   });
   const canvas = app.view;
+  setupCleanup.push(() => {
+    releaseGl(app.renderer);
+    try { app.destroy(true, { children: true, texture: false, baseTexture: false }); }
+    finally { canvas.remove(); }
+  });
   canvas.style.display = 'block';
   canvas.style.width = '100%';
   canvas.style.height = '100%';
@@ -238,7 +257,6 @@ export async function createFieldView(host, options = {}) {
     for (const fn of [...set]) { try { fn(payload); } catch (err) { console.error(`[render] ${name} listener failed`, err); } }
   };
 
-  let destroyed = false;
   let mode = 'idle';          // 'idle' | 'prep' | 'battle'
   let stageRec = null;
   let cam = presetCamera('prep', { width: s0.width, height: s0.height, padding: defaultPadding('prep', s0) }, { hud: hudBands('prep', s0) });
@@ -258,9 +276,6 @@ export async function createFieldView(host, options = {}) {
   const gone = new Set();
   const woundUp = new WeakSet(); // atk event tuples whose attack wind-up already started
   const interp = new SnapshotBuffer({ delay: 0.1, rate: 2 });
-  // Local deterministic feed state (client-side combat): when on, every snapshot carries the battle speed and the
-  // interpolation rate is synced from it on the same frame (no React-effect lag at a 1x/2x/4x switch).
-  let localFeedOn = false;
   const sample = new Map();
   const meleePending = new Map(); // target id → { src, t }
   const consumedIds = new Set();  // battle ids used up by their own effect (fx `consumed`): no death particles
@@ -301,12 +316,14 @@ export async function createFieldView(host, options = {}) {
     renderer: app.renderer,
     frameNo: () => frameNo,
     impostorInterval: () => impInterval,
+    impostorSlot: () => impSlot++,
     clipAllowed: () => clipAllowed,
     viewport: () => vp,
     loadLevel: () => loadLevel,
     surfaceLayer: (row) => tiles.surfaceLayer(row),
   };
   const tiles = new TileField({ ground: layers.ground, overlay: layers.overlay, props: layers.units, anim: layers.anim });
+  setupCleanup.push(() => tiles.destroy());
   const fx = new FxSystem({
     P, layers, cam: () => cam, settings, assets, heightAt, redVignette: bg.red, surfaceLayer: ctx.surfaceLayer,
     timeScale: () => ctx.timeScale(),
@@ -321,10 +338,12 @@ export async function createFieldView(host, options = {}) {
       return Math.max(80, Math.min(size().height * 0.4, p.y));
     },
   });
+  setupCleanup.push(() => fx.destroy());
   ctx.fx = fx;
   // battle devices (crates / turrets as sim units): the official crate mesh in the 3D scene, else a Pixi box
   ctx.createBox = () => switchableBox({ board: () => board3d, pixi: () => tiles.createBox() });
   const impostors = new ImpostorAtlas(app.renderer);
+  setupCleanup.push(() => impostors.destroy());
   ctx.impostors = impostors;
   tiles.setView(bandFor('prep'), camRect(), fieldRows('prep'));
   // the real board art of the local client (optional): wait briefly so the first frame already uses it; a late
@@ -333,7 +352,6 @@ export async function createFieldView(host, options = {}) {
     if (art && !destroyed) { tiles.setArt(art); tiles.project(cam, true); }
     return art;
   }, () => null);
-  await withTimeout(artPromise, 2500);
 
   // ---- 3D board layer (render/board3d, DESIGN §15) -----------------------------------------------------------
   let board3d = null;          // BoardScene while the 3D board is on
@@ -341,6 +359,7 @@ export async function createFieldView(host, options = {}) {
   let board3dError = null;
   // lost-context recovery: the THREE module + art pack of the last 3D board, the pending retry, failures so far
   const recover = { THREE: null, pack: null, timer: 0, tries: 0, since: 0, off: false, count: 0 };
+  setupCleanup.push(() => { clearTimeout(recover.timer); disable3d(); });
   function enable3d(THREE, pack) {
     if (destroyed || board3d || !THREE || !pack) return false;
     recover.THREE = THREE; recover.pack = pack;
@@ -410,13 +429,13 @@ export async function createFieldView(host, options = {}) {
       if (!enable3d(recover.THREE, recover.pack)) scheduleRecover();
     }, delay);
   }
-  if (want3d) {
-    const ready = Promise.all([threePromise, packPromise]).then(([THREE, pack]) => (THREE && pack ? enable3d(THREE, pack) : false), () => false);
-    await withTimeout(ready, 6000);
-  }
+  // Attach the board only after synchronous setup completes; enable3d also guards late arrivals.
+  const boardReady = Promise.all([threePromise, packPromise]).then(([THREE, pack]) => (THREE && pack ? enable3d(THREE, pack) : false), () => false);
   // the official soft shadow sprite replaces the procedural one once loaded (may already be cached; asked again when the
   // manifest arrives late)
   let shadowAsked = false;
+  let offShadow = null;
+  setupCleanup.push(() => offShadow?.());
   function loadShadow() {
     const shadowUrl = !shadowAsked && assets.ui ? assets.ui('battle/sprite_shadow') : null;
     if (!shadowUrl) return;
@@ -429,7 +448,11 @@ export async function createFieldView(host, options = {}) {
         for (const v of views.values()) if (v.shadow && !v.destroyed) v.shadow.texture = t;
         for (const v of penViews.values()) if (v.shadow && !v.destroyed) v.shadow.texture = t;
       };
-      if (t.baseTexture.valid) use(); else t.baseTexture.once('loaded', use);
+      if (t.baseTexture.valid) use();
+      else {
+        t.baseTexture.once('loaded', use);
+        offShadow = () => t.baseTexture.off('loaded', use);
+      }
     } catch { /* optional */ }
   }
   loadShadow();
@@ -636,7 +659,7 @@ export async function createFieldView(host, options = {}) {
     }
     if (kind === 'token') {
       const rec = data.token(piece.id);
-      return { kind: 'token', side: 'ally', defId: piece.id, spine: rec?.assets?.spine || piece.id, avatar: rec?.assets?.avatar || piece.id, tier: piece.tier || 1, golden: false, dir, researchStage: piece.research ? piece.stage : undefined };
+      return { kind: 'token', side: 'ally', defId: piece.id, spine: rec?.assets?.spine || piece.id, avatar: rec?.assets?.avatar || piece.id, tier: piece.tier || 1, golden: false, dir };
     }
     const chess = data.chess(piece.id);
     // 0.2.0 补位: a piece of a chess the player does not own (m.private.standIns) is its stand-in's model, in the hand,
@@ -764,7 +787,6 @@ export async function createFieldView(host, options = {}) {
         }
       }
       v._home = w;
-      if (info.researchStage != null) v.setResearchStage?.(info.researchStage);
       v.dimmed = false;
       if (info.kind === 'item' && v.setIcon) v.setIcon(info.icon); // an icon the manifest named late (onAssets)
       if (v.setCount) v.setCount(e.piece.kind === 'token' ? e.piece.count : 0);
@@ -1020,16 +1042,10 @@ export async function createFieldView(host, options = {}) {
    */
   function drawHighlight(list, style, group) {
     const key = hlKey(style, group);
-    if (style?.circle) style = { ...style, circle: circleToDisp(mode === 'prep' ? prepXf : IDENTITY, style.circle) };
     const range = RANGE_GROUPS.has(key) || style === 'range';
     let t = tilesToDisp(IDENTITY, list);
-    if (range && !style?.researchRange) t = t.filter(([r]) => r !== GEO.HAND_ROW && r !== GEO.TEMP_ROW);
+    if (range) t = t.filter(([r]) => r !== GEO.HAND_ROW && r !== GEO.TEMP_ROW);
     if (mode === 'prep' && prepXf !== IDENTITY) t = tilesToDisp(prepXf, t);
-    if (style?.researchRange) {
-      const bounds = mode === 'prep' && prepXf !== IDENTITY ? GEO.BOSS_RECT
-        : mode === 'battle' && battleMeta?.rect ? battleMeta.rect : GEO.NORMAL_RECT;
-      t = t.filter(([r, c]) => r >= bounds.r0 && r <= bounds.r1 && c >= bounds.c0 && c <= bounds.c1);
-    }
     tiles.setHighlights(t, style, key, { stripes: range && key !== 'rangeStand' && !board3d });
   }
   function clearHl(group) {
@@ -1147,8 +1163,11 @@ export async function createFieldView(host, options = {}) {
   /**
    * The ground itself was tapped: nothing stands there, so the TILE explains itself — a special terrain tile (活性源石,
    * 沼泽, 排气格栅, 深水区, 红/蓝门, 传送) opens its own card (GitHub issue #184; screens/game.js `tileClick` →
-   * gameLogic.terrainInfo). The tile is picked as a BOARD tile (`pickBoardTile`), and the screen maps board → stage once
-   * more with `gameLogic.fieldTile` on a boss-prep board.
+   * gameLogic.terrainInfo, which says nothing about an ordinary floor / road / wall tile).
+   * The tile is picked as a BOARD tile (`pickBoardTile`, i.e. through `prepXf.toBoard`): on a Final Assault / Hidden Core
+   * PREP the board draws the boss field's own rows (stage 2–5 as board 9–12), and the screen maps board → stage once more
+   * with `gameLogic.fieldTile` — reporting the DRAWN tile here would be converted twice and explain the wrong tile
+   * (review on #185).
    */
   function emitTileClick(ev, e) {
     const t = pickBoardTile(ev.x, ev.y);
@@ -1206,10 +1225,22 @@ export async function createFieldView(host, options = {}) {
   // 撤退 / 出售 (user playtest #4 item 1 on a phone). Cancelling touchend drops them.
   const onTouchEnd = (e) => { if (e.cancelable) e.preventDefault(); };
   // The canvas is a click target too (a no-op listener). The browser's touch adjustment moves a tap onto a nearby
-  // click-responding element, so a tap on the back row right under the bond strip's discs opened the bond popup
-  // instead of selecting the unit. As a click target that holds the finger's point the canvas wins: a tap on the board
-  // stays on the tile under it.
+  // element that responds to clicks (click / mousedown listeners, buttons, links; pointer listeners do not count) when the
+  // finger's contact area reaches one, so a tap on the back row right under the bond strip's discs (row 12 at 844×390 once
+  // the 收起 toggle of PR #149 moved the discs one button to the right) opened the bond popup instead of selecting the
+  // unit. As a click target that holds the finger's point the canvas wins: a tap on the board stays on the tile under it.
   const onTapTarget = () => {};
+  const removeInput = () => {
+    canvas.removeEventListener('pointerdown', onPointerDown);
+    canvas.removeEventListener('pointermove', onPointerMove);
+    canvas.removeEventListener('pointerup', onPointerUp);
+    canvas.removeEventListener('pointercancel', onPointerCancel);
+    canvas.removeEventListener('pointerleave', onPointerLeave);
+    canvas.removeEventListener('contextmenu', onContext);
+    canvas.removeEventListener('touchend', onTouchEnd);
+    canvas.removeEventListener('click', onTapTarget);
+  };
+  setupCleanup.push(removeInput);
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
@@ -1308,10 +1339,7 @@ export async function createFieldView(host, options = {}) {
   function pushSnapshot(snap) {
     if (destroyed || mode !== 'battle') return false;
     if (battleMeta?.fieldId && snap && snap.fieldId && snap.fieldId !== battleMeta.fieldId) return false;
-    const ok = interp.push(snap, performance.now() / 1000);
-    // local deterministic feed: apply the known battle speed on the same frame a snapshot arrives (zero switch lag)
-    if (ok && localFeedOn && snap && Number(snap.speed) > 0) interp.setLocalRate(Number(snap.speed));
-    return ok;
+    return interp.push(snap, performance.now() / 1000);
   }
 
   function pushEvents(ev) {
@@ -1395,6 +1423,8 @@ export async function createFieldView(host, options = {}) {
       }
       case 'heal': { const v = views.get(e[1]); if (v) fx.heal(v, Number(e[2]) || 0); break; }
       case 'skill': { const v = views.get(e[1]); if (v) { v.setSkill?.(!!e[2]); fx.skill(v, !!e[2]); } break; }
+      // the skill slot an enemy ability casts (PR #275): the view swaps to that slot's clip (a multi-skill boss's Skill_01..04)
+      case 'cast': { const v = views.get(e[1]); if (v) v.setSkillSlot?.(e[2] | 0); break; }
       case 'die': {
         const v = views.get(e[1]);
         const used = consumedIds.delete(e[1]);
@@ -1416,6 +1446,14 @@ export async function createFieldView(host, options = {}) {
         if (e[4] && typeof e[4] === 'object' && e[4].consumed && e[4].id != null) {
           consumedIds.add(e[4].id);
           if (consumedIds.size > 200) consumedIds.delete(consumedIds.values().next().value);
+        }
+        // 推拉: a push / pull (battle/displacement.js) moves the enemy inside one call; its `displace` fx carries the
+        // destination ['fx', 'displace', x, y, { id }] and the view slides there (UnitView.slideTo, PR #380) — normally
+        // started already by syncBattle's look-ahead, which this repeats harmlessly
+        if (e[1] === 'displace') {
+          const d = e[4] && typeof e[4] === 'object' ? e[4] : null;
+          const v = d && d.id != null ? views.get(d.id) : null;
+          if (v && v.slideTo) v.slideTo(Number(e[2]), Number(e[3]), Number(d.dur) > 0 ? { dur: Number(d.dur) } : {});
         }
         // an enemy's mode change — the `form` of a sim setForm fx (shared/protocol.js fxForm: 掠海漂移体 → 爬行模式, user
         // playtest #5 item 1; 转译基底's forms, a 逐火 ember and its revival, the leaders' 重生, 守墓石像 — user report after
@@ -1469,10 +1507,25 @@ export async function createFieldView(host, options = {}) {
     if (best) { tiles.flashObjective(best[0], best[1]); board3d?.flashObjective(best[0], best[1]); }
   }
 
+  /** syncBattle's look-ahead: a queued `displace` fx ['fx', 'displace', x, y, { id }] starts that view's slide. */
+  let slideAt = 0;
+  function startSlide(e) {
+    if (!Array.isArray(e) || e[0] !== 'fx' || e[1] !== 'displace') return;
+    const extra = e[4] && typeof e[4] === 'object' ? e[4] : null;
+    const v = extra && extra.id != null ? views.get(extra.id) : null;
+    // `dur`: the push / pull's 失衡 time in game seconds (battle/displacement.js) — the slide's length
+    if (v && v.slideTo) v.slideTo(Number(e[2]), Number(e[3]), Number(extra.dur) > 0 ? { at: slideAt, dur: Number(extra.dur) } : { at: slideAt });
+  }
   let renderT0Battle = null;   // game time of the first rendered battle frame (spawn puffs skip the initial wave)
   let downSeq = 0;             // syncBattle pass counter: a view still marked down after a pass left the `down` list
   function syncBattle(renderT) {
     if (renderT0Battle == null) renderT0Battle = renderT;
+    // A push / pull's slide starts as soon as the interval sampled below ends on the snapshot that carries the
+    // destination: its `displace` fx is due only when renderT reaches that snapshot, and by then sample() has already
+    // lerped (≤ teleport) or snapped the enemy most of the way — no frames in between (PR #380). The fx are still queued
+    // here (processEvents took only those ≤ renderT); the view holds until `at`, then eases into the sim's position.
+    slideAt = interp.nextSnapT(renderT);
+    if (slideAt > renderT) interp.forEachUpcoming(renderT, slideAt, startSlide);
     interp.sample(renderT, sample);
     for (const [id, s] of sample) {
       let v = views.get(id);
@@ -1483,9 +1536,7 @@ export async function createFieldView(host, options = {}) {
       if (!v) v = battleView(id) || createUnknown(id, s);
       if (!v) continue;
       if (!v._seen) { v._seen = true; v.fadeIn = 0; }
-      if (v.alive || v.info?.kind === 'device') v.sync(s, renderT);
-      else if (v.dying > 0) { v.x = s.x; v.y = s.y; }
-      else if (s.anim !== ANIM.DIE && s.hp > 0) { v.revive?.(); v.sync(s, renderT); }
+      syncView(v, s, renderT);
     }
     // knocked-out operators waiting to redeploy (b.snap `down`, user playtest #4 item 9): their view stays on the
     // field knocked down under a redeploy ring (UnitView.setDown) — made on the spot for one already down when this
@@ -1536,6 +1587,10 @@ export async function createFieldView(host, options = {}) {
   let cpuMs = 0;
   let frameNo = 0;
   let impInterval = 0;
+  // Each frame the impostor units take slots 0, 1, 2 … in update order (units.js _updateImpostor): a unit refreshes when
+  // (frame + slot) % interval === 0, so a frame refreshes ⌊n/k⌋ or ⌈n/k⌉ of n units. Random per-unit phases left the
+  // busiest frame 20–66% above that (16–48 units, intervals 2–6) and set the frame-time peaks of a crowded battle.
+  let impSlot = 0;
   let vp = { width: s0.width, height: s0.height };   // viewport (CSS px) of this frame: unit culling
   let culledCount = 0;
   // Adaptive load level 0–3: a device that cannot hold the frame rate with the current work switches crowds to
@@ -1552,8 +1607,9 @@ export async function createFieldView(host, options = {}) {
   // Crowded fields render skeletons through staggered RenderTexture impostors (units.js): the interval grows with
   // the number of Spine units so the per-frame vertex work stays roughly constant (hysteresis: re-evaluated
   // every 30 frames). Prep and ordinary fields keep full-rate direct rendering.
-  // Spine clipping masks (only eyeball clips on the current roster, invisible at chibi scale) each cost a stencil
-  // render-pass break (~2–5 ms of GPU on tiled GPUs): kept only for a lone clipped skeleton at high quality
+  // Spine clipping masks (the eyelids on the current roster) each cost a stencil render-pass break (~2–5 ms of GPU on
+  // tiled GPUs): kept only for a lone clipped skeleton at high quality; without them SpineActor hides the eyeball slots a
+  // closed lid would cut (GitHub #177, spine.js _eyeMaskFallback)
   let clipAllowed = true;
   function pickClipping() {
     let n = 0;
@@ -1576,6 +1632,7 @@ export async function createFieldView(host, options = {}) {
   }
   function frameBody(now) {
     frameNo++;
+    impSlot = 0;
     if (frameNo % 30 === 1) {
       impInterval = pickImpostorInterval(); clipAllowed = pickClipping();
       culledCount = 0;
@@ -1660,6 +1717,7 @@ export async function createFieldView(host, options = {}) {
   let ro = null;
   if (typeof ResizeObserver === 'function') {
     ro = new ResizeObserver(() => resize());
+    setupCleanup.push(() => ro.disconnect());
     ro.observe(host);
   }
   // a DPR change without a size change (window dragged to another monitor, zoom) must re-rasterise too; polled
@@ -1682,6 +1740,7 @@ export async function createFieldView(host, options = {}) {
     leader?.view.retryAssets?.();
   }
   const offAssets = typeof assets.onChange === 'function' ? assets.onChange(onAssets) : null;
+  setupCleanup.push(() => offAssets?.());
   const onVisible = () => {
     if (destroyed || globalThis.document?.visibilityState !== 'visible') return;
     if (assets.loaded === false && typeof assets.ready === 'function') assets.ready();
@@ -1690,10 +1749,11 @@ export async function createFieldView(host, options = {}) {
     leader?.view.retryAssets?.();
   };
   globalThis.document?.addEventListener?.('visibilitychange', onVisible);
+  setupCleanup.push(() => globalThis.document?.removeEventListener?.('visibilitychange', onVisible));
 
   // ---- public API ---------------------------------------------------------------------------------------------
 
-  const view = {
+  view = {
     setStage,
     setCamera,
     setPrep,
@@ -1710,12 +1770,9 @@ export async function createFieldView(host, options = {}) {
     setLocalFeed(o) {
       const on = !!(o && o.on);
       const speed = Number(o && o.speed) > 0 ? Number(o.speed) : 2;
-      localFeedOn = on;
       interp.delay = on ? 0.034 : 0.1;
       interp.defaultRate = on ? Math.min(20, speed) : 2;
       interp.maxRate = on ? Math.max(8, speed * 1.5) : 8;
-      // apply the rate at once (local feed knows it) instead of waiting for the arrival EMA to converge
-      if (on) interp.setLocalRate(speed); else interp.clearLocalRate();
       return true;
     },
     highlightTiles(tilesList, style) {
@@ -1812,14 +1869,9 @@ export async function createFieldView(host, options = {}) {
       try { ro?.disconnect(); } catch { /* ignore */ }
       try { offAssets?.(); } catch { /* ignore */ }
       globalThis.document?.removeEventListener?.('visibilitychange', onVisible);
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerCancel);
-      canvas.removeEventListener('pointerleave', onPointerLeave);
-      canvas.removeEventListener('contextmenu', onContext);
-      canvas.removeEventListener('touchend', onTouchEnd);
-      canvas.removeEventListener('click', onTapTarget);
+      removeInput();
+      offShadow?.();
+      signal?.removeEventListener('abort', onAbort);
       app.ticker.remove(frame);
       app.ticker.remove(preRender);
       app.ticker.remove(postRender);
@@ -1837,6 +1889,7 @@ export async function createFieldView(host, options = {}) {
       try { board3dCanvas?.remove(); } catch { /* ignore */ }
       releaseGl(app.renderer);
       try { app.destroy(true, { children: true, texture: false, baseTexture: false }); } catch { /* ignore */ }
+      canvas.remove();
     },
     stats() {
       return {
@@ -1856,5 +1909,22 @@ export async function createFieldView(host, options = {}) {
       pick: { pieceAt, battleUnitAt, penUnitAt, groundTile },
     },
   };
+  // All teardown dependencies now exist. Aborting during either asset wait immediately releases
+  // the renderer, ticker and listeners; late shared asset results see destroyed and do nothing.
+  setupCleanup.length = 0;
+  onAbort = () => view.destroy();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  signal?.throwIfAborted();
+  await withTimeout(artPromise, 2500, signal);
+  if (want3d) await withTimeout(boardReady, 6000, signal);
+  signal?.throwIfAborted();
   return view;
+  } catch (err) {
+    if (view) view.destroy();
+    else {
+      destroyed = true;
+      for (const dispose of setupCleanup.reverse()) { try { dispose(); } catch { /* continue cleanup */ } }
+    }
+    throw err;
+  }
 }

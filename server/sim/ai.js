@@ -545,6 +545,9 @@ export function updateEnemy(b, e, dt) {
   if (!e.alive) return;
   // hidden (teleporting) enemies only advance wait legs
   const stunned = e.s.flags.stun;
+  if (stunned || e.hidden || e.s.flags.fear) b._cutAttackStand(e);
+  // 失衡 (UNBALANCE): 浮空时清除推/拉力
+  if (e.s.flags.levitate && e.unbalanceUntil > b.time) e.unbalanceUntil = -Infinity;
   const unbalanced = b.time < e.unbalanceUntil - 1e-9;
   const prevCd = e.atkCd;
   if (e.atkCd > 0 && !stunned && !e.hidden) e.atkCd = attackCountdown(e.atkCd, dt);
@@ -581,12 +584,13 @@ export function updateEnemy(b, e, dt) {
   if (b.time < e.pauseUntil) return;
   // standing for an attack clip (attackStand, GitHub #58): only the walking waits — a checkpoint's WAIT keeps running
   // and DISAPPEAR / APPEAR legs still happen (advanceRoute); drawn idle (the client plays the clip, then Move again);
-  // a 恐惧 runs at once (it cannot attack)
+  // a 恐惧 runs at once (it cannot attack). 失衡 holds the walking too — under 恐惧 / 诱导 as well (失衡免疫 says 「失衡期间
+  // 无法自主移动」; no source exempts a fear)
   const standing = winding || unbalanced || (b.time < e.atkStandUntil && !e.s.flags.fear);
   if (e.s.flags.noMove) { e.moving = false; return; }   // standing (a 重生, a form change): drawn idle, not walking
   // 恐惧 (ba.fear "无法被阻挡并四散逃跑"; PRTS 诱发移动: 恐惧 outranks 诱导): runs to random tiles of the fan away from
   // its source — a self-inflicted fear flutters inside its own tile (fear.js); the route re-plans once it ends
-  if (e.s.flags.fear && !e.hidden) { moveFeared(b, e, dt); return; }
+  if (e.s.flags.fear && !e.hidden) { if (unbalanced) e.moving = false; else moveFeared(b, e, dt); return; }
   if (e.mem.fearMove) endFear(e);
   // 诱导 (ba.attract "无法被阻挡并向目标位置移动"): walks to the attract point instead of following its route
   if (e.s.flags.attract) { if (standing) e.moving = false; else moveAttracted(b, e, dt); return; }
