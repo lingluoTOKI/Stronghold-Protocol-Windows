@@ -27,13 +27,8 @@
       "rngDraws": 395,
       "errors": {"count":0,"kinds":[]},
       "players": {
-<<<<<<< HEAD
         "p1": {"killed":20,"total":20,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":1445774,"bossDmg":1008435,"heal":17694,"deaths":1,"layerGains":{}},
         "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":1050853,"bossDmg":791565,"heal":65610,"deaths":2,"layerGains":{}}
-=======
-        "p1": {"killed":20,"total":16,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":1654181,"bossDmg":1231515,"heal":19498,"deaths":1,"layerGains":{}},
-        "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":1792443,"bossDmg":1508258,"heal":66028,"deaths":1,"layerGains":{}}
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       },
       "units": [
         ["p1",1,"op","chess_char_6_03_b",2,"uniequip_002_yu",2089.19,1,13,0,0,11316,11362,0,1],
@@ -82,17 +77,10 @@
         "enemy_9013_acstmk": [1,1,0,41409,1800000],
         "enemy_9016_acstmr": [7,7,0,0,56]
       },
-<<<<<<< HEAD
       "hooks": [1,70,5249,1013,1013,2478,2830,1935,34,41,83,79,18,33653,2658,14,28,0,1,33,0,20,0],
       "events": {"atk":1288,"deploy":36,"die":41,"dmg":2551,"engage":16,"fx":569,"heal":569,"skill":162,"spawn":66,"status":654},
       "fx": {"airstrike":5,"beam":48,"blink":1,"bombard":18,"bombardShell":18,"burst":20,"copy":3,"dp":3,"drone":252,"droneLock":22,"drones":3,"firewall":1,"firewallBlock":1,"garrisonGrant":1,"lightning":101,"link":3,"lock":18,"phase":1,"radiantSword":3,"shell":7,"snow":5,"split":2,"storm":9,"summon":7,"talent":4,"tide":4,"wanted":9},
       "snaps": "894f44af 313e3a72 a1ca1bcc 538c8df7 836414dd 44afd7b8 7ae02b33 acea2d90 d875735a b27b203d 8f33b14c 1286669e 3b6def40 8e947c0d b1a852d9 3b9ffa7e 6d96d8b1 28aa20b4"
-=======
-      "hooks": [1,72,6000,1206,1206,3099,3496,3972,31,41,95,89,9,39824,2903,15,29,0,1,32,0,23,0],
-      "events": {"atk":1542,"deploy":37,"die":41,"dmg":3212,"engage":18,"fx":658,"heal":385,"skill":184,"spawn":69,"status":710},
-      "fx": {"airstrike":5,"beam":54,"blessing":1,"blink":1,"bombard":9,"bombardShell":9,"burst":23,"copy":3,"dp":4,"drone":335,"droneLock":17,"drones":3,"finale":2,"firewall":1,"garrisonGrant":1,"lightning":124,"link":1,"lock":9,"radiantSword":4,"shell":8,"slash":2,"snow":5,"split":3,"storm":10,"summon":8,"talent":4,"tide":5,"wanted":7},
-      "snaps": "44bc2b70 b3daaf96 baf6929d 143779f3 c1387369 80ca050e 4e208395 6728039d 417e6ec7 e83606e2 06a61aec 78738a35 a6c6ae9c c7844f12 05ba7c16 89e6563a eafb1f1c 5f815a0a f048b25a cef59d00"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
     },
     "boss-boss_1-solo": {
       "about": "假想敌：胄 solo pool 450000: chess_char_5_08_b chess_char_5_11_b chess_char_5_05_b chess_char_5_06_b chess_char_5_13_b chess_char_5_07_b chess_char_5_02_b chess_char_5_03_b chess_char_5_10_b chess_char_5_12_b",
@@ -112,11 +100,7 @@
       "bossHpLeft": 16534,
       "rngDraws": 52,
       "errors": {"count":0,"kinds":[]},
-<<<<<<< HEAD
       "players": {"p1":{"killed":17,"total":17,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":652781,"bossDmg":433466,"heal":33375,"deaths":1,"layerGains":{}}},
-=======
-      "players": {"p1":{"killed":17,"total":13,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":966812,"bossDmg":752394,"heal":37356,"deaths":0,"layerGains":{}}},
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "units": [
         ["p1",1,"op","chess_char_5_08_b",2,"uniequip_002_horn",2775,1,3,0,6394,3554,0,5,1],
         ["p1",2,"op","chess_char_5_11_b",1,"uniequip_002_demkni",4804.8,1,5,0,0,4111,23085,0,36],
@@ -137,17 +121,10 @@
         "enemy_9013_acstmk": [1,0,0,33409,433466],
         "enemy_9016_acstmr": [8,7,0,0,56]
       },
-<<<<<<< HEAD
       "hooks": [1,39,6000,574,574,827,921,186,27,27,58,56,168,18902,2365,0,28,0,1,25,0,0,0],
       "events": {"atk":595,"deploy":11,"die":27,"dmg":861,"engage":6,"fx":285,"heal":172,"skill":114,"spawn":38,"status":277},
       "fx": {"anchor":4,"beam":54,"camouflage":1,"candle":2,"healAoe":36,"overload":1,"phase":1,"reborn":1,"revive":1,"shell":8,"splash":168,"substitute":2,"summon":4,"swap":2},
       "snaps": "a5dad180 d125af54 48cee8b5 3b07616c bc0eda5a e532e5f3 d3b187a2 2c98a5f8 559544bf 798c9fad 22a3c133 b3cbd348 1d516e17 4fa0428c b96b4cc9 c98f2306 628c0fee dd8030f8 3266c412 97ddd90c"
-=======
-      "hooks": [1,36,6000,693,693,1031,1120,3142,24,24,60,59,168,20939,2386,0,26,0,1,24,0,0,0],
-      "events": {"atk":709,"deploy":10,"die":24,"dmg":1060,"engage":6,"fx":278,"heal":148,"skill":119,"spawn":36,"status":286},
-      "fx": {"anchor":3,"beam":54,"camouflage":1,"healAoe":35,"overload":1,"shell":8,"splash":168,"substitute":2,"summon":4,"swap":2},
-      "snaps": "5160aa85 7e265445 0be2d2e9 6c0188d5 103cf813 9aace512 f579cdb4 8ee9aa58 8005f42d ba1509c1 5738e08d a56aea09 c76253e8 4d964f19 99f8d5c9 4cc5c3f9 9ea422bb 63e8d010 53339522 4b7760db"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
     },
     "boss-boss_2-pair": {
       "about": "假想敌：铳 pair pool 3000000: chess_char_5_19_b chess_char_4_01_b chess_char_5_14_b chess_char_5_17_b chess_char_5_15_b chess_char_5_20_b chess_char_5_21_b chess_char_5_22_b chess_char_5_23_b chess_char_4_02_b | chess_char_4_11_b chess_char_4_04_b chess_char_4_07_b chess_char_4_16_b chess_char_4_09_b chess_char_4_06_b chess_char_4_10_b chess_char_4_12_b chess_char_4_13_b chess_char_4_14_b token_10041_cathy_catsld token_10041_cathy_catsld",
@@ -250,25 +227,15 @@
       "time": 107.23,
       "ticks": 3217,
       "reason": "cleared",
-<<<<<<< HEAD
       "killed": 17,
       "total": 18,
-=======
-      "killed": 19,
-      "total": 6,
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "unspawned": 0,
       "bossHpLeft": 0,
       "rngDraws": 754,
       "errors": {"count":0,"kinds":[]},
       "players": {
-<<<<<<< HEAD
         "p1": {"killed":17,"total":18,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":816845,"bossDmg":760192,"heal":3551,"deaths":0,"layerGains":{}},
         "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":1366927,"bossDmg":1239808,"heal":13677,"deaths":0,"layerGains":{}}
-=======
-        "p1": {"killed":19,"total":6,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":1572377,"bossDmg":1451138,"heal":8263,"deaths":4,"layerGains":{}},
-        "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":2612061,"bossDmg":2548862,"heal":37169,"deaths":3,"layerGains":{}}
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       },
       "units": [
         ["p1",1,"op","chess_char_6_03_b",2,"uniequip_002_yu",3430,1,7,0,0,0,0,0,0],
@@ -292,6 +259,35 @@
         ["p2",19,"op","chess_char_6_16_b",2,"uniequip_002_halo2",1554.12,1,25,0,29929,0,0,57,2],
         ["p2",20,"op","chess_char_6_18_b",2,"uniequip_002_whitw2",1541,1,6,2,90511,0,0,8,2],
         ["p2",21,"op","chess_char_6_20_b",2,"uniequip_002_agoat2",1631.88,1,18,0,0,0,9298,36,1],
+=======
+      "rngDraws": 1406,
+      "errors": {"count":0,"kinds":[]},
+      "players": {
+        "p1": {"killed":19,"total":6,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":1619158,"bossDmg":1497941,"heal":4080,"deaths":4,"layerGains":{}},
+        "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":2565276,"bossDmg":2502059,"heal":40214,"deaths":2,"layerGains":{}}
+      },
+      "units": [
+        ["p1",1,"op","chess_char_6_03_b",2,"uniequip_002_yu",3700,1,7,0,0,0,2395,0,1],
+        ["p1",2,"op","chess_char_6_06_b",2,"uniequip_002_pepe",2939,1,11,0,0,0,0,0,0],
+        ["p1",3,"op","chess_char_6_07_b",2,"uniequip_002_siege2",3101,1,9,2,47,3535,101,30,1],
+        ["p1",4,"op","chess_char_6_01_b",2,"uniequip_002_lemuen",2131.5,1,13,3,947163,4159,423,59,8],
+        ["p1",5,"op","chess_char_6_02_b",2,"uniequip_002_sbell2",196.86,1,17,1,337196,7383,349,60,3],
+        ["p1",6,"op","chess_char_6_04_b",2,"uniequip_002_skadi2",0,0,61,1,26509,12339,419,0,3],
+        ["p1",7,"op","chess_char_6_05_b",2,"uniequip_002_pasngr",0,0,65,2,169268,7389,372,48,3],
+        ["p1",8,"op","chess_char_6_08_b",2,"uniequip_002_reed2",1668,1,5,0,31,0,20,14,1],
+        ["p1",9,"op","chess_char_6_09_b",0,"uniequip_002_cello",1322,1,15,0,38,0,0,9,9],
+        ["p1",10,"op","chess_char_6_11_b",2,"uniequip_002_mlyss",1893,1,23,0,95529,0,0,193,5],
+        ["p1",11,"token","token_10017_skadi2_dedant",null,null,138,0,26,0,0,0,0,0,null],
+        ["p2",12,"op","chess_char_6_15_b",2,"uniequip_002_qiubai",3801.6,1,31,2,463396,0,0,196,3],
+        ["p2",13,"op","chess_char_6_19_b",2,"uniequip_002_blkkgt",2767,1,12,1,31,129,0,5,2],
+        ["p2",14,"op","chess_char_5_01_b",1,"uniequip_002_excu2",2314,1,55,0,16,3647,960,16,1],
+        ["p2",15,"op","chess_char_6_17_b",2,"uniequip_002_nearl2",6287.75,1,32,0,315064,2551,0,89,3],
+        ["p2",16,"op","chess_char_6_12_b",1,"uniequip_002_rosmon",3175.48,1,16,6,206430,3608,591,71,4],
+        ["p2",17,"op","chess_char_6_13_b",1,"uniequip_002_angel2",2436.5,1,20,2,1376335,6026,1630,340,6],
+        ["p2",18,"op","chess_char_6_14_b",2,"uniequip_002_lumen",2088.9,1,22,0,0,3550,5117,54,1],
+        ["p2",19,"op","chess_char_6_16_b",2,"uniequip_002_halo2",1582.9,1,25,0,76191,1525,0,135,4],
+        ["p2",20,"op","chess_char_6_18_b",2,"uniequip_002_whitw2",1541,1,59,0,103616,1541,0,20,2],
+        ["p2",21,"op","chess_char_6_20_b",2,"uniequip_002_agoat2",1662.1,1,18,0,0,2238,31915,54,2],
         ["-","~1","device","trap_1105_accrate",null,null,100,1,1,0,0,0,0,0,null],
         ["-","~2","device","trap_1105_accrate",null,null,100,1,2,0,0,0,0,0,null],
         ["-","~3","device","trap_1105_accrate",null,null,100,1,3,0,0,0,0,0,null],
@@ -311,17 +307,10 @@
         "enemy_9021_acduml": [1,1,0,0,2000000],
         "enemy_9023_acdums": [6,5,0,10453,56]
       },
-<<<<<<< HEAD
       "hooks": [1,52,3217,835,835,1876,2153,587,18,26,39,31,178,24531,946,3,19,0,1,17,0,2,0],
       "events": {"atk":950,"deploy":29,"die":26,"dmg":1987,"engage":14,"fx":591,"heal":214,"skill":70,"spawn":50,"status":337},
       "fx": {"airstrike":82,"beam":6,"blink":2,"bombard":29,"bombardShell":29,"burst":2,"copy":1,"displace":1,"dp":3,"drone":173,"droneLock":16,"drones":2,"explode":96,"finale":1,"garrisonGrant":1,"lightning":44,"link":2,"lock":29,"lure":2,"phase":12,"radiantSword":2,"slash":11,"snow":11,"split":2,"steal":4,"storm":4,"summon":10,"sunBurst":1,"talent":4,"telegraph":3,"tide":3,"wanted":3},
       "snaps": "0e2e327e 9068cc6a ced48e18 fdd1b2ba 7bbf69fc 61492769 1b5e7d15 aa2c6113 9484b207 1ca0f38b efde51f4"
-=======
-      "hooks": [1,66,5803,1515,1515,4109,4992,3727,27,41,66,60,358,42326,2036,3,22,0,1,27,0,12,0],
-      "events": {"atk":1784,"deploy":40,"die":41,"dmg":4700,"engage":20,"fx":1252,"heal":433,"skill":126,"spawn":59,"status":886},
-      "fx": {
-        "airstrike": 128,
-        "appear": 2,
         "beam": 11,
         "blessing": 1,
         "blink": 2,
@@ -330,8 +319,9 @@
         "buff": 3,
         "burst": 12,
         "copy": 1,
-        "disappear": 2,
+        "disappear": 1,
         "displace": 1,
+        "dodge": 2,
         "dp": 5,
         "drone": 208,
         "droneLock": 18,
@@ -344,7 +334,7 @@
         "link": 7,
         "lock": 69,
         "lure": 3,
-        "phase": 43,
+        "phase": 42,
         "radiantSword": 3,
         "scorchBurst": 5,
         "slash": 11,
@@ -360,7 +350,8 @@
         "wanted": 1
       },
       "snaps": "8c6eb9d3 796da093 9e3c16b7 fa7000d5 b0ba5df0 c13bfdd0 b5a04ea3 1a096951 99f7023b ee7eca69 27c012ea 189a5d94 675b6a80 c16a2d26 fb45381b dc80cb4d 62258e5c f5fd826c 841da98a c3777617"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
+=======
+      "snaps": "8c6eb9d3 796da093 9e3c16b7 fa7000d5 926c8ad7 f6cd064c 78697556 fed4cadf f5ea4a01 770df7f2 ff609399 52322e58 9b7ed238 669666d5 19bed882 6d67f5c1 4d304319 3f680d1a e2f8d2c9 86bcc5a3"
     },
     "boss-boss_3-solo": {
       "about": "假想敌：管 solo pool 500000: chess_char_5_08_b chess_char_5_11_b chess_char_5_05_b chess_char_5_06_b chess_char_5_13_b chess_char_5_07_b chess_char_5_02_b chess_char_5_03_b chess_char_5_10_b chess_char_5_12_b",
@@ -374,22 +365,13 @@
       "time": 200,
       "ticks": 6000,
       "reason": "forced",
-<<<<<<< HEAD
       "killed": 18,
       "total": 18,
-=======
-      "killed": 15,
-      "total": 9,
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "unspawned": 0,
       "bossHpLeft": 1598,
       "rngDraws": 15,
       "errors": {"count":0,"kinds":[]},
-<<<<<<< HEAD
       "players": {"p1":{"killed":18,"total":18,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":571110,"bossDmg":498402,"heal":11733,"deaths":2,"layerGains":{}}},
-=======
-      "players": {"p1":{"killed":15,"total":9,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":790763,"bossDmg":718055,"heal":12252,"deaths":2,"layerGains":{}}},
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "units": [
         ["p1",1,"op","chess_char_5_08_b",2,"uniequip_002_horn",2775,1,11,1,162769,8125,0,133,4],
         ["p1",2,"op","chess_char_5_11_b",1,"uniequip_002_demkni",4804.8,1,9,0,0,0,8390,0,18],
@@ -417,17 +399,10 @@
         "enemy_9021_acduml": [1,0,0,278,498402],
         "enemy_9023_acdums": [9,9,0,4276,90]
       },
-<<<<<<< HEAD
       "hooks": [1,42,6000,359,359,677,1340,255,21,24,62,61,21,14628,1263,3,20,0,1,102,0,1,0],
       "events": {"atk":383,"deploy":16,"die":24,"dmg":627,"engage":8,"fx":243,"heal":56,"skill":123,"spawn":37,"status":192},
       "fx": {"anchor":1,"aoe":2,"beam":9,"burst":1,"candle":1,"ember":2,"explode":151,"healAoe":18,"overload":4,"phase":17,"splash":21,"substitute":2,"summon":9,"swap":2,"telegraph":1,"teleport":2},
       "snaps": "350d2037 5eb324a9 93890c27 cfd3cc69 9d47cb8d 97a81071 03889d40 e843828d 92884942 e6498744 15391702 f00b712f fcb3da1c 0b44c227 2802904f c8eaf7b3 a142e278 b3656951 bd850e24 0b8940d4"
-=======
-      "hooks": [1,42,6000,403,403,736,1597,1098,20,24,64,63,21,16163,1212,2,19,0,1,153,0,1,0],
-      "events": {"atk":422,"deploy":17,"die":24,"dmg":716,"engage":8,"fx":217,"heal":42,"skill":127,"spawn":36,"status":180},
-      "fx": {"anchor":1,"aoe":3,"beam":6,"burst":1,"candle":3,"ember":3,"explode":132,"healAoe":18,"overload":4,"phase":13,"revive":1,"splash":21,"substitute":1,"summon":6,"swap":1,"telegraph":1,"teleport":2},
-      "snaps": "edad47f7 646819de f70d4209 623036bb 007bda8c c32ef17d 45a767ca ba1d4895 692a0b5b 00e8b931 0257c6ee b3448033 79f115e6 61c7911a e82a3934 95da73a6 72fc7d06 d6376b51 d8d5a6a7 2e2cb739"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
     },
     "boss-boss_4-pair": {
       "about": "盐风主教昆图斯 pair pool 4200000: chess_char_5_19_b chess_char_4_01_b chess_char_5_14_b chess_char_5_17_b chess_char_5_15_b chess_char_5_20_b chess_char_5_21_b chess_char_5_22_b chess_char_5_23_b chess_char_4_02_b | chess_char_4_11_b chess_char_4_04_b chess_char_4_07_b chess_char_4_16_b chess_char_4_09_b chess_char_4_06_b chess_char_4_10_b chess_char_4_12_b chess_char_4_13_b chess_char_4_14_b token_10041_cathy_catsld token_10041_cathy_catsld",
@@ -568,25 +543,15 @@
       "time": 68.03,
       "ticks": 2041,
       "reason": "cleared",
-<<<<<<< HEAD
       "killed": 10,
       "total": 14,
-=======
-      "killed": 18,
-      "total": 8,
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "unspawned": 0,
       "bossHpLeft": 0,
       "rngDraws": 528,
       "errors": {"count":0,"kinds":[]},
       "players": {
-<<<<<<< HEAD
         "p1": {"killed":10,"total":14,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":541965,"bossDmg":419309,"heal":8004,"deaths":0,"layerGains":{}},
         "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":511065,"bossDmg":360691,"heal":42402,"deaths":0,"layerGains":{}}
-=======
-        "p1": {"killed":18,"total":8,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":1203964,"bossDmg":884209,"heal":18083,"deaths":2,"layerGains":{}},
-        "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":1184403,"bossDmg":675791,"heal":65228,"deaths":1,"layerGains":{}}
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       },
       "units": [
         ["p1",1,"op","chess_char_6_03_b",2,"uniequip_002_yu",5108.01,1,7,1,28090,2498,4334,9,1],
@@ -662,11 +627,7 @@
         "tide": 2,
         "wanted": 5
       },
-<<<<<<< HEAD
       "snaps": "50495219 7a5c640a 399e1299 4ccea964 8a3c154f b3a7a915 9951d87d"
-=======
-      "snaps": "7db84769 ccd2ecf5 49d646d8 1185f93a 64db5dca 1a9e67db 3a4e3045 5b3ba069 0dcc32cf 7d6016ed 4061bb14 3c99a82f a50f8c81"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
     },
     "boss-boss_5-solo": {
       "about": "卢西恩，“猩红血钻” solo pool 195000: chess_char_5_08_b chess_char_5_11_b chess_char_5_05_b chess_char_5_06_b chess_char_5_13_b chess_char_5_07_b chess_char_5_02_b chess_char_5_03_b chess_char_5_10_b chess_char_5_12_b",
@@ -677,28 +638,16 @@
       "round": 14,
       "seed": 3943361264,
       "waveId": "act2autochess_h07_05_s",
-<<<<<<< HEAD
       "time": 151.5,
       "ticks": 4545,
       "reason": "cleared",
       "killed": 8,
       "total": 8,
-=======
-      "time": 200,
-      "ticks": 6000,
-      "reason": "forced",
-      "killed": 10,
-      "total": 5,
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "unspawned": 0,
       "bossHpLeft": 0,
       "rngDraws": 249,
       "errors": {"count":0,"kinds":[]},
-<<<<<<< HEAD
       "players": {"p1":{"killed":8,"total":8,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":294260,"bossDmg":195000,"heal":28254,"deaths":1,"layerGains":{}}},
-=======
-      "players": {"p1":{"killed":10,"total":5,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":476733,"bossDmg":313913,"heal":44154,"deaths":2,"layerGains":{}}},
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "units": [
         ["p1",1,"op","chess_char_5_08_b",2,"uniequip_002_horn",1387.5,1,2,1,57352,5199,1387,39,2],
         ["p1",2,"op","chess_char_5_11_b",1,"uniequip_002_demkni",4804.8,1,1,0,0,0,7060,0,19],
@@ -721,17 +670,10 @@
         "enemy_2017_csphts": [3,3,0,876,30000],
         "enemy_5601_entlec": [2,2,0,0,2905]
       },
-<<<<<<< HEAD
       "hooks": [1,25,4545,286,286,539,734,344,13,15,49,47,84,13386,970,10,11,0,1,16,0,3,41],
       "events": {"atk":290,"deploy":14,"die":15,"dmg":614,"engage":7,"fx":184,"heal":316,"skill":96,"spawn":23,"status":146},
       "fx": {"anchor":1,"blink":3,"bloodBattle":1,"burst":3,"candle":2,"dodge":41,"ember":1,"explode":18,"healAoe":19,"overload":2,"shieldBreak":2,"splash":84,"summon":4,"telegraph":1,"teleport":2},
       "snaps": "1b2c287a eaa9179b 630f3c60 4d66a11e 1bb71808 3f98dccb 22cb18a1 217a35ef 09de2906 ba0f42cc 81fbd1d0 398611ec 0abd9c6f 252f015d fe9c3866 f9bb937f"
-=======
-      "hooks": [1,30,6000,357,357,687,1120,4237,14,18,58,57,92,17108,995,17,14,0,1,60,0,5,47],
-      "events": {"atk":367,"deploy":16,"die":18,"dmg":806,"engage":9,"fx":221,"heal":249,"skill":115,"spawn":27,"status":191},
-      "fx": {"anchor":1,"aoe":1,"blink":6,"bloodBattle":1,"burst":5,"candle":2,"dodge":47,"ember":1,"explode":24,"healAoe":25,"overload":3,"shieldBreak":2,"splash":92,"summon":8,"telegraph":1,"teleport":2},
-      "snaps": "20a08a18 e7c4e5c0 19953744 0b473fe3 5361c85f cb383aa0 6804cf6e 34e854d8 abc09b9d 4729ee83 d3e3e78f bf8d4ce2 824cc2db fcf4e1ba 663a28e6 358410c3 de4f40de 6c169100 7b105e25 70e4dc0f"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
     },
     "boss-boss_6-pair": {
       "about": "阿利斯泰尔，帝国余晖 pair pool 3980000: chess_char_5_19_b chess_char_4_01_b chess_char_5_14_b chess_char_5_17_b chess_char_5_15_b chess_char_5_20_b chess_char_5_21_b chess_char_5_22_b chess_char_5_23_b chess_char_4_02_b | chess_char_4_11_b chess_char_4_04_b chess_char_4_07_b chess_char_4_16_b chess_char_4_09_b chess_char_4_06_b chess_char_4_10_b chess_char_4_12_b chess_char_4_13_b chess_char_4_14_b token_10041_cathy_catsld token_10041_cathy_catsld",
@@ -837,22 +779,13 @@
       "time": 200,
       "ticks": 6000,
       "reason": "forced",
-<<<<<<< HEAD
       "killed": 8,
       "total": 10,
-=======
-      "killed": 5,
-      "total": 4,
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "unspawned": 0,
       "bossHpLeft": 892194,
       "rngDraws": 36,
       "errors": {"count":0,"kinds":[]},
-<<<<<<< HEAD
       "players": {"p1":{"killed":8,"total":10,"perfect":false,"leaks":2,"leaksUncounted":0,"coins":0,"dmg":160724,"bossDmg":102806,"heal":1710,"deaths":15,"layerGains":{}}},
-=======
-      "players": {"p1":{"killed":5,"total":4,"perfect":false,"leaks":5,"leaksUncounted":0,"coins":0,"dmg":152625,"bossDmg":105194,"heal":1783,"deaths":16,"layerGains":{}}},
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "units": [
         ["p1",1,"op","chess_char_4_17_b",1,"uniequip_002_hsguma",3513,1,10,0,1,0,0,1,0],
         ["p1",2,"op","chess_char_4_18_b",1,"uniequip_002_mudrok",6104,1,11,3,4,0,0,4,1],
@@ -880,17 +813,10 @@
         "enemy_1198_msfshu": [6,6,0,0,18],
         "enemy_9032_aclionk": [1,0,0,40419,102806]
       },
-<<<<<<< HEAD
       "hooks": [1,47,6000,190,190,281,479,239,32,34,21,21,0,7024,68,2,20,2,1,23,0,0,2],
       "events": {"atk":220,"deploy":21,"die":32,"dmg":208,"engage":7,"fx":90,"heal":34,"leak":2,"skill":44,"spawn":36,"status":187},
       "fx": {"dodge":2,"equip":12,"featherArrow":7,"flame":3,"garrisonGrant":1,"jungleSoul":2,"mote":9,"riposte":2,"rockslide":1,"sandChains":4,"slash":24,"summon":2,"sword":1,"telegraph":11,"truesilver":4,"vest":5},
       "snaps": "8056ac8d bae7d7dc 775827b4 0d832bb0 b68eb0ff 07afed85 063dbd3e 1ffe3d7a b60db00b cc64833f 2776a8b9 a8e2de77 5a30391e 46573a52 04e74ed7 41e6b272 5ea737fb bb532ee9 6cc70b97 f363c643"
-=======
-      "hooks": [1,49,6000,179,179,275,472,1334,29,34,20,20,0,6463,12,1,19,5,1,21,0,0,3],
-      "events": {"atk":205,"deploy":24,"die":29,"dmg":201,"engage":7,"fx":91,"leak":5,"skill":42,"spawn":35,"status":73},
-      "fx": {"dodge":3,"equip":9,"featherArrow":7,"flame":3,"garrisonGrant":1,"jungleSoul":2,"mote":8,"riposte":3,"rockslide":1,"sandChains":3,"slash":29,"summon":2,"sword":3,"telegraph":10,"truesilver":4,"vest":3},
-      "snaps": "3e08ed3d b0f5c6bf 12616b1d 9cce9eed afcfc076 fb56bae7 617f9500 b046bb87 398d9618 80f1089f 99802228 823c06f9 a478439e 71b3d152 452c5be2 683a7bbf 1f49e639 2d0e0575 72ea261c 8fc27088"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
     },
     "boss-boss_7-pair": {
       "about": "“萨米的意志” pair pool 2000000: chess_char_6_03_b chess_char_6_06_b chess_char_6_07_b chess_char_6_01_b chess_char_6_02_b chess_char_6_04_b chess_char_6_05_b chess_char_6_08_b chess_char_6_09_b chess_char_6_11_b token_10017_skadi2_dedant token_10030_mlyss_wtrman | chess_char_6_15_b chess_char_6_19_b chess_char_5_01_b chess_char_6_17_b chess_char_6_12_b chess_char_6_13_b chess_char_6_14_b chess_char_6_16_b chess_char_6_18_b chess_char_6_20_b",
@@ -1009,25 +935,15 @@
       "time": 200,
       "ticks": 6000,
       "reason": "forced",
-<<<<<<< HEAD
       "killed": 14,
       "total": 18,
-=======
-      "killed": 16,
-      "total": 14,
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "unspawned": 0,
       "bossHpLeft": 6146493,
       "rngDraws": 684,
       "errors": {"count":0,"kinds":[]},
       "players": {
-<<<<<<< HEAD
         "p1": {"killed":14,"total":18,"perfect":false,"leaks":2,"leaksUncounted":0,"coins":0,"dmg":1530308,"bossDmg":540995,"heal":37591,"deaths":18,"layerGains":{}},
         "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":660811,"bossDmg":511926,"heal":7513,"deaths":22,"layerGains":{}}
-=======
-        "p1": {"killed":16,"total":14,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":2677042,"bossDmg":1550396,"heal":69312,"deaths":17,"layerGains":{}},
-        "p2": {"killed":0,"total":0,"perfect":false,"leaks":1,"leaksUncounted":0,"coins":0,"dmg":560253,"bossDmg":262771,"heal":9942,"deaths":25,"layerGains":{}}
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       },
       "units": [
         ["p1",1,"op","chess_char_5_19_b",2,"uniequip_002_mlynar",0,0,3,6,292256,22464,364,30,2],
@@ -1050,6 +966,35 @@
         ["p2",18,"op","chess_char_4_12_b",2,"uniequip_002_glady",0,0,75,0,44999,7547,3083,34,2],
         ["p2",19,"op","chess_char_4_13_b",1,"uniequip_002_gnosis",0,0,65,0,19343,4017,39,32,9],
         ["p2",20,"op","chess_char_4_14_b",1,"uniequip_002_lionhd",0,0,66,1,63014,3567,315,25,4],
+=======
+      "bossHpLeft": 12585798,
+      "rngDraws": 666,
+      "errors": {"count":0,"kinds":[]},
+      "players": {
+        "p1": {"killed":16,"total":14,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":2676913,"bossDmg":1550369,"heal":58431,"deaths":17,"layerGains":{}},
+        "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":560253,"bossDmg":262771,"heal":20725,"deaths":25,"layerGains":{}}
+      },
+      "units": [
+        ["p1",1,"op","chess_char_5_19_b",2,"uniequip_002_mlynar",7814,1,90,2,334546,24097,655,20,3],
+        ["p1",2,"op","chess_char_4_01_b",2,"uniequip_002_rmixer",7074,1,87,0,4861,9337,790,6,1],
+        ["p1",3,"op","chess_char_5_14_b",1,"none",4348,1,71,2,352602,19433,5661,5,16],
+        ["p1",4,"op","chess_char_5_17_b",1,"uniequip_002_f12yin",0,0,70,1,48055,29763,5829,84,2],
+        ["p1",5,"op","chess_char_5_15_b",1,"uniequip_002_thorn2",0,0,74,5,876096,5355,675,71,9],
+        ["p1",6,"op","chess_char_5_20_b",2,"uniequip_002_aglina",0,0,75,2,761501,15781,75,35,3],
+        ["p1",7,"op","chess_char_5_21_b",1,"uniequip_002_sntlla",3258,1,81,0,5686,3481,223,18,2],
+        ["p1",8,"op","chess_char_5_22_b",1,"uniequip_002_nymph",1855.46,1,80,2,211918,4930,342,30,11],
+        ["p1",9,"op","chess_char_5_23_b",1,"uniequip_002_reckpr",3082.61,1,72,0,0,14900,44126,38,4],
+        ["p1",10,"op","chess_char_4_02_b",2,"uniequip_002_mostma",0,0,84,1,81648,10225,55,13,2],
+        ["p2",11,"op","chess_char_4_11_b",1,"uniequip_002_cathy",0,0,76,0,0,8420,223,0,2],
+        ["p2",12,"op","chess_char_4_04_b",1,"uniequip_002_ines",0,0,82,0,27913,14385,4392,91,4],
+        ["p2",13,"op","chess_char_4_07_b",1,"uniequip_002_bpipe",0,0,91,0,6283,14796,2285,9,3],
+        ["p2",14,"op","chess_char_4_16_b",2,"uniequip_002_texas2",1619,1,94,0,128154,14622,3856,60,8],
+        ["p2",15,"op","chess_char_4_09_b",1,"uniequip_002_mizuki",0,0,69,1,120204,9521,1535,31,3],
+        ["p2",16,"op","chess_char_4_06_b",1,"uniequip_002_kroos2",1561,1,89,0,14218,3122,0,84,2],
+        ["p2",17,"op","chess_char_4_10_b",1,"uniequip_002_aroma",1432.92,1,86,0,76985,4206,2311,76,3],
+        ["p2",18,"op","chess_char_4_12_b",2,"uniequip_002_glady",884.71,1,79,0,60016,5447,1868,33,3],
+        ["p2",19,"op","chess_char_4_13_b",1,"uniequip_002_gnosis",0,0,60,0,64038,7927,3949,72,22],
+        ["p2",20,"op","chess_char_4_14_b",1,"uniequip_002_lionhd",0,0,61,0,62441,3559,307,25,4],
         ["p2",21,"token","token_10041_cathy_catsld",null,null,100,1,21,0,0,0,0,0,null],
         ["p2",22,"token","token_10041_cathy_catsld",null,null,100,1,22,0,0,0,0,0,null]
       ],
@@ -1105,11 +1050,9 @@
         "weightless": 2,
         "zone": 156
       },
-<<<<<<< HEAD
       "snaps": "3795cfd4 891856fd fa1c1210 2c30aa4b d8e5b303 a2e870a9 2c890acc 9c3510e1 c0c588c6 b4adfe33 919f2f15 3096a982 11725bf2 da1f3dc4 43291420 c44f7791 f63a2f31 d153dec1 dea37ac5 1edec0c5"
 =======
-      "snaps": "0499777c 66895c47 00cd2e8d 02a8aa95 5d3f3829 3d4bf1c3 1ecb5a32 b9d715e5 54e94d88 7c9b3f95 de81172e 15cddd71 78890306 d4586c67 72920db0 61a8a2c6 4a931d91 d389bff6 1cdd3841 f76bc0a3"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
+      "snaps": "0499777c 2a8a8958 27548bdc 4d50b14c 2d952e29 e8bac176 f62bddd6 c54603c8 51656465 9ecf84f7 f5a69ccb 658967be 427da03c 135738d4 c9cadaf0 ae8120c2 8af17fbf 3fc4b1b1 5b218cee 89d8e629"
     },
     "hidden-boss_8-solo": {
       "about": "假想敌：胄 solo pool 1800000: chess_char_4_17_b chess_char_4_18_b chess_char_4_23_b chess_char_4_19_b chess_char_4_22_b chess_char_4_20_b chess_char_4_21_b chess_char_4_24_b chess_char_4_25_b chess_char_4_26_b",
@@ -1123,22 +1066,13 @@
       "time": 200,
       "ticks": 6000,
       "reason": "forced",
-<<<<<<< HEAD
       "killed": 5,
       "total": 13,
-=======
-      "killed": 3,
-      "total": 6,
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "unspawned": 0,
       "bossHpLeft": 1618158,
       "rngDraws": 226,
       "errors": {"count":0,"kinds":[]},
-<<<<<<< HEAD
       "players": {"p1":{"killed":5,"total":13,"perfect":false,"leaks":8,"leaksUncounted":0,"coins":0,"dmg":234954,"bossDmg":181842,"heal":28143,"deaths":21,"layerGains":{}}},
-=======
-      "players": {"p1":{"killed":3,"total":6,"perfect":false,"leaks":10,"leaksUncounted":0,"coins":0,"dmg":450453,"bossDmg":402606,"heal":28293,"deaths":23,"layerGains":{}}},
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "units": [
         ["p1",1,"op","chess_char_4_17_b",1,"uniequip_002_hsguma",0,0,6,1,3027,8626,0,8,0],
         ["p1",2,"op","chess_char_4_18_b",1,"uniequip_002_mudrok",0,0,33,2,14168,17396,5188,10,6],
@@ -1165,17 +1099,10 @@
         "enemy_9015_acstmb": [3,2,0,6563,790],
         "enemy_9016_acstmr": [7,7,0,0,31]
       },
-<<<<<<< HEAD
       "hooks": [1,53,6000,301,301,538,573,110,37,45,17,17,0,5624,46,4,27,8,1,33,0,0,0],
       "events": {"atk":354,"deploy":22,"die":37,"dmg":567,"engage":5,"fx":174,"heal":104,"leak":8,"skill":35,"spawn":41,"status":138},
       "fx": {"bandage":1,"beam":32,"blink":10,"block":3,"charge":6,"explode":7,"featherArrow":1,"garrisonGrant":1,"healField":4,"mote":5,"phase":1,"redistribute":7,"reweave":1,"rockslide":6,"sandChains":1,"shell":7,"shieldBreak":6,"slash":56,"spGift":3,"summon":5,"telegraph":3,"thorns":5,"truesilver":3},
       "snaps": "32c4a923 512591e1 e9c907a6 e3107633 ba7c0969 3a59d469 b8cecc85 46968da9 2129d863 19b4ada6 9afd8bfd ede8ed1f 6d35ee92 820ce8ef 4981d928 d404a14b 089b661f 39f4bf14 8620255e 7016887c"
-=======
-      "hooks": [1,56,6000,303,303,564,576,1204,37,47,17,17,0,5895,50,3,28,10,1,29,0,0,0],
-      "events": {"atk":360,"deploy":24,"die":37,"dmg":569,"engage":5,"fx":188,"heal":76,"leak":10,"skill":35,"spawn":42,"status":149},
-      "fx": {"bandage":1,"beam":34,"blink":11,"block":6,"charge":6,"explode":11,"garrisonGrant":1,"healField":6,"mote":4,"redistribute":5,"reweave":1,"rockslide":5,"sandChains":1,"shell":7,"shieldBreak":7,"slash":58,"spGift":2,"summon":5,"telegraph":3,"thorns":11,"truesilver":3},
-      "snaps": "9b5e58cf c4e06fea a40166a3 0e30f917 42214d72 ebc20f66 7258ad62 49f2a70f 0b93ecfb 8a8ebc4e 4bf3c623 15ee0c07 41d58e70 7b48444f 6d3425f8 2d1f93c0 a755c2ad 76e23872 1016f3ce e5423b09"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
     },
     "hidden-boss_9-pair": {
       "about": "假想敌：铳 pair pool 2800000: chess_char_6_03_b chess_char_6_06_b chess_char_6_07_b chess_char_6_01_b chess_char_6_02_b chess_char_6_04_b chess_char_6_05_b chess_char_6_08_b chess_char_6_09_b chess_char_6_11_b token_10017_skadi2_dedant token_10030_mlyss_wtrman | chess_char_6_15_b chess_char_6_19_b chess_char_5_01_b chess_char_6_17_b chess_char_6_12_b chess_char_6_13_b chess_char_6_14_b chess_char_6_16_b chess_char_6_18_b chess_char_6_20_b",
@@ -1284,7 +1211,6 @@
         "sunBurst": 3,
         "talent": 4,
         "tide": 4,
-        "undying": 1,
         "wanted": 6,
         "zone": 6
       },
@@ -1350,25 +1276,15 @@
       "time": 200,
       "ticks": 6000,
       "reason": "forced",
-<<<<<<< HEAD
       "killed": 12,
       "total": 12,
-=======
-      "killed": 10,
-      "total": 4,
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "unspawned": 0,
       "bossHpLeft": 6832620,
       "rngDraws": 975,
       "errors": {"count":0,"kinds":[]},
       "players": {
-<<<<<<< HEAD
         "p1": {"killed":12,"total":12,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":367861,"bossDmg":200159,"heal":4914,"deaths":2,"layerGains":{}},
         "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":734023,"bossDmg":567221,"heal":9205,"deaths":5,"layerGains":{}}
-=======
-        "p1": {"killed":10,"total":4,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":459267,"bossDmg":234580,"heal":65462,"deaths":5,"layerGains":{}},
-        "p2": {"killed":0,"total":0,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":520827,"bossDmg":330160,"heal":13987,"deaths":24,"layerGains":{}}
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       },
       "units": [
         ["p1",1,"op","chess_char_5_19_b",2,"uniequip_002_mlynar",3907,1,5,0,0,0,0,0,0],
@@ -1443,11 +1359,9 @@
         "weightless": 6,
         "zone": 114
       },
-<<<<<<< HEAD
       "snaps": "8c189829 81a8fef7 3a4efaf3 440bf668 b43d07bc c46051bd 2bcf8382 efce6da0 a46087d4 5f55eb3f f9676b16 b50095b5 2f6e3a01 4ac1b23a abb356ab 46054e7e 664989bd 9279976f d91a3dbd c2732ee9"
 =======
-      "snaps": "f891236c f6672d61 695d2e11 dd4444a7 2a7dde13 b3213880 431cd2c4 6abcdf88 03c938b6 2adbab93 89502717 3fc3d404 0c63a20c 8d49e8fc f8eb3fc4 640373e1 0243b53a 3b3694f0 569f5d6c 6ebfcb06"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
+      "snaps": "f891236c f6672d61 f9ae299a bd864733 a34ff855 ee6e490a 8d637482 2808cda1 b8ebc810 72052abe c42b6edb 8a1ce86d f52b121e 6ec9eb74 6a1199ed 05aa4e08 5d012397 6fee9656 361ddec2 24e36087"
     },
     "hidden-boss_10-solo": {
       "about": "假想敌：管 solo pool 1900000: chess_char_4_17_b chess_char_4_18_b chess_char_4_23_b chess_char_4_19_b chess_char_4_22_b chess_char_4_20_b chess_char_4_21_b chess_char_4_24_b chess_char_4_25_b chess_char_4_26_b",
@@ -1461,22 +1375,13 @@
       "time": 200,
       "ticks": 6000,
       "reason": "forced",
-<<<<<<< HEAD
       "killed": 12,
       "total": 13,
-=======
-      "killed": 11,
-      "total": 5,
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "unspawned": 0,
       "bossHpLeft": 1534520,
       "rngDraws": 27,
       "errors": {"count":0,"kinds":[]},
-<<<<<<< HEAD
       "players": {"p1":{"killed":12,"total":13,"perfect":false,"leaks":1,"leaksUncounted":0,"coins":0,"dmg":518992,"bossDmg":365480,"heal":71614,"deaths":1,"layerGains":{}}},
-=======
-      "players": {"p1":{"killed":11,"total":5,"perfect":false,"leaks":1,"leaksUncounted":0,"coins":0,"dmg":430741,"bossDmg":276122,"heal":148595,"deaths":10,"layerGains":{}}},
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       "units": [
         ["p1",1,"op","chess_char_4_17_b",1,"uniequip_002_hsguma",3513,1,4,1,4,0,0,4,0],
         ["p1",2,"op","chess_char_4_18_b",1,"uniequip_002_mudrok",6720.8,1,6,0,7,6537,5983,7,2],
@@ -1496,17 +1401,10 @@
         "enemy_9022_acdumm": [1,0,0,1918,0],
         "enemy_9023_acdums": [10,10,0,38449,100]
       },
-<<<<<<< HEAD
       "hooks": [1,26,6000,606,606,1242,1839,452,13,14,27,24,0,13867,59,10,15,1,1,17,0,11,0],
       "events": {"atk":723,"deploy":11,"die":13,"dmg":1826,"engage":6,"fx":463,"heal":441,"leak":1,"skill":53,"spawn":25,"status":257},
       "fx": {"bandage":4,"beam":15,"burst":11,"ember":2,"explode":189,"featherArrow":7,"garrisonGrant":1,"healField":2,"jungleSoul":5,"mote":61,"phase":30,"redistribute":43,"reweave":3,"rockslide":2,"sandChainsCharged":1,"shieldBreak":15,"slash":52,"spGift":7,"summon":8,"telegraph":2,"truesilver":3},
       "snaps": "39af4287 c1c868de fadf8f46 c55be858 66f9b2a4 3ff37c1b 45adfa96 4967058e cea41925 489c48a7 bccea42b 898a4b3c 6df25753 873fc61f 1619fcb8 7afad5a1 763db01d 46db0a43 f918b4af 75a431db"
-=======
-      "hooks": [1,33,6000,650,650,2402,2852,7246,21,22,33,33,0,9568,105,16,15,1,1,65,0,27,2],
-      "events": {"atk":973,"deploy":18,"die":21,"dmg":2838,"engage":7,"fx":844,"heal":298,"leak":1,"skill":69,"spawn":25,"status":303},
-      "fx": {"bandage":9,"beam":21,"block":14,"burst":27,"dodge":2,"ember":2,"explode":500,"featherArrow":6,"garrisonGrant":1,"healField":2,"jungleSoul":3,"mote":52,"phase":55,"redistribute":15,"reweave":1,"riposte":1,"rockslide":6,"sandChains":1,"sandChainsCharged":3,"shieldBreak":21,"slash":40,"spGift":2,"summon":8,"telegraph":2,"thorns":47,"truesilver":2,"undying":1},
-      "snaps": "65ab7720 4d0f9bc6 b175a7ad decfc6d9 d1ad8895 b6add8db 8b187de4 1339864b 84136f5a 963ae966 244b6531 f0d249a1 55dc7a49 f44509fa 5ba1fdbd c65a6ccf 00d4edb3 c6669080 45cab92a 414911cc"
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
     },
     "unite-1": {
       "about": "联防 1 helper(s), 11 leaked: chess_char_6_03_b chess_char_6_06_b chess_char_6_07_b chess_char_6_01_b chess_char_6_02_b chess_char_6_04_b chess_char_6_05_b chess_char_6_08_b token_10017_skadi2_dedant",

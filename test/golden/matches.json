@@ -22,24 +22,12 @@
       "rounds": [
         {"round":1,"ai_0":[1,27,4,0,0,1,2,"20c00c02",0,"preciShip 0/2, sargonShip 0/2",4,4,0,4]},
         {"round":2,"ai_0":[1,27,5,0,0,2,4,"8cdbb4d3",0,"preciShip 0/2, sargonShip 0/4",8,8,0,9]},
-<<<<<<< HEAD
         {"round":3,"ai_0":[1,27,6,0,0,3,6,"24c9b010",1,"indomShip 1/1, preciShip 0/2, sargonShip 0/4",7,7,0,15]},
         {"round":4,"ai_0":[1,27,7,0,0,3,8,"2f6d1395",16,"deputShip 1/2, indomShip 1/4, preciShip 0/2, sargonShip 1/10",10,10,0,22]},
         {"round":5,"ai_0":[1,27,8,0,0,3,8,"beffa9be",29,"deputShip 1/4, indomShip 1/7, preciShip 0/2, sargonShip 1/12, steadShip 1/6",53,53,0,29]},
         {"round":6,"ai_0":[1,27,9,0,0,4,8,"522b51a4",40,"deputShip 2/8, indomShip 0/7, preciShip 0/2, sargonShip 1/18, steadShip 2/14",28,28,0,40]},
         {"round":7,"ai_0":[1,27,10,0,0,4,8,"84e59f1d",58,"deputShip 2/12, indomShip 0/7, preciShip 0/2, sargonShip 1/24, steadShip 2/22",27,27,0,51]},
         {"round":8,"ai_0":[1,27,11,0,0,4,8,"f9f2e5fd",76,"deputShip 2/16, indomShip 0/7, preciShip 0/2, sargonShip 1/28, steadShip 2/32",14,14,0,61]}
-=======
-        {"round":3,"ai_0":[1,27,6,0,0,3,6,"88b2c40f",1,"indomShip 1/1, preciShip 0/2, sargonShip 0/4",7,7,0,15]},
-        {"round":4,"ai_0":[1,27,7,0,0,3,8,"12cbee9d",2,"indomShip 1/2, preciShip 0/2, sargonShip 0/4",10,10,0,21]},
-        {"round":5,"ai_0":[1,27,8,0,0,3,8,"bea79fc5",3,"indomShip 2/3, kjeragShip 1/0, preciShip 0/2, sargonShip 0/4",53,16,0,29]},
-        {"round":6,"ai_0":[1,27,9,0,0,4,8,"b6051456",15,"indomShip 2/4, kjeragShip 1/3, preciShip 0/2, sargonShip 0/4, steadShip 1/8",28,28,0,39]},
-        {"round":7,"ai_0":[1,27,10,0,0,4,8,"bc01603b",31,"indomShip 2/5, kjeragShip 1/7, preciShip 0/2, sargonShip 0/4, steadShip 2/19",27,27,0,49]},
-        {
-          "round": 8,
-          "ai_0": [1,27,11,0,0,4,8,"144e1f0b",44,"deputShip 1/2, emptyShip 1/2, indomShip 0/5, kjeragShip 1/10, preciShip 0/2, sargonShip 0/4, steadShip 2/28, swiftShip 1/2",14,14,0,58]
-        }
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
       ],
       "players": {
         "ai_0": {
@@ -122,11 +110,7 @@
         {"round":5,"ai_0":[1,27,8,0,0,3,8,"e6160244",3,"kazimierzShip 0/4, kjeragShip 0/2, sargonShip 0/8, soloShip 1/3, steadShip 0/2, swiftShip 0/4",21,21,0,30]},
         {
           "round": 6,
-<<<<<<< HEAD
           "ai_0": [1,27,9,0,0,3,8,"83353941",23,"deputShip 1/2, kazimierzShip 0/4, kjeragShip 0/2, sargonShip 0/8, siracusaShip 1/8, soloShip 1/9, steadShip 1/4, swiftShip 0/4",64,64,0,39]
-=======
-          "ai_0": [1,27,11,0,0,3,8,"bc2d0f8e",27,"kazimierzShip 0/8, kjeragShip 0/2, preciShip 1/3, sargonShip 0/8, siracusaShip 1/12, soloShip 1/3, steadShip 0/2, suntShip 1/0, swiftShip 1/9",64,19,0,39]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         },
         {
           "round": 7,
@@ -154,11 +138,13 @@
         },
         {
           "round": 13,
-<<<<<<< HEAD
           "ai_0": [1,17,12,0,0,6,8,"1cf42739",230,"arcaneShip 0/2, deputShip 2/12, emptyShip 1/8, kazimierzShip 0/16, kjeragShip 0/22, miraShip 1/13, preciShip 0/12, sargonShip 0/8, siracusaShip 1/129, soloShip 1/20, steadShip 0/6, suntShip 1/6, swiftShip 1/42",115,115,0,121]
 =======
-          "ai_0": [1,27,12,0,0,6,8,"20f861b4",335,"arcaneShip 2/18, kazimierzShip 0/10, kjeragShip 0/2, preciShip 2/65, sargonShip 0/8, siracusaShip 1/204, soloShip 1/3, steadShip 0/2, suntShip 1/0, swiftShip 1/45",115,35,0,121]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
+          "ai_0": [1,17,12,0,0,6,8,"a01c862d",134,"arcaneShip 0/2, deputShip 0/8, emptyShip 0/4, kazimierzShip 0/8, kjeragShip 0/14, miraShip 1/7, preciShip 0/12, sargonShip 0/8, siracusaShip 2/93, soloShip 1/16, steadShip 0/6, suntShip 1/2, swiftShip 1/16",21,31,10,109]
+        },
+        {
+          "round": 13,
+          "ai_0": [1,17,12,0,0,6,8,"d9f5c26d",210,"arcaneShip 0/2, deputShip 2/12, emptyShip 1/8, kazimierzShip 0/16, kjeragShip 0/22, miraShip 1/11, preciShip 0/12, sargonShip 0/8, siracusaShip 1/117, soloShip 1/20, steadShip 0/6, suntShip 1/6, swiftShip 1/36",115,35,0,121]
         }
       ],
       "players": {
@@ -269,24 +255,12 @@
       "rounds": [
         {"round":1,"ai_0":[1,27,4,0,0,1,2,"cc1bac8f",0,"sargonShip 0/2, soloShip 1/0",5,5,0,4]},
         {"round":2,"ai_0":[1,27,5,0,0,1,4,"eee78fe4",0,"kazimierzShip 0/2, sargonShip 0/4, soloShip 1/0, swiftShip 0/2",10,10,0,9]},
-<<<<<<< HEAD
         {"round":3,"ai_0":[1,27,6,0,1,1,6,"d5f9d956",1,"kazimierzShip 0/2, sargonShip 0/8, soloShip 1/1, swiftShip 0/2",11,11,0,15]},
         {"round":4,"ai_0":[1,27,8,0,1,2,8,"247bff16",4,"kazimierzShip 0/4, kjeragShip 0/2, sargonShip 0/8, soloShip 1/1, steadShip 1/3, swiftShip 0/4",11,11,0,23]},
         {"round":5,"ai_0":[1,27,9,0,0,3,8,"8f1605f3",5,"kazimierzShip 0/4, kjeragShip 0/2, sargonShip 0/8, soloShip 1/1, steadShip 1/4, swiftShip 0/4",21,21,0,31]},
         {
           "round": 6,
           "ai_0": [1,27,9,0,0,3,8,"3bdfd652",23,"deputShip 1/2, kazimierzShip 0/4, kjeragShip 0/2, sargonShip 0/8, siracusaShip 1/8, soloShip 1/3, steadShip 1/10, swiftShip 0/4",56,56,0,40]
-=======
-        {"round":3,"ai_0":[1,27,6,0,1,1,6,"d5f9d956",1,"kazimierzShip 0/2, sargonShip 0/8, soloShip 1/1, swiftShip 0/2",11,9,0,15]},
-        {"round":4,"ai_0":[1,27,8,0,1,2,8,"247bff16",4,"kazimierzShip 0/4, kjeragShip 0/2, sargonShip 0/8, soloShip 1/1, steadShip 1/3, swiftShip 0/4",11,9,0,23]},
-        {
-          "round": 5,
-          "ai_0": [1,27,9,0,0,3,8,"98f10fe1",11,"kazimierzShip 0/8, kjeragShip 0/2, sargonShip 0/8, siracusaShip 1/6, soloShip 1/1, steadShip 1/4, suntShip 1/0, swiftShip 0/8",21,21,0,32]
-        },
-        {
-          "round": 6,
-          "ai_0": [1,27,9,0,0,3,8,"3b1cee08",42,"kazimierzShip 0/8, kjeragShip 0/2, raidShip 1/16, sargonShip 0/8, siracusaShip 1/17, soloShip 1/1, steadShip 1/8, suntShip 1/0, swiftShip 0/8",56,17,0,41]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         },
         {
           "round": 7,
@@ -314,11 +288,7 @@
         },
         {
           "round": 13,
-<<<<<<< HEAD
           "ai_0": [1,14,12,0,2,6,8,"ae3d8af6",224,"arcaneShip 1/26, deputShip 0/14, emptyShip 1/10, kazimierzShip 0/8, kjeragShip 1/34, preciShip 2/40, sargonShip 0/8, siracusaShip 1/79, soloShip 1/15, steadShip 0/17, swiftShip 1/20",115,115,0,126]
-=======
-          "ai_0": [1,27,12,0,0,6,8,"b6fe7f54",432,"arcaneShip 1/6, kazimierzShip 1/104, kjeragShip 0/2, miraShip 1/3, preciShip 1/60, raidShip 1/134, sargonShip 0/8, siracusaShip 1/91, soloShip 1/1, steadShip 0/10, suntShip 1/0, swiftShip 1/33",115,35,0,125]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         }
       ],
       "players": {
@@ -429,7 +399,6 @@
       "rounds": [
         {"round":1,"ai_0":[1,27,4,0,0,1,2,"cc1bac8f",0,"sargonShip 0/2, soloShip 1/0",5,5,0,4]},
         {"round":2,"ai_0":[1,27,5,0,0,1,4,"eee78fe4",0,"kazimierzShip 0/2, sargonShip 0/4, soloShip 1/0, swiftShip 0/2",10,10,0,9]},
-<<<<<<< HEAD
         {"round":3,"ai_0":[1,27,6,0,1,1,6,"d5f9d956",1,"kazimierzShip 0/2, sargonShip 0/8, soloShip 1/1, swiftShip 0/2",11,11,0,15]},
         {"round":4,"ai_0":[1,27,8,0,1,2,8,"247bff16",4,"kazimierzShip 0/4, kjeragShip 0/2, sargonShip 0/8, soloShip 1/1, steadShip 1/3, swiftShip 0/4",11,11,0,23]},
         {"round":5,"ai_0":[1,27,9,0,0,3,8,"247bff16",5,"kazimierzShip 0/4, kjeragShip 0/2, sargonShip 0/8, soloShip 1/1, steadShip 1/4, swiftShip 0/4",21,21,0,31]},
@@ -446,7 +415,6 @@
         {
           "round": 6,
           "ai_0": [1,27,9,0,0,3,8,"3b1cee08",40,"kazimierzShip 0/8, kjeragShip 0/2, raidShip 1/15, sargonShip 0/8, siracusaShip 1/17, soloShip 1/1, steadShip 1/7, suntShip 1/0, swiftShip 0/8",56,17,0,41]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         },
         {
           "round": 7,
@@ -470,15 +438,7 @@
         },
         {
           "round": 12,
-<<<<<<< HEAD
           "ai_0": [0,0,12,0,0,6,0,"811c9dc5",0,"arcaneShip 0/20, deputShip 0/14, emptyShip 0/10, kazimierzShip 0/8, kjeragShip 0/34, preciShip 0/30, sargonShip 0/8, siracusaShip 0/65, soloShip 0/15, steadShip 0/17, swiftShip 0/8",6,31,25,109]
-=======
-          "ai_0": [1,8,13,0,0,6,8,"c9c17eab",350,"arcaneShip 1/0, kazimierzShip 1/96, kjeragShip 0/2, preciShip 1/50, raidShip 1/119, sargonShip 0/8, siracusaShip 1/61, soloShip 1/1, steadShip 0/12, suntShip 1/0, swiftShip 1/23",21,31,10,111]
-        },
-        {
-          "round": 13,
-          "ai_0": [1,3,12,0,0,6,8,"c27bbe57",455,"arcaneShip 1/6, kazimierzShip 1/116, kjeragShip 0/2, miraShip 1/3, preciShip 1/68, raidShip 1/147, sargonShip 0/8, siracusaShip 1/81, soloShip 1/1, steadShip 0/12, suntShip 1/0, swiftShip 1/33",110,35,5,125]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         }
       ],
       "players": {
@@ -537,19 +497,11 @@
         },
         {
           "round": 9,
-<<<<<<< HEAD
           "ai_0": [0,0,12,0,0,4,0,"811c9dc5",0,"arcaneShip 0/14, kazimierzShip 0/2, kjeragShip 0/16, lateranoShip 0/3, preciShip 0/13, sargonShip 0/2, steadShip 0/8, swiftShip 0/8",16,32,16,74]
-=======
-          "ai_0": [1,2,13,2,2,4,8,"539ad44a",92,"arcaneShip 0/2, egirShip 1/25, kazimierzShip 0/2, kjeragShip 0/8, lateranoShip 1/24, preciShip 0/2, raidShip 1/16, sargonShip 0/8, soloShip 1/0, steadShip 1/14, suntShip 1/0, swiftShip 0/5, visiShip 1/13",28,32,4,78]
-        },
-        {
-          "round": 10,
-          "ai_0": [1,2,16,0,3,5,8,"2c5b0363",120,"arcaneShip 0/2, egirShip 1/41, kazimierzShip 0/2, kjeragShip 0/8, lateranoShip 1/24, preciShip 0/2, raidShip 1/18, sargonShip 0/8, soloShip 1/0, steadShip 1/16, suntShip 1/0, swiftShip 0/5, visiShip 1/21",30,30,0,93]
         },
         {
           "round": 11,
           "ai_0": [0,0,16,0,0,5,0,"811c9dc5",0,"arcaneShip 0/2, egirShip 0/60, kazimierzShip 0/2, kjeragShip 0/8, lateranoShip 0/45, preciShip 0/2, raidShip 0/18, sargonShip 0/8, steadShip 0/16, swiftShip 0/5, visiShip 0/38",18,24,10,107]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         }
       ],
       "players": {
@@ -595,13 +547,8 @@
         },
         {
           "round": 3,
-<<<<<<< HEAD
           "ai_0": [1,45,6,0,0,1,6,"cb2c7b2a",3,"preciShip 0/10, sargonShip 0/10, siracusaShip 0/3, soloShip 1/3, suntShip 1/0, swiftShip 1/0",19,19,0,15],
           "ai_1": [1,28,6,0,0,1,7,"1878928c",2,"arcaneShip 0/2, kazimierzShip 0/2, preciShip 0/12, sargonShip 0/10, soloShip 1/0, swiftShip 1/2",19,19,0,15]
-=======
-          "ai_0": [1,45,6,0,0,1,6,"cb2c7b2a",3,"preciShip 0/10, sargonShip 0/10, siracusaShip 0/3, soloShip 1/3, suntShip 1/0, swiftShip 1/0",19,6,0,15],
-          "ai_1": [1,28,6,0,0,1,7,"b7cd12ed",2,"arcaneShip 0/2, kazimierzShip 0/2, preciShip 0/12, sargonShip 0/10, soloShip 1/0, swiftShip 1/2",19,6,0,15]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         },
         {
           "round": 4,
@@ -645,18 +592,21 @@
         },
         {
           "round": 12,
-<<<<<<< HEAD
           "ai_0": [1,45,14,0,0,6,8,"d434f9ef",168,"arcaneShip 2/46, miraShip 1/6, preciShip 0/10, sargonShip 0/10, siracusaShip 1/68, skillfulShip 1/18, soloShip 1/6, suntShip 1/0, swiftShip 1/24",105,105,0,113],
           "ai_1": [1,28,12,0,0,6,8,"57452d77",157,"arcaneShip 2/28, kazimierzShip 1/30, kjeragShip 0/8, lateranoShip 0/8, preciShip 1/45, sargonShip 0/10, steadShip 1/0, suntShip 1/0, swiftShip 1/54",105,105,0,114]
-=======
-          "ai_0": [1,37,12,0,0,6,8,"e51a7992",183,"arcaneShip 1/26, egirShip 1/82, preciShip 0/10, raidShip 1/7, sargonShip 0/10, siracusaShip 1/32, skillfulShip 0/8, soloShip 1/6, suntShip 1/0, swiftShip 1/30",103,32,2,114],
-          "ai_1": [1,16,12,0,0,6,8,"c13a70f2",199,"arcaneShip 2/22, indomShip 0/2, kazimierzShip 1/62, kjeragShip 0/10, preciShip 2/88, sargonShip 0/10, soloShip 1/0, steadShip 0/9, suntShip 1/0, swiftShip 1/27",100,32,5,111]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         },
         {
           "round": 13,
           "ai_0": [1,37,12,0,2,6,8,"5deeb03a",214,"arcaneShip 2/70, miraShip 1/12, preciShip 0/10, sargonShip 0/10, siracusaShip 1/98, skillfulShip 1/28, soloShip 1/6, suntShip 1/0, swiftShip 0/32",26,34,8,125],
           "ai_1": [1,21,12,0,0,6,8,"ecba4cc3",189,"arcaneShip 2/34, kazimierzShip 1/38, kjeragShip 0/8, lateranoShip 0/8, preciShip 1/50, sargonShip 0/10, steadShip 1/0, suntShip 1/0, swiftShip 1/67",27,34,7,125]
+=======
+          "ai_0": [1,45,14,0,0,6,8,"dd5db63e",168,"arcaneShip 2/46, miraShip 1/6, preciShip 0/10, sargonShip 0/10, siracusaShip 1/68, skillfulShip 1/18, soloShip 1/6, suntShip 1/0, swiftShip 1/24",105,32,0,113],
+          "ai_1": [1,28,12,0,0,6,8,"992eaa0c",157,"arcaneShip 2/28, kazimierzShip 1/30, kjeragShip 0/8, lateranoShip 0/8, preciShip 1/45, sargonShip 0/10, steadShip 1/0, suntShip 1/0, swiftShip 1/54",104,32,1,114]
+        },
+        {
+          "round": 13,
+          "ai_0": [1,38,12,0,2,6,8,"d0654a7f",214,"arcaneShip 2/70, miraShip 1/12, preciShip 0/10, sargonShip 0/10, siracusaShip 1/98, skillfulShip 1/28, soloShip 1/6, suntShip 1/0, swiftShip 0/32",27,34,7,125],
+          "ai_1": [1,21,12,0,0,6,8,"dc3bc59a",189,"arcaneShip 2/34, kazimierzShip 1/38, kjeragShip 0/8, lateranoShip 0/8, preciShip 1/50, sargonShip 0/10, steadShip 1/0, suntShip 1/0, swiftShip 1/67",27,34,7,125]
         }
       ],
       "players": {
@@ -829,18 +779,12 @@
         },
         {
           "round": 3,
-<<<<<<< HEAD
           "ai_0": [1,23,6,0,1,1,7,"205b9f2b",4,"deputShip 1/4",12,12,0,15],
           "ai_1": [1,45,6,0,2,1,6,"81325be0",7,"kazimierzShip 0/5, swiftShip 1/7",10,10,0,15],
-=======
-          "ai_0": [1,23,6,0,2,1,7,"205b9f2b",4,"deputShip 1/4",10,10,0,15],
-          "ai_1": [1,45,6,0,1,1,6,"81325be0",7,"kazimierzShip 0/5, swiftShip 1/7",12,10,0,15],
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
           "ai_2": [1,27,15,0,1,1,8,"ee62b7b8",2,"soloShip 1/2, yanShip 0/1",10,10,0,15]
         },
         {
           "round": 4,
-<<<<<<< HEAD
           "ai_0": [1,23,8,0,3,2,8,"68de5356",12,"deputShip 1/8, kazimierzShip 0/2, swiftShip 1/4",11,14,3,22],
           "ai_1": [1,45,9,0,2,2,8,"695e8a3a",16,"deputShip 1/2, kazimierzShip 0/7, swiftShip 1/14",8,12,4,23],
           "ai_2": [1,27,8,0,1,2,8,"7d605cca",12,"deputShip 1/2, siracusaShip 1/2, soloShip 1/8, yanShip 0/1",12,12,0,23]
@@ -850,17 +794,13 @@
           "ai_0": [1,23,11,0,0,3,8,"59856422",20,"deputShip 1/12, kazimierzShip 0/2, skillfulShip 1/2, swiftShip 1/6",49,51,2,33],
           "ai_1": [1,45,10,0,0,3,8,"a37755ee",27,"deputShip 2/6, kazimierzShip 0/7, swiftShip 1/21",53,53,0,32],
           "ai_2": [1,27,9,0,2,3,8,"c25b67c7",22,"deputShip 1/4, siracusaShip 1/4, soloShip 1/14, yanShip 0/1",53,53,0,31]
-=======
-          "ai_0": [1,23,9,0,2,2,8,"1b31669c",14,"deputShip 1/8, kazimierzShip 0/2, skillfulShip 1/2, swiftShip 1/4",11,12,1,24],
-          "ai_1": [1,45,8,0,1,2,8,"370b1623",11,"kazimierzShip 0/7, swiftShip 1/11, yanShip 0/2",14,12,0,23],
-          "ai_2": [1,27,8,0,1,2,8,"80fcb6a2",4,"siracusaShip 1/0, soloShip 1/4, yanShip 0/1",12,12,0,23]
-        },
-        {
-          "round": 5,
           "ai_0": [1,23,10,0,0,2,8,"be84400f",34,"deputShip 1/12, indomShip 1/3, kazimierzShip 1/7, skillfulShip 0/5, soloShip 1/2, suntShip 1/2, swiftShip 1/8",53,16,0,34],
           "ai_1": [1,45,9,0,0,3,8,"1f27df00",13,"kazimierzShip 0/7, swiftShip 1/13, yanShip 0/2",53,16,0,32],
           "ai_2": [1,27,9,0,0,3,8,"9bdbc0d9",12,"deputShip 1/2, siracusaShip 1/2, soloShip 1/8, yanShip 0/1",49,16,4,32]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
+=======
+          "ai_0": [1,23,10,0,0,3,8,"d8f34b72",27,"deputShip 1/12, kazimierzShip 0/4, skillfulShip 1/7, swiftShip 1/8",53,16,0,33],
+          "ai_1": [1,45,9,0,0,3,8,"df2ac198",21,"deputShip 1/4, kazimierzShip 0/7, swiftShip 1/17",43,16,10,32],
+          "ai_2": [1,27,9,0,0,3,8,"b7b66774",14,"siracusaShip 1/10, soloShip 1/4, yanShip 0/1",52,16,1,31]
         },
         {
           "round": 6,
@@ -882,15 +822,19 @@
         },
         {
           "round": 9,
-<<<<<<< HEAD
           "ai_0": [1,5,12,0,0,4,8,"6d558be7",156,"deputShip 2/32, indomShip 1/4, kazimierzShip 0/2, kjeragShip 1/27, skillfulShip 1/51, soloShip 1/16, steadShip 1/22, suntShip 1/4, swiftShip 0/20",61,67,6,81],
           "ai_1": [1,24,12,0,0,4,8,"ad1959de",111,"deputShip 2/35, kazimierzShip 0/7, skillfulShip 1/22, soloShip 1/16, suntShip 1/16, swiftShip 0/21, victoriaShip 1/22",44,56,12,73],
           "ai_2": [1,10,12,0,0,4,8,"e0957cd2",127,"deputShip 0/10, miraShip 1/3, siracusaShip 2/78, soloShip 1/22, suntShip 1/6, swiftShip 1/18, yanShip 0/1",57,63,6,75]
 =======
-          "ai_0": [1,3,12,0,0,4,8,"e73e84c6",170,"deputShip 2/24, indomShip 1/29, kazimierzShip 1/29, siracusaShip 0/24, skillfulShip 0/19, soloShip 1/14, suntShip 1/14, swiftShip 1/60",32,22,16,76],
-          "ai_1": [1,25,12,0,0,4,8,"fec52ed0",54,"arcaneShip 1/17, indomShip 1/18, kazimierzShip 0/7, siracusaShip 1/12, soloShip 1/0, suntShip 1/0, swiftShip 0/17, victoriaShip 1/7, visiShip 0/4, yanShip 0/2",19,22,24,76],
-          "ai_2": [1,15,12,0,0,4,8,"549a87ca",142,"deputShip 1/12, indomShip 1/12, siracusaShip 1/88, skillfulShip 1/2, soloShip 1/18, suntShip 1/10, swiftShip 0/6, yanShip 0/1",52,22,7,80]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
+          "ai_0": [1,13,11,0,1,4,8,"3c234f18",78,"deputShip 2/24, kazimierzShip 0/4, lateranoShip 1/4, skillfulShip 1/26, soloShip 1/8, swiftShip 1/16",8,20,12,60],
+          "ai_1": [1,35,11,0,0,4,8,"e467c2a4",77,"deputShip 2/16, kazimierzShip 0/7, siracusaShip 1/10, skillfulShip 1/4, soloShip 0/8, suntShip 1/12, swiftShip 1/35",6,20,14,60],
+          "ai_2": [1,17,11,0,0,4,8,"e7b660e2",62,"siracusaShip 1/52, soloShip 1/4, swiftShip 1/6, yanShip 0/1",9,20,11,58]
+        },
+        {
+          "round": 9,
+          "ai_0": [1,3,13,0,2,4,8,"c27d4a4b",110,"deputShip 2/28, kazimierzShip 0/4, lateranoShip 1/11, miraShip 1/4, skillfulShip 1/35, soloShip 1/12, swiftShip 1/20",34,22,10,73],
+          "ai_1": [1,26,12,0,0,4,8,"ab750cbb",82,"deputShip 1/18, kazimierzShip 0/7, raidShip 1/4, siracusaShip 1/20, skillfulShip 1/8, soloShip 1/10, steadShip 1/8, suntShip 1/14, swiftShip 0/37",44,22,9,72],
+          "ai_2": [1,7,12,0,4,4,8,"335cbc51",78,"siracusaShip 1/68, soloShip 1/4, suntShip 1/0, swiftShip 1/6, yanShip 0/1",36,22,16,69]
         },
         {
           "round": 10,
@@ -1137,14 +1081,14 @@
       "rounds": [
         {
           "round": 1,
-          "ai_0": [1,45,4,0,0,1,2,"cf5de4b4",0,"kazimierzShip 0/2, swiftShip 0/2",5,5,0,4],
-          "ai_1": [1,26,4,0,0,1,2,"59374416",0,"kazimierzShip 0/2, sargonShip 0/2, swiftShip 0/2",5,5,0,4],
+          "ai_0": [1,45,4,0,0,1,2,"79943064",0,"kazimierzShip 0/2, swiftShip 0/2",5,5,0,4],
+          "ai_1": [1,26,4,0,0,1,2,"704ffa4d",0,"kazimierzShip 0/2, sargonShip 0/2, swiftShip 0/2",5,5,0,4],
           "ai_2": [1,28,4,0,0,1,2,"eb0c1458",0,"deputShip 0/2, victoriaShip 0/2",2,5,3,4],
           "ai_3": [1,26,4,0,0,1,2,"ba03322a",0,"soloShip 1/0",5,5,0,4]
         },
         {
           "round": 2,
-          "ai_0": [1,45,5,0,0,1,4,"62de86cd",4,"kazimierzShip 0/4, swiftShip 1/4",8,8,0,9],
+          "ai_0": [1,45,5,0,0,1,4,"e8a46594",4,"kazimierzShip 0/4, swiftShip 1/4",8,8,0,9],
           "ai_1": [1,26,5,0,0,1,4,"a2ec5116",5,"kazimierzShip 0/5, sargonShip 0/2, soloShip 1/0, swiftShip 1/5",8,8,0,9],
           "ai_2": [1,28,5,0,0,1,3,"70d74d61",0,"deputShip 0/4, kjeragShip 0/2, soloShip 1/0, victoriaShip 0/6",7,8,1,9],
           "ai_3": [1,26,5,0,0,1,4,"9e98d014",0,"sargonShip 0/2, soloShip 1/0",8,8,0,9]
@@ -1159,15 +1103,9 @@
         {
           "round": 4,
           "ai_0": [1,45,8,0,1,2,8,"822a03c7",6,"arcaneShip 0/8, kazimierzShip 0/4, preciShip 0/8, swiftShip 1/6",10,10,0,23],
-<<<<<<< HEAD
           "ai_1": [1,26,8,0,1,2,8,"f1865800",7,"arcaneShip 1/2, kazimierzShip 0/5, kjeragShip 0/2, preciShip 0/2, sargonShip 0/4, soloShip 1/0, steadShip 0/2, swiftShip 1/5",11,12,1,21],
           "ai_2": [1,28,8,0,3,2,8,"38880204",9,"deputShip 1/7, kazimierzShip 0/2, kjeragShip 0/10, soloShip 1/2, steadShip 0/4, swiftShip 0/2, victoriaShip 0/10, yanShip 0/4",10,10,0,22],
           "ai_3": [1,26,9,0,0,2,8,"00097ea6",4,"arcaneShip 1/3, preciShip 0/2, sargonShip 0/2, siracusaShip 1/0, soloShip 1/1",6,10,4,24]
-=======
-          "ai_1": [1,26,8,0,1,2,8,"1d09144d",12,"arcaneShip 1/2, kazimierzShip 0/5, kjeragShip 0/2, preciShip 0/2, sargonShip 0/4, soloShip 1/0, steadShip 1/2, swiftShip 1/8",12,10,0,23],
-          "ai_2": [1,28,8,0,1,2,8,"38880204",9,"deputShip 1/7, kazimierzShip 0/2, kjeragShip 0/10, soloShip 1/2, steadShip 0/4, swiftShip 0/2, victoriaShip 0/10, yanShip 0/4",10,10,0,22],
-          "ai_3": [1,26,9,0,2,2,8,"654ed0cf",10,"arcaneShip 1/5, deputShip 1/2, preciShip 0/2, sargonShip 0/2, soloShip 1/3",9,10,1,24]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         },
         {
           "round": 5,
@@ -1326,13 +1264,8 @@
         },
         {
           "round": 6,
-<<<<<<< HEAD
           "ai_0": [1,29,9,0,3,3,8,"5840167c",27,"arcaneShip 0/2, kjeragShip 0/2, preciShip 1/2, siracusaShip 1/12, soloShip 1/11, steadShip 2/2",25,25,0,39],
           "ai_1": [1,28,11,0,1,3,8,"10bc7ef2",6,"arcaneShip 0/2, kjeragShip 0/4, preciShip 1/2, siracusaShip 1/0, soloShip 1/0, steadShip 2/4",22,22,0,41]
-=======
-          "ai_0": [1,29,9,0,3,3,8,"41bbfcb2",32,"arcaneShip 0/2, deputShip 1/2, kjeragShip 0/2, preciShip 1/4, siracusaShip 1/12, soloShip 1/14, steadShip 0/2",25,23,0,39],
-          "ai_1": [1,28,9,0,1,3,8,"ee24046e",11,"arcaneShip 0/2, kjeragShip 0/9, preciShip 2/7, siracusaShip 1/0, soloShip 1/0, steadShip 1/4",20,22,2,37]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         },
         {
           "round": 7,
@@ -1411,7 +1344,7 @@
       "combat": "client",
       "boost": {"lp":400,"layers":300},
       "setup": {"stageId":"act1autochess_m02","bossId":"boss_5","hiddenBossId":"boss_10","factions":["TIMES","ELEMENT","DOT"]},
-      "end": {"victory":true,"roundsPassed":15,"hiddenReached":true,"hiddenCleared":true,"reason":"victory","teamLp":399,"bossPoolLeft":0,"virtualMs":113700},
+      "end": {"victory":true,"roundsPassed":15,"hiddenReached":true,"hiddenCleared":true,"reason":"victory","teamLp":398,"bossPoolLeft":0,"virtualMs":113700},
       "rng": {"setup":25,"shop":346,"waves":0,"draft":42,"bots":10350,"meta":3},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
@@ -1425,19 +1358,11 @@
         },
         {
           "round": 3,
-<<<<<<< HEAD
           "ai_0": [1,400,6,0,1,1,6,"38b6de95",603,"arcaneShip 0/300, deputShip 0/300, egirShip 0/300, emptyShip 0/300, indomShip 0/300, investShip 0/300, kazimierzShip 0/308, kjeragShip 0/300, lateranoShip 0/300, maniShip 0/300, miraShip 0/300, preciShip 0/300, raidShip 0/300, sargonShip 0/300, siracusaShip 0/300, skillfulShip 0/300, soloShip 1/303, steadShip 1/300, suntShip 0/300, swiftShip 0/308, victoriaShip 0/300, visiShip 0/300, yanShip 0/300",10,10,0,15]
         },
         {
           "round": 4,
           "ai_0": [1,400,8,0,1,2,8,"22c02a44",603,"arcaneShip 0/302, deputShip 0/300, egirShip 0/300, emptyShip 0/300, indomShip 0/300, investShip 0/300, kazimierzShip 0/308, kjeragShip 0/300, lateranoShip 0/300, maniShip 0/300, miraShip 0/300, preciShip 0/302, raidShip 0/300, sargonShip 0/300, siracusaShip 0/300, skillfulShip 0/300, soloShip 1/303, steadShip 1/300, suntShip 0/300, swiftShip 0/308, victoriaShip 0/300, visiShip 0/300, yanShip 0/300",10,10,0,22]
-=======
-          "ai_0": [1,400,6,0,1,1,6,"193fde59",603,"arcaneShip 0/300, deputShip 0/300, egirShip 0/300, emptyShip 0/300, indomShip 0/300, investShip 0/300, kazimierzShip 0/308, kjeragShip 0/300, lateranoShip 0/300, maniShip 0/300, miraShip 0/300, preciShip 0/300, raidShip 0/300, sargonShip 0/300, siracusaShip 0/300, skillfulShip 0/300, soloShip 1/303, steadShip 1/300, suntShip 0/300, swiftShip 0/308, victoriaShip 0/300, visiShip 0/300, yanShip 0/300",10,8,0,15]
-        },
-        {
-          "round": 4,
-          "ai_0": [1,400,8,0,1,2,8,"1fa2c5ec",603,"arcaneShip 0/302, deputShip 0/300, egirShip 0/300, emptyShip 0/300, indomShip 0/300, investShip 0/300, kazimierzShip 0/308, kjeragShip 0/300, lateranoShip 0/300, maniShip 0/300, miraShip 0/300, preciShip 0/302, raidShip 0/300, sargonShip 0/300, siracusaShip 0/300, skillfulShip 0/300, soloShip 1/303, steadShip 1/300, suntShip 0/300, swiftShip 0/308, victoriaShip 0/300, visiShip 0/300, yanShip 0/300",10,8,0,22]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         },
         {
           "round": 5,
@@ -1469,11 +1394,7 @@
         },
         {
           "round": 12,
-<<<<<<< HEAD
           "ai_0": [1,399,14,0,0,6,8,"108fc4b5",2194,"arcaneShip 1/328, deputShip 0/300, egirShip 0/300, emptyShip 0/300, indomShip 1/308, investShip 0/300, kazimierzShip 0/308, kjeragShip 0/300, lateranoShip 0/300, maniShip 0/300, miraShip 0/300, preciShip 0/302, raidShip 0/300, sargonShip 0/300, siracusaShip 1/326, skillfulShip 1/309, soloShip 1/307, steadShip 0/300, suntShip 1/300, swiftShip 1/316, victoriaShip 0/300, visiShip 0/300, yanShip 0/300",114,114,0,111]
-=======
-          "ai_0": [1,399,14,0,0,6,8,"bc6cba50",2478,"arcaneShip 1/310, deputShip 0/300, egirShip 0/300, emptyShip 0/300, indomShip 1/300, investShip 0/300, kazimierzShip 1/308, kjeragShip 0/310, lateranoShip 0/300, maniShip 0/300, miraShip 0/300, preciShip 1/314, raidShip 0/300, sargonShip 0/300, siracusaShip 0/306, skillfulShip 0/316, soloShip 1/307, steadShip 1/310, suntShip 1/300, swiftShip 1/329, victoriaShip 0/300, visiShip 0/300, yanShip 0/300",115,32,0,112]
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
         },
         {
           "round": 13,
@@ -1486,7 +1407,7 @@
           "victory": true,
           "roundsPassed": 15,
           "eliminatedRound": null,
-          "lp": 399,
+          "lp": 398,
           "bandId": "band_paganini",
           "title": {"id":"comment_1","name":"卫戍之星","picId":"comment_icon_1","text":"对敌方领袖造成伤害最高（仅胜利时）"},
           "trophies": 0,
@@ -1607,19 +1528,6 @@
           "bonds": ["arcaneShip 0/302","deputShip 1/328","egirShip 0/300","emptyShip 0/300","indomShip 1/322","investShip 0/300","kazimierzShip 0/300","kjeragShip 0/300","lateranoShip 1/304","maniShip 1/304","miraShip 0/300","preciShip 1/323","raidShip 0/300","sargonShip 0/300","siracusaShip 0/300","skillfulShip 0/304","soloShip 0/322","steadShip 1/390","suntShip 1/312","swiftShip 0/300","victoriaShip 1/340","visiShip 0/306","yanShip 0/310"]
         }
       }
-<<<<<<< HEAD
-=======
-    },
-    "coop2-NORMAL-14-standins": {
-      "about": "coop NORMAL, 1 bot seat(s) + 1 human seat (AI 托管) without 9 operators (补位 stand-ins), seed 14",
-      "fast": true,
-      "mode": "coop",
-      "difficulty": "NORMAL",
-      "seats": 1,
-      "seed": 14,
-      "combat": "client",
-      "boost": null,
-      "setup": {"stageId":"act1autochess_m01","bossId":"boss_5","hiddenBossId":"boss_10","factions":["DOT","INVISIBLE","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":13,"hiddenReached":false,"hiddenCleared":false,"reason":"defeat","teamLp":0,"bossPoolLeft":87210,"virtualMs":119900},
       "rng": {"setup":25,"shop":511,"waves":0,"draft":34,"bots":18074,"meta":23},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
@@ -1813,7 +1721,7 @@
           "victory": true,
           "roundsPassed": 14,
           "eliminatedRound": null,
-          "lp": 27,
+          "lp": 25,
           "bandId": "band_yu",
           "title": {"id":"comment_1","name":"卫戍之星","picId":"comment_icon_1","text":"对敌方领袖造成伤害最高（仅胜利时）"},
           "trophies": 4,
@@ -1827,7 +1735,7 @@
           "victory": true,
           "roundsPassed": 14,
           "eliminatedRound": null,
-          "lp": 28,
+          "lp": 22,
           "bandId": "band_mlyss",
           "title": {"id":"comment_3","name":"坚若磐石","picId":"comment_icon_3","text":"目标生命值损失最少"},
           "trophies": 4,
@@ -1862,7 +1770,6 @@
         ],
         "stock": {"chess_char_5_diy1_a":6,"chess_char_5_diy2_a":8,"chess_char_6_diy1_a":5,"chess_char_6_diy2_a":5}
       }
->>>>>>> b4bc89ad (feedback7 UIBACK: the top-bar capsule counts like the official — resolved = killed + leaked among the enemies the round scheduled (opening 0/3, a leak 1/3, a kill 2/3, the splitter 3/3); a split child, a summon and a boss summon are in neither number but still cost LP and break 完美作战 (PR #308 by @xcdoge, the capsule half of PR #157 — authored by them: the sim / protocol / HUD hunks applied as reviewed): inTotal / killedInTotal / leakedInTotal / resolved, b.snap / BattleResult / b.progress (optional field) / m.public progress carry resolved, killed may exceed total (validation bounds it by the content-spawn allowance); dropped the PR's stray design-doc line — it had replaced the S→C b.end bullet of docs/design/network.md, which is back; the 联防 live-counter change mark follows the enemy list now that a spawn no longer moves total (uniteLeftMark + test); golden: only total / players.*.total / snaps move, outcomes bit-identical — roster 23 (roster-002 003 007 008 009 010 011 012 013 015 017 018 020 023 024 025 026 027 037 045 047 048 049), bonds 2 (bond-maniShip-low, bond-soloShip-high), fields 11 (boss-boss_1 3 5 pair+solo, boss-boss_6-solo, hidden-boss_8 10 pair+solo), diy 11 (diy-036 040 056 062 068 073 083 091 095 114 115), matches 12 (solo-FUNNY-1 NORMAL-1 HARD-1 ABYSS-1 ABYSS-2, coop2-NORMAL-3 coop2-HARD-4 coop3-ABYSS-5 coop4-ABYSS-7 coop2-NORMAL-8-serverrun solo-HARD-9-boosted coop2-NORMAL-70-diy: the total column of 36 round rows), standins unchanged)
     }
   }
 }
