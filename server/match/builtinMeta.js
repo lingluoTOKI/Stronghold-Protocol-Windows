@@ -115,8 +115,9 @@ const ITEM_HANDLERS = {
         const id = rollSameBond(ctx, bonds, ctx.shopLevel());
         if (id && ctx.grantChess(id)) got++;
       }
-      // 低等级时给高星盟约干员用（如梅尔在4级商店）：roll 不到可选项时不吞物品，让它留在身上等等级高了再用。
-      if (got === 0) { ev.keep = true; }
+      // 莱茵改编：低等级给高星盟约干员用（如梅尔在 4 级商店）roll 不到可选项时不吞物品（ev.keep，留待商店等级高了再用）；
+      // 原版档案严格对齐上游 0.2.2（物品照常销毁）。两档案都采纳 #401：本次没有授予时弹 toast 说明原因。
+      if (!got) { if (ctx.gd?.dataProfile === 'rhine') ev.keep = true; toastNothing(ctx, ev); }
     },
   },
   use_equip_gain_coin_when_next_round_start: {
@@ -156,7 +157,8 @@ const ITEM_HANDLERS = {
         return;
       }
       const id = rollSameBond(ctx, ctx.pieceBonds(ev.target.uid), 6);
-      if (!id || !ctx.grantChess(id)) ev.keep = true; // 低等级给高星盟约干员用时不吞物品
+      // 莱茵改编：owned<2 的随机同盟约分支，低等级 roll 不到时不吞物品（仅莱茵档案，原版按上游销毁）；两档案都按 #401 提示。
+      if (!id || !ctx.grantChess(id)) { if (ctx.gd?.dataProfile === 'rhine') ev.keep = true; toastNothing(ctx, ev); }
     },
   },
   use_equip_reward_special_goods_char_chess: {
@@ -167,8 +169,8 @@ const ITEM_HANDLERS = {
       // a pick-one offer never shows one operator twice (user playtest #6 item 19); fewer cards when the pool runs out
       for (let k = 0; k < n; k++) { const id = rollSameBond(ctx, bonds, ctx.shopLevel(), ids); if (id) ids.push(id); }
       if (ids.length) ctx.offerChess(ids, { source: 'item' });
-      // 低等级给高星盟约干员用（如梅尔在4级商店）：roll 不到可选项时不吞物品。
-      else { ev.keep = true; }
+      // 莱茵改编：低等级给高星盟约干员用（如梅尔在 4 级商店）roll 不到时不吞物品（仅莱茵档案）；两档案都按上游 #401 提示。
+      else { if (ctx.gd?.dataProfile === 'rhine') ev.keep = true; toastNothing(ctx, ev); }
     },
   },
   // 信标 (act2autochess eff_acarm109 / eff_acgarm109 "装备时，目标干员和本装备销毁并进行一次特殊刷新，出现两名与携带者同等阶的
