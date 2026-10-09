@@ -858,8 +858,7 @@ export class UnitView {
   }
 
   /**
-   * Slide to a displacement's destination (推拉, the `displace` fx at (x, y)) instead of appearing there: `opts.dur` = the
-   * fx's 失衡 time in game seconds (real seconds = dur / ctx.animRate), else the DISPLACE_SLIDE·√D fallback.
+   * Slide to a displacement's destination (推拉, the `displace` fx at (x, y)) instead of appearing there (DISPLACE_SLIDE).
    * `at` (game s): the time of the snapshot that carries the destination — render/app.js starts the slide as soon as the
    * interpolator shows the interval before it, and until the render clock reaches `at` the view holds where it stood
    * (the sample in between is a lerp or a snap towards the destination). From then on it eases from there into the
