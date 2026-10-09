@@ -75,6 +75,7 @@ export default {
       skill: null,
       trait: { noAttack: true },
       install(battle, bomb) {
+        champagneHold(battle, bomb);   // 禁疗, no HP loss, never gone because of its HP (the owner's decision D2 of 2026-10-08)
         battle.on('tick', () => {
           if (!bomb.alive || !bomb.deployed) return;
           for (const e of battle.enemies) {
