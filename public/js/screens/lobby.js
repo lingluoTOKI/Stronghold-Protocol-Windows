@@ -17,6 +17,7 @@ import { openingBanCounts } from '../../../shared/openingBans.js';
 import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, confirmDialog, Modal } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton } from '../ui/guide.js';
+import { openStats } from './stats.js';
 import { LoadoutButton } from './loadout.js';
 import { BulletinButton } from './title.js';
 import { net, identity } from '../net.js';
@@ -411,6 +412,7 @@ export function LobbyScreen() {
         <h1 class="topbar__title">${t('选择模拟协议')}</h1>
       </div>
       <div class="topbar__right">
+        <${Button} variant="secondary" size="sm" icon="signal" onClick=${openStats} title=${t('统计数据')}>${t('统计')}<//>
         <${GuideButton} class="lobby-guide" variant="secondary" label=${t('玩法说明')} />
         <${LoadoutButton} from="lobby" size="sm" class="lobby-loadout" label=${t('干员调配')} />
         <div class="me-chip">
