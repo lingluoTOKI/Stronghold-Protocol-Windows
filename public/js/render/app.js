@@ -158,7 +158,7 @@ export async function createFieldView(host, options = {}) {
   const opts = options && typeof options === 'object' ? options : {};
   const signal = opts.signal;
   signal?.throwIfAborted();
-  const P = await withTimeout(ensurePixi(), null, signal);
+  const P = await ensurePixi();
   signal?.throwIfAborted();
   const assets = resolveAssets(opts.assets);
   const data = makeData(opts.data);

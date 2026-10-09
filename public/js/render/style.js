@@ -64,6 +64,9 @@ export const COLORS = Object.freeze({
   spReady: 0xffe066,
   spActive: 0xffb347,
   shield: 0xdfe8ff,
+  hpNeg: 0xff4b3e,
+  ammo: 0xffd04a,
+  wolf: 0xe8f0ff,
 });
 
 /** Chess tier accents (theme.css --tier-1…6) and rarity-ish frames for enemies. */
