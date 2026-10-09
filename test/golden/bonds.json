@@ -1396,7 +1396,7 @@
       "total": 30,
       "unspawned": 0,
       "bossHpLeft": null,
-      "rngDraws": 59,
+      "rngDraws": 60,
       "errors": {"count":0,"kinds":[]},
       "players": {"p1":{"killed":30,"total":30,"perfect":true,"leaks":0,"leaksUncounted":0,"coins":0,"dmg":202522,"bossDmg":0,"heal":5833,"deaths":0,"layerGains":{}}},
       "units": [
