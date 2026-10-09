@@ -548,7 +548,7 @@ export function updateEnemy(b, e, dt) {
   if (stunned || e.hidden || e.s.flags.fear) b._cutAttackStand(e);
   // 失衡 (UNBALANCE): 浮空时清除推/拉力
   if (e.s.flags.levitate && e.unbalanceUntil > b.time) e.unbalanceUntil = -Infinity;
-  const unbalanced = b.time < e.unbalanceUntil - 1e-9;
+  const unbalanced = b.time < e.unbalanceUntil - 1e-9;   // (the 1e-9: a float-summed end such as 35/30 s keeps its frame)
   const prevCd = e.atkCd;
   if (e.atkCd > 0 && !stunned && !e.hidden) e.atkCd = attackCountdown(e.atkCd, dt);
   // a stun / freeze / sleep / 浮空 / 失衡 — or leaving the field — takes the enemy out of its attack: a swing short of its
@@ -667,6 +667,8 @@ function advanceRoute(b, e, dt, R, standing = false) {
     if (leg.t === 'appear') {
       e.x = leg.c; e.y = leg.r;
       b._setHidden(e, false);
+      // a relocation is a forced state switch: it ends a 失衡 (PRTS 失衡位移机制 「被强制切换至其他状态机」)
+      e.unbalanceUntil = -Infinity;
       R.legIdx++; R.pts = null;
       continue;
     }
