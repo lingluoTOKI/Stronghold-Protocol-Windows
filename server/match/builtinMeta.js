@@ -30,6 +30,7 @@
 
 import { getData } from '../data.js';
 import { itemKey } from './gamedata.js';
+import { msg, dn } from '../../shared/i18n.js';
 
 const int = (v, d = 0) => (Number.isFinite(v) ? Math.trunc(v) : d);
 
@@ -38,6 +39,15 @@ const paramsOf = (ctx, item) => {
   const rec = item ? ctx.gd.item(item.id) : null;
   return rec && rec.params && typeof rec.params === 'object' ? rec.params : {};
 };
+
+/**
+ * The item gave nothing — the copies are all owned (the shared pool, research 06 §7) or no operator shares the bond — but
+ * it is still destroyed ("装备时销毁"): say why instead of swallowing it (GitHub #401, the owner's OK of 2026-10-09).
+ */
+function toastNothing(ctx, ev, chessName = null) {
+  const who = ctx.gd.item(ev.item?.id)?.name || '';
+  ctx.toast(chessName ? msg('{who}：卡池中已没有{name}', { who: dn(who), name: dn(chessName) }) : msg('{who}：没有可获得的同盟约干员', { who: dn(who) }), 'warn');
+}
 
 /** random chess sharing at least one bond with `bonds`, tier ≤ maxTier */
 function rollSameBond(ctx, bonds, maxTier, exclude = null) {
@@ -101,14 +111,13 @@ const ITEM_HANDLERS = {
     onEquip(ctx, ev) {
       const n = Math.max(1, int(paramsOf(ctx, ev.item).count, 1));
       const bonds = ctx.pieceBonds(ev.target.uid);
-      let granted = 0;
+      let got = 0;
       for (let k = 0; k < n; k++) {
         const id = rollSameBond(ctx, bonds, ctx.shopLevel());
-        if (id) { ctx.grantChess(id); granted++; }
+        if (id && ctx.grantChess(id)) got++;
       }
-      // 目标干员的盟约在当前商店等级下没有可招募的同盟约干员（如低等级时给高星莱茵干员用）：
-      // 不吞物品，让它留在身上，等等级高了再用。
-      if (granted === 0) { ev.keep = true; }
+      // 低等级时给高星盟约干员用（如梅尔在4级商店）：roll 不到可选项时不吞物品，让它留在身上等等级高了再用。
+      if (got === 0) { ev.keep = true; }
     },
   },
   use_equip_gain_coin_when_next_round_start: {
@@ -143,10 +152,12 @@ const ITEM_HANDLERS = {
     onEquip(ctx, ev) {
       const base = ctx.gd.baseIdOf(ev.target.id);
       const owned = [...ctx.board(), ...ctx.hand(), ...ctx.temp()].filter((p) => p && p.kind === 'chess' && !p.golden && ctx.gd.baseIdOf(p.id) === base).length;
-      if (owned >= 2) { ctx.grantChess(base); return; }
+      if (owned >= 2) {
+        if (!ctx.grantChess(base)) toastNothing(ctx, ev, ctx.gd.chess(base)?.name || null);
+        return;
+      }
       const id = rollSameBond(ctx, ctx.pieceBonds(ev.target.uid), 6);
-      if (id) ctx.grantChess(id);
-      else ev.keep = true; // 低等级给高星盟约干员用时不吞物品
+      if (!id || !ctx.grantChess(id)) ev.keep = true; // 低等级给高星盟约干员用时不吞物品
     },
   },
   use_equip_reward_special_goods_char_chess: {
@@ -157,7 +168,7 @@ const ITEM_HANDLERS = {
       // a pick-one offer never shows one operator twice (user playtest #6 item 19); fewer cards when the pool runs out
       for (let k = 0; k < n; k++) { const id = rollSameBond(ctx, bonds, ctx.shopLevel(), ids); if (id) ids.push(id); }
       if (ids.length) ctx.offerChess(ids, { source: 'item' });
-      // 低等级给高星盟约干员用（如梅尔在 4 级商店）：roll 不到可选项时不吞物品。
+      // 低等级给高星盟约干员用（如梅尔在4级商店）：roll 不到可选项时不吞物品。
       else { ev.keep = true; }
     },
   },
