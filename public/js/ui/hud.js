@@ -23,9 +23,15 @@
 // 准备就绪 is refused while the temp overflow row (临时整备区) holds pieces: the reason shows under the button
 // (user playtest #3 item 3; the row's own label is ui/underframe.js TempRowNotice).
 
+<<<<<<< HEAD
 import { useRef, useState, useEffect } from '../../vendor/hooks.module.js';
 import { PHASE } from '../../../shared/constants.js';
 import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, useTicker, hasDeadline } from './components.js';
+=======
+import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { PHASE } from '../../../shared/constants.js';
+import { html, Button, Icon, PingPill, Countdown, Tooltip, MicroLabel, DifficultyTag, Modal, useTicker } from './components.js';
+>>>>>>> d7c665db (feedback7 UIBACK: the match's top bar lists the spectator seats — a 观战席 capsule (eye + count) beside the latency opens the roster, the host removes a spectator with its ✕ while the match runs (PR #120 by @salt-fishes, the part the owner accepted: the cap stays 2, no per-room spectator option); the server already took room.removeSpectator at any time — test/match/lobby-integration.test.js now covers the host removing one mid-match (room.closed kicked, the other spectator and the host told, no frame after it, the seat refilled), test/ui/spectator-roster.e2e.test.js the capsule; one new UI string in the four packs; the dev mock seats spectators on ?variant=spectators; golden: unchanged (client only))
 import { Sprite, LpTower, GIcon, LocalSprite } from './gameComponents.js';
 import { localAsset } from '../data.js';
 import { serverNow } from '../store.js';
@@ -37,6 +43,45 @@ import { t, tParts, N_ } from '../../../shared/i18n.js';
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 // 战斗基准速度（游戏秒 / 真实秒）：服务器下发的战斗 deadline 按此真实时钟设定，默认 2×。
 const BATTLE_BASE_SPEED = 2;
+
+/**
+ * 观战席 capsule of the in-match top bar (GitHub #120, PR #120 by @salt-fishes; the spectator seats of community report #26):
+ * the room's spectators, which the room screen lists in a strip but the game screen — the route after 开始 — used to hide
+ * completely, so a spectator could only be removed before the match or after it. A small eye + the count beside the latency;
+ * a tap opens the roster, with the host's ✕ on every row (room.removeSpectator: the server takes it at any time; the removed
+ * seat gets room.closed {kicked} and no more frames). Renders nothing while no spectator seat is taken.
+ * @param {{ spectators: any[]|null, myId: any, isHost: boolean, onRemove: ((playerId: any) => any)|null }} props
+ */
+export function SpectatorPill({ spectators, myId, isHost, onRemove }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(null);
+  const list = Array.isArray(spectators) ? spectators.filter((s) => s && typeof s === 'object') : [];
+  // the roster closes with its last seat (the pill is gone: it must not pop up again for the next spectator)
+  useEffect(() => { if (!list.length) setOpen(false); }, [list.length]);
+  if (!list.length) return null;
+  const remove = async (playerId) => {
+    if (!onRemove) return;
+    setBusy(playerId);
+    try { await onRemove(playerId); } finally { setBusy(null); }
+  };
+  return html`<${Button} variant="ghost" size="sm" icon="eye" class=${cx('specpill', list.some((s) => s.playerId === myId) && 'is-me')}
+      onClick=${() => setOpen(true)} data-testid="spectators" title=${t('观战席')} aria-label=${t('观战席')}>
+      <span class="specpill__num num">${list.length}</span>
+    <//>
+    ${open ? html`<${Modal} open=${true} title=${t('观战席')} micro="SPECTATORS" width="6.4rem" onClose=${() => setOpen(false)}
+        actions=${html`<${Button} variant="secondary" onClick=${() => setOpen(false)}>${t('关闭')}<//>`}>
+      <ul class="spec__roster" data-testid="spectator-roster">
+        ${list.map((s) => html`<li key=${s.playerId} class=${cx('spec__row', s.playerId === myId && 'is-me', s.connected === false && 'is-offline')}>
+          <${Icon} name=${s.connected === false ? 'wifiOff' : 'eye'} class="spec__ico" />
+          <span class="spec__name">${s.name || t('博士')}</span>
+          ${s.playerId === myId ? html`<span class="seat__you">${t('你')}</span>` : null}
+          ${isHost && onRemove ? html`<${Button} variant="ghost" size="sm" square=${true} icon="close" loading=${busy === s.playerId} data-testid="spectator-remove"
+            onClick=${() => remove(s.playerId)} aria-label=${t('移出观战者 {name}', { name: s.name || '' })} title=${t('移出该观战者')} />` : null}
+        </li>`)}
+      </ul>
+      <p class="spec__hint t-lo">${t('观战者不占博士席位，只能观看；创建者可以把观战者移出，被移出的人不再收到战场画面。')}</p>
+    <//>` : null}`;
+}
 
 /**
  * Phase capsule: prep label, kills n/m (combat/unite), kills + boss HP bar (boss rounds).
@@ -386,15 +431,26 @@ function useBattleCountdown(speed) {
  *   onReady:(r:boolean)=>void, readyBusy?:boolean, readyCount?:number, playerCount?:number,
  *   pen?:boolean, penAvail?:boolean, onPen?:(on:boolean)=>void, config?: any, frozenAt?: number|null,
  *   pause?: { show: boolean, paused: boolean, busy?: boolean, onToggle: () => void } | null,
+<<<<<<< HEAD
  *   speed?: { show: boolean, value: number, onCycle: () => void } | null,
  *   skip?: { show: boolean, ready?: boolean, onSkip: () => void } | null,
  *   live?: { pending: number, unite: boolean, left?: number|null } | null }} props
+=======
+ *   live?: { pending: number, unite: boolean, left?: number|null } | null,
+ *   spectators?: any[]|null, myId?: any, isHost?: boolean, onRemoveSpectator?: ((playerId: any) => any)|null }} props
+ *   spectators: the room's spectator seats (room.state) — the 观战席 capsule beside the latency (SpectatorPill; the host removes)
+>>>>>>> d7c665db (feedback7 UIBACK: the match's top bar lists the spectator seats — a 观战席 capsule (eye + count) beside the latency opens the roster, the host removes a spectator with its ✕ while the match runs (PR #120 by @salt-fishes, the part the owner accepted: the cap stays 2, no per-room spectator option); the server already took room.removeSpectator at any time — test/match/lobby-integration.test.js now covers the host removing one mid-match (room.closed kicked, the other spectator and the host told, no frame after it, the seat refilled), test/ui/spectator-roster.e2e.test.js the capsule; one new UI string in the four packs; the dev mock seats spectators on ?variant=spectators; golden: unchanged (client only))
  *   frozenAt: the server time every clock shows while the solo match is paused (null = live)
  *   live: the own battle's pending LP loss (liveLp): the tower shows lp − pending in red with a −N tick, 联防中 during 联防;
  *     `left` (a leaker in 联防): its enemies still standing — the capsule's ×N tag
  */
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
+<<<<<<< HEAD
   config = null, frozenAt = null, pause = null, speed = null, skip = null, live = null, spectator = false }) {
+=======
+  config = null, frozenAt = null, pause = null, live = null, spectator = false,
+  spectators = null, myId = null, isHost = false, onRemoveSpectator = null }) {
+>>>>>>> d7c665db (feedback7 UIBACK: the match's top bar lists the spectator seats — a 观战席 capsule (eye + count) beside the latency opens the roster, the host removes a spectator with its ✕ while the match runs (PR #120 by @salt-fishes, the part the owner accepted: the cap stays 2, no per-room spectator option); the server already took room.removeSpectator at any time — test/match/lobby-integration.test.js now covers the host removing one mid-match (room.closed kicked, the other spectator and the host told, no frame after it, the seat refilled), test/ui/spectator-roster.e2e.test.js the capsule; one new UI string in the four packs; the dev mock seats spectators on ?variant=spectators; golden: unchanged (client only))
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
@@ -423,7 +479,10 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
     <div class="gtop__left">
       <${Button} variant="danger" size="lg" square=${true} icon="exit" onClick=${onExit} aria-label=${t('离开')} title=${t('离开 / 暂离')} class="gtop__exit tapx" />
       <div class="gtop__meta">
-        <${PingPill} ms=${conn?.ping} online=${conn?.status === 'online'} />
+        <div class="gtop__net">
+          <${PingPill} ms=${conn?.ping} online=${conn?.status === 'online'} />
+          <${SpectatorPill} spectators=${spectators} myId=${myId} isHost=${isHost} onRemove=${onRemoveSpectator} />
+        </div>
         ${pub?.difficulty ? html`<${DifficultyTag} difficulty=${pub.difficulty} size="sm" />` : null}
       </div>
     </div>

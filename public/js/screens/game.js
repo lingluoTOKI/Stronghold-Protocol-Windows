@@ -159,6 +159,12 @@ function MatchScreen() {
   const emotes = useStore((s) => s.emotes);
   const roomSolo = useStore((s) => s.room?.mode === 'solo');
   const spectator = useStore((s) => isSpectating(s.room, s.me.playerId));
+  // the room's spectator seats for the top bar's 观战席 capsule (ui/hud.js SpectatorPill; GitHub #120): room.state keeps coming
+  // during the match, the list is replaced only when a seat changes — shallowEqual keeps an unrelated push from re-rendering
+  const specFacts = useStore((s) => ({
+    list: Array.isArray(s.room?.spectators) ? s.room.spectators : null,
+    isHost: !!s.room && s.room.hostId === s.me.playerId,
+  }), shallowEqual);
   const gd = useGameData();
 
   const hostRef = useRef(null);
@@ -719,6 +725,7 @@ function MatchScreen() {
 
   // ---- actions ----------------------------------------------------------------------------------------------
   const buy = useCallback((i) => actions.buy(i), []);
+  const removeSpectator = useCallback((playerId) => actions.removeSpectator(playerId), []);
   // 准备 with funds left asks first: the prep's end wipes them (community report #4; not 坎诺特, not at 0 funds, not
   // under AI 托管 — gameLogic.readyFundsPrompt). The button and Space both come here.
   const askingReady = useRef(false);
@@ -1378,9 +1385,14 @@ function MatchScreen() {
         readyBusy=${readyBusy} readyCount=${readyCount} playerCount=${solo ? 1 : aliveCount}
         pen=${pen} penAvail=${penAvail} onPen=${togglePen} config=${gd.config} frozenAt=${frozenAt}
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
+<<<<<<< HEAD
         speed=${canSpeed ? { show: true, value: speedValue, onCycle: cycleSpeed, clock: () => (battleRunner?.battleClock?.() ?? null) } : null}
         skip=${canSkip ? { show: true, ready: skipReady, onSkip: skipBattleCb } : null}
         live=${liveLpNow} spectator=${spectator} />
+=======
+        live=${liveLpNow} spectator=${spectator}
+        spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} />
+>>>>>>> d7c665db (feedback7 UIBACK: the match's top bar lists the spectator seats — a 观战席 capsule (eye + count) beside the latency opens the roster, the host removes a spectator with its ✕ while the match runs (PR #120 by @salt-fishes, the part the owner accepted: the cap stays 2, no per-room spectator option); the server already took room.removeSpectator at any time — test/match/lobby-integration.test.js now covers the host removing one mid-match (room.closed kicked, the other spectator and the host told, no frame after it, the seat refilled), test/ui/spectator-roster.e2e.test.js the capsule; one new UI string in the four packs; the dev mock seats spectators on ?variant=spectators; golden: unchanged (client only))
 
       <div class="gm__bonds">
         <button type="button" class="bonds-toggle" aria-expanded=${!bondsCollapsed} aria-controls="match-bond-strip"
