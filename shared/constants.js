@@ -5,19 +5,12 @@ import { N_ } from './i18n.js';
 export const PROTOCOL_VERSION = 1;
 /** Release version shown to players (title screen, server banner, /healthz). Kept equal to package.json "version"
  * (test/version.test.js); PROTOCOL_VERSION above is the separate wire-format number. */
-export const APP_VERSION = '0.2.1';
+export const APP_VERSION = '0.2.2';
 /** A development build (the public `dev` branch): the title screen, the boot banner and the README say so, and
  * tools/package.mjs refuses to build a release zip from it without --allow-dev. */
 export const DEV_BUILD = /-dev$/.test(APP_VERSION);
 
-export const MAX_SEATS = 6;
-/**
- * Server matchmaking (自加): one big pool per difficulty, capped at MATCH_TARGET humans — the player cap of a matched
- * co-op room (independent of MAX_SEATS, the seat cap of a directly-created room / the 6-player Rhine expansion).
- */
-export const MATCH_TARGET = 4;
-/** How long a queued player waits before the server offers match.timeout (continue / AI top-up / start now). */
-export const MATCH_TIMEOUT_MS = 20000;
+export const MAX_SEATS = 4;
 /**
  * Spectator seats of a co-op room (community report #26, owner's decision 2026-10-04) — a remake feature: the official
  * room has 1–4 players and no spectator seat (there only eliminated players and 联防 bystanders watch, research 09 §3.1).
@@ -247,7 +240,3 @@ export const emoteArtGroup = (id) => { const e = emoteInfo(id); return e ? `emot
 export const emoteArtPath = (id) => { const e = emoteInfo(id); return e ? `/assets/local/emoticon/${e.dir}/${e.picId}.png` : null; };
 export const EMOTE_COOLDOWN_MS = 1000; // activity_table autoChessData.constData.chatCD (s)
 export const EMOTE_BUBBLE_MS = 3000;   // constData.chatTime (s): how long a bubble stays up
-// 房间文字聊天（自加）：单条最大长度、发送冷却、客户端本地保留条数
-export const CHAT_MAX_LEN = 200;
-export const CHAT_COOLDOWN_MS = 300;
-export const CHAT_KEEP = 20;
