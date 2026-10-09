@@ -653,8 +653,35 @@ function TerrainDetail({ terrain }) {
 }
 
 /**
+ * A stage device's tip (GitHub #228, PR #229: 阻隔工事 / “双眼皮” / 射击台 / 源石流发生装置 — the terrain tip's sibling). Opened
+ * by a tap on the device itself: the game screen resolves it with `gameLogic.deviceInfo` (prep) or `deviceTipAt` (a battle)
+ * from the stage the board on screen is built from, so the lines carry that stage's own numbers. In a battle the
+ * crate / turret is a device unit: its live HP (`live` from the battle's own sim, else `snapHp` — the screen reads the latest
+ * snapshot tuple through `unitId`) draws a HP bar like a unit card's.
+ * @param {{ name:string, tag:string, lines:string[], facts?:string[], stats?:{k:string,v:any}[] }} device
+ * @param {{ hp:number, max:number }|null} snapHp
+ */
+function DeviceDetail({ device, snapHp = null, live = null }) {
+  const hp = hpOf(live, snapHp);
+  return html`
+    <div class="dhead">
+      <div class="dhead__icon"><${Icon} name="info" /></div>
+      <div class="dhead__info">
+        <div class="dhead__chips"><span class="dtag-kind">${device.tag}</span></div>
+        <h3 class="dhead__name">${device.name}</h3>
+        ${hp ? html`<div class="dhp"><i style=${`width:${Math.max(0, Math.min(100, (hp.hp / Math.max(1, hp.max)) * 100))}%`}></i><span class="num">${fmtNum(hp.hp)} / ${fmtNum(hp.max)}</span></div>` : null}
+      </div>
+    </div>
+    <${Section} title=${t('装置机制')} micro="DEVICE">
+      ${device.lines.map((line, i) => html`<p class="dtext" key=${i}>${line}</p>`)}
+    <//>
+    ${Array.isArray(device.stats) && device.stats.length ? html`<div class="dstats">${device.stats.map((x) => html`<${Stat} key=${x.k} k=${x.k} v=${x.v} />`)}</div>` : null}
+    ${Array.isArray(device.facts) && device.facts.length ? html`<${Section} title=${t('这一格')}><p class="dtext">${device.facts.join(' · ')}</p><//>` : null}`;
+}
+
+/**
  * Resolve what a detail target shows.
- * @param {{ kind:'piece'|'chess'|'item'|'enemy'|'unit'|'token'|'terrain', id?:string, uid?:number, unit?:any, count?:number }} target
+ * @param {{ kind:'piece'|'chess'|'item'|'enemy'|'unit'|'token'|'terrain'|'device', id?:string, uid?:number, unit?:any, count?:number }} target
  * @param {Map<number, any>} pieces indexPieces(priv)
  * @param {{ priv?: any, backups?: any }} [opts] 0.2.0 补位: the player's own pieces and cards of a chess in
  *   m.private.standIns — a unit carrying `standInFor`, and a teammate's bond popup row that says it (`target.standInFor`)
@@ -666,6 +693,12 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
   if (!target) return null;
   // a special terrain tile (issue #184): the screen resolved the stage's own numbers already (gameLogic.terrainInfo)
   if (target.kind === 'terrain') return target.terrain && typeof target.terrain === 'object' ? { type: 'terrain', terrain: target.terrain } : null;
+  // a stage device (#228): the screen resolved the device's stage entry (gameLogic.deviceInfo / deviceTipAt); in a battle
+  // `unitId` is the crate / turret unit whose snapshot tuple gives the live HP
+  if (target.kind === 'device') {
+    const device = target.device && typeof target.device === 'object' ? target.device : null;
+    return device ? { type: 'device', device, ...(Number.isInteger(device.unitId) ? { unitId: device.unitId } : {}) } : null;
+  }
   const ownSi = (c) => ownStandIn(c, priv, backups);
   const dd = { chess: data.get('chess'), backups };
   /** the own card of chess `c`: its 自选 record and pick when the player filled that DIY slot */
@@ -695,20 +728,14 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     // (a teammate's 自选 row hands its unit's pick on, `target.diy`: their operator, not the empty 甄选干员 slot — 0.2.1)
     const mate = foreign && c && target.diy && typeof target.diy === 'object' ? diyRecordFor(c, target.diy, dd) : null;
     const d = mate ? { chess: mate, diy: target.diy } : foreign ? null : ownDiy(c);
-<<<<<<< HEAD
-    // 0.2.2: a teammate's member card reads its unit's 潜能 / 练度 when the row hands it on (`target.cultivation`), else
+    // 0.2.2: a teammate's member card reads its 潜能 / 练度 when the row hands it on (`target.cultivation`), else
     // the defaults (never the viewer's own settings)
     const cv = foreign ? (target.cultivation !== undefined ? { cultivation: target.cultivation } : { ops: null }) : null;
-    if (d) return { type: 'chess', chess: d.chess, hint: target.hint || null, standIn: null, diy: d.diy, ...(items.length ? { unitItems: items } : {}), ...(cv ? { cultOpts: cv } : {}) };
-    const si = !c ? null : foreign ? (typeof target.standInFor === 'string' && target.standInFor ? standInOf(c, backups) : null) : ownSi(c);
-    return c ? { type: 'chess', chess: c, hint: target.hint || null, standIn: si, ...(items.length ? { unitItems: items } : {}), ...(cv ? { cultOpts: cv } : {}) } : null;
-=======
     // `tap`: which card tap opened it (game.js numbers every shop / reward card it opens) — selectVoiceKey
     const tap = target.tap != null ? { tap: target.tap } : null;
-    if (d) return { type: 'chess', chess: d.chess, hint: target.hint || null, standIn: null, diy: d.diy, ...(items.length ? { unitItems: items } : {}), ...tap };
+    if (d) return { type: 'chess', chess: d.chess, hint: target.hint || null, standIn: null, diy: d.diy, ...(items.length ? { unitItems: items } : {}), ...(cv ? { cultOpts: cv } : {}), ...tap };
     const si = !c ? null : foreign ? (typeof target.standInFor === 'string' && target.standInFor ? standInOf(c, backups) : null) : ownSi(c);
-    return c ? { type: 'chess', chess: c, hint: target.hint || null, standIn: si, ...(items.length ? { unitItems: items } : {}), ...tap } : null;
->>>>>>> bcee737f (feedback7 R22-VOICES: review fixes — a 选中 tap no longer restarts the battle-voice gap, and the second shop / reward card of one operator says its 选中 line too; the package switch's comment quotes the measured JP size; golden: unchanged)
+    return c ? { type: 'chess', chess: c, hint: target.hint || null, standIn: si, ...(items.length ? { unitItems: items } : {}), ...(cv ? { cultOpts: cv } : {}), ...tap } : null;
   }
   if (target.kind === 'item') { const it = data.lookup('items', target.id); return it ? { type: 'item', item: it } : null; }
   if (target.kind === 'enemy') { const en = data.lookup('enemies', target.id); return en ? { type: 'enemy', enemy: en, count: target.count } : null; }
@@ -765,13 +792,10 @@ export function selectVoiceKey(detail) {
  *   resolved as another player's carries its own, `detail.cultOpts`)
  *   live: the unit's live stats (unitStatsEntry + src 'battle' | 'prep') — an object, or a getter the panel re-reads 4×
  *   a second (the battle's own sim, battle/runner.js unitStats); null ⇒ the record's numbers
-<<<<<<< HEAD
-=======
  *   voice: whether the panel may speak — 选中干员 (audio.voice 'select') when it opens on an operator the player tapped:
  *   a piece on the field or in the hand, a shop / reward card, a bond member. The game screen passes true in every phase
  *   (the owner's request of 2026-10-08 「添加一下干员点击上去的语气一样的语音」 lifted 2026-10-03's 「整备阶段不需要干员语音」
  *   for this line only; [ASSUMED] the official prep tap says 选中干员 like the battle's FOCUS_CHAR)
->>>>>>> cb8865d9 (feedback7 R22-VOICES: a tap on an operator says its 选中干员 line in every phase — the prep, the shop and the hand too, not only while a battle runs (the owner's request of 2026-10-08 「添加一下干员点击上去的语气一样的语音」, lifting 2026-10-03's 「整备阶段不需要干员语音」 for this line only; [ASSUMED] the official prep tap = the battle's FOCUS_CHAR); golden: unchanged)
  */
 export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestroy, bonds = [], offBonds = null, loadout = null, ops = null, onBond = null, side = 'left', shopOpen = false, live = null, voice = false }) {
   const getter = typeof live === 'function' ? live : null;
@@ -811,6 +835,7 @@ export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestr
       ${detail.type === 'enemy' ? html`<${EnemyDetail} enemy=${detail.enemy} snapHp=${snapHp} count=${detail.count} live=${liveNow} />` : null}
       ${detail.type === 'token' ? html`<${TokenDetail} token=${detail.token} piece=${detail.piece} ownerId=${detail.ownerId ?? null} snapHp=${snapHp} live=${liveNow} researchStage=${detail.researchStage} />` : null}
       ${detail.type === 'terrain' ? html`<${TerrainDetail} terrain=${detail.terrain} />` : null}
+      ${detail.type === 'device' ? html`<${DeviceDetail} device=${detail.device} snapHp=${snapHp} live=${liveNow} />` : null}
     </div>
   </aside>`;
 }
