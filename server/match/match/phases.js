@@ -10,6 +10,10 @@ import { pairPlayers } from '../finalAssault.js';
 import { botPickBand } from '../bot.js';
 import { OK, fail, DELAYS, BAND_TURN_SECONDS } from './common.js';
 
+// v0.1.4 six-player co-op reward: on these rounds every alive player receives one 信标 item (see startRound).
+const SIX_PLAYER_BEACON_ROUNDS = new Set([10, 12, 14]);
+const ROUND_BEACON_ITEM = 'chess_item_5_04_e_a';
+
 export class MatchPhases {
   enterInfoCheck() {
     this.phase = PHASE.INFO_CHECK;
@@ -250,6 +254,17 @@ export class MatchPhases {
     for (const ps of this.order) {
       if (ps.alive) continue;
       try { this.dispatcher.dispatchEliminated(ps, 'onRoundStart', { round: r }); } catch (e) { this.reportError('dispatch onRoundStart (eliminated)', e); }
+    }
+    // Restore v0.1.4 six-player logic: on rounds 10/12/14, every alive player in a full six-seat co-op room is granted
+    // one 信标 item. Persistent per-round counters make reconnects / repeated round entries never double-grant it.
+    if (!this.isSolo && this.startingPlayerCount === 6 && SIX_PLAYER_BEACON_ROUNDS.has(r)) {
+      for (const ps of alive) {
+        const key = `sixPlayerBeacon:${r}`;
+        if (ps.counters[key]) continue;
+        ps.counters[key] = 1;
+        const beacon = ps.acquireItem(ROUND_BEACON_ITEM, { source: 'sixPlayerBeacon' });
+        if (beacon) beacon.meta.sixPlayerBeaconRound = r;
+      }
     }
     for (const ps of alive) ps.recompute();
     this.setDeadline(DELAYS.ROUND_START / 1000, () => this.afterRoundStart(), { silent: this.soloUntimed });

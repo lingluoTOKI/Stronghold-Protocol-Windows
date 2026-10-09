@@ -239,7 +239,19 @@ export class Match {
     this.dataProfile = typeof opts.dataProfile === 'string' ? opts.dataProfile
       : (opts.rhineEnabled === false ? 'vanilla' : (this.data.dataProfile || 'rhine'));
     this.rhineEnabled = this.dataProfile === 'rhine';
-    this.gd = new GameData(this.data, this.modeId);
+    // Restore the stable v0.1.4 six-player logic: count occupied starting seats (humans + bots, de-duplicated) once
+    // and pass it to GameData. Without it startingPlayerCount defaulted to 1, so the large-room bounty draft top-up
+    // (+1/+2/+2 coins → 9 offers), the six-player shared-health-pool multiplier and the opening ban counts all ran in
+    // the single-player branch. (Choices.js largeRoomBountyCards / gamedata.js six-player HP & openingBanCounts.)
+    const _seenSeatIds = new Set();
+    let _startingSeatCount = 0;
+    for (const s of opts.seats) {
+      if (!s || typeof s.playerId !== 'string' || _seenSeatIds.has(s.playerId)) continue;
+      _seenSeatIds.add(s.playerId);
+      _startingSeatCount++;
+    }
+    this.startingPlayerCount = _startingSeatCount;
+    this.gd = new GameData(this.data, this.modeId, this.startingPlayerCount);
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
     this.ownsScheduler = !opts.scheduler;
