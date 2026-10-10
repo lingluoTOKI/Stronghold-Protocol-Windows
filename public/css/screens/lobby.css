@@ -238,3 +238,26 @@
 .create-box { margin-top: .3rem; display: flex; flex-direction: column; gap: .12rem; }
 .create-box .btn--xl { height: .92rem; font-size: calc(.32 * var(--t)); letter-spacing: .3em; }
 .create-box__hint { display: flex; align-items: center; justify-content: center; min-height: .3rem; font-size: calc(.14 * var(--t)); color: var(--text-lo); }
+
+/* ---- online pill (GET /api/online, 5s poll) --------------------------------------------------------- */
+.online-pill { display: inline-flex; align-items: center; gap: .06rem; height: .34rem; padding: 0 .1rem; border: 1px solid var(--line-2, #3e4b45); color: var(--text-md, #c3cbc7); font-size: calc(.14 * var(--t)); }
+.online-pill .icon { width: .18rem; height: .18rem; color: var(--mint-500, #4ed8af); }
+.online-pill__n { font-weight: 700; color: var(--text-hi, #f2f2f2); min-width: .2rem; text-align: right; }
+
+/* ---- co-op create mode: direct room vs quick match pool --------------------------------------------- */
+.create-box__mode { display: flex; flex-direction: column; gap: .08rem; }
+.create-box__mode-label { font-size: calc(.13 * var(--t)); color: var(--text-dim); letter-spacing: .1em; }
+.create-box__mode-opts { display: grid; grid-template-columns: 1fr 1fr; gap: .08rem; }
+.create-box__mode-opt { display: flex; flex-direction: column; gap: .02rem; align-items: flex-start; text-align: left; padding: .1rem .12rem; background: rgba(8,11,10,.6); border: 1px solid var(--line-2, #3e4b45); color: var(--text-md, #c3cbc7); cursor: pointer; transition: border-color .15s, background .15s; }
+.create-box__mode-opt.is-on { border-color: var(--mint-500, #4ed8af); background: rgba(78,216,175,.08); }
+.create-box__mode-opt-name { font-weight: 700; color: var(--text-hi, #f2f2f2); font-size: calc(.15 * var(--t)); }
+.create-box__mode-opt-desc { font-size: calc(.12 * var(--t)); color: var(--text-lo, #8a948f); }
+
+/* ---- quick-match queue + timeout triage ------------------------------------------------------------- */
+.match-queue { display: flex; align-items: center; gap: .1rem; justify-content: center; padding: .08rem .1rem; border: 1px dashed var(--line-2, #3e4b45); }
+.match-queue__count { font-size: calc(.22 * var(--t)); font-weight: 700; color: var(--mint-400, #59f4ca); }
+.match-timeout__body { display: flex; flex-direction: column; align-items: center; gap: .08rem; padding: .1rem 0; }
+.match-timeout__n { font-size: calc(.4rem * var(--t)); font-weight: 700; color: var(--mint-400, #59f4ca); }
+
+/* ---- difficulty card: opening-BAN preview line ------------------------------------------------------- */
+.diff-card__bans { color: var(--amber, #ffb454); font-size: calc(.12 * var(--t)); letter-spacing: .04em; opacity: .9; }

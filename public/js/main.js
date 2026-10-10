@@ -40,7 +40,7 @@ import { net, identity, NetError } from './net.js';
 import { store, useStore, emptyMatch, selectRoute, sessionResetNotice, isSpectating } from './store.js';
 import { data } from './data.js';
 import { GAME_FILES } from './ui/gameComponents.js';
-import { TitleScreen, sanitizeName } from './screens/title.js';
+import { TitleScreen, sanitizeName, UrgentNoticeHost } from './screens/title.js';
 import { LobbyScreen, rememberRoom, parseRoomParam } from './screens/lobby.js';
 import { RoomScreen } from './screens/room.js';
 import { GameScreen } from './screens/game.js';
@@ -61,6 +61,7 @@ const RESTORE_GRACE_MS = 1500;
 const JOIN_DELAY_MS = 350;
 const TICKER_KEEP = 20;
 const EMOTE_KEEP = 20;
+const CHAT_KEEP = 20;
 
 const SCREENS = { title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen };
 
@@ -256,6 +257,11 @@ function wireNet() {
   net.on('m.emote', (msg) => {
     store.set((s) => ({ emotes: [...s.emotes.slice(-(EMOTE_KEEP - 1)), { seq: ++seq, playerId: msg.playerId, id: msg.id, at: Date.now() }] }));
   });
+  // room text chat (规格C): latest lines for the draggable chat panel (ui/chat.js). The server enforces the 1s cooldown
+  // and the 200-char cap (shared/protocol g.chat); we only render. S2C m.chat = { id, name, text, ts }.
+  net.on('m.chat', (msg) => {
+    store.set((s) => ({ chat: [...s.chat.slice(-(CHAT_KEEP - 1)), { seq: ++seq, id: msg.id, name: msg.name, text: msg.text, ts: msg.ts, at: Date.now() }] }));
+  });
 
   // Entering (title → lobby) while already online also needs the deep-link join.
   store.subscribe((s, prev) => {
@@ -300,6 +306,7 @@ function App() {
     <div class="app-bg" aria-hidden="true"></div>
     ${error ? html`<${ScreenCrashed} error=${error} reset=${resetError} />` : html`<${Screen} key=${route} />`}
     <${ConnectionBanner} />
+    <${UrgentNoticeHost} />
     <${ToastHost} />
     <${UiHosts} />
     <${GuideHost} />

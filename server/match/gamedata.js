@@ -14,6 +14,7 @@
 import { getConfig, getMode } from '../data.js';
 import { isShopItem } from '../sim/simdata.js';
 import { standInRecord } from '../../shared/standIn.js';
+import { openingBanCounts } from '../../shared/openingBans.js';
 
 const own = (map, id) => (map && typeof map === 'object' && typeof id === 'string' && Object.hasOwn(map, id) && map[id] && typeof map[id] === 'object' ? map[id] : null);
 const numOr = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -91,10 +92,17 @@ export class GameData {
    * @param {Readonly<Record<string, any>>} data server/data.js getData() (may be partial)
    * @param {string} modeId e.g. 'mode_multi_hard'
    */
-  constructor(data, modeId) {
+  /**
+   * @param {Readonly<Record<string, any>>} data server/data.js getData() (may be partial)
+   * @param {string} modeId e.g. 'mode_multi_hard'
+   * @param {number} [startingPlayerCount=1] 开局占用席位数（人座 + AI 座），用于六人座的血池翻倍与开局少 BAN
+   */
+  constructor(data, modeId, startingPlayerCount = 1) {
     this.raw = data && typeof data === 'object' ? data : {};
     this.config = getConfig(this.raw) || {};
     this.modeId = modeId;
+    /** @type {number} 对局开始时占用的座位数（不是仍存活的人数） */
+    this.startingPlayerCount = Number.isInteger(startingPlayerCount) && startingPlayerCount >= 1 ? startingPlayerCount : 1;
     this.mode = getMode(modeId, this.raw) || {};
     this.economy = this.config.economy && typeof this.config.economy === 'object' ? this.config.economy : {};
     const chess = this.raw.chess && typeof this.raw.chess === 'object' ? this.raw.chess : {};
@@ -162,7 +170,10 @@ export class GameData {
    * @param {number} [aliveCount]
    */
   bossPoolShare(aliveCount) {
-    return bossPoolShareOf(this.mode.bossHpScale, this.config.bossHpScale, this.isSolo, aliveCount);
+    // 六人座：开局坐满六人时共享血池翻倍为「四人基准 ×200%」。上游 bossPoolShareOf 已以 aliveFull=4
+    // 封顶按存活人数缩放，这里的 ×2 与之相乘叠加（startingPlayerCount 是开局占用席位数）。
+    const sixPlayerHp = this.startingPlayerCount === 6 ? 2 : 1;
+    return sixPlayerHp * bossPoolShareOf(this.mode.bossHpScale, this.config.bossHpScale, this.isSolo, aliveCount);
   }
 
   /** config.titles with the tuning overrides (stat / rule per title id) merged in. */
@@ -468,10 +479,8 @@ export class GameData {
     };
   }
   bans(difficulty) {
-    const b = this.config.bans && this.config.bans[difficulty];
-    const d = DEFAULTS.bans[difficulty] || { core: 0, addon: 0 };
-    if (!b || typeof b !== 'object') return { ...d };
-    return { core: Number.isInteger(b.core) && b.core >= 0 ? b.core : d.core, addon: Number.isInteger(b.addon) && b.addon >= 0 ? b.addon : d.addon };
+    // 开局少 BAN：接入 shared/openingBans.js，基础值沿用官服，五人少禁一个核心、六人少禁两个（人机座位同等计入）。
+    return openingBanCounts(difficulty, this.startingPlayerCount, this.config.bans);
   }
   get bandDraft() {
     const b = this.config.bandDraft && typeof this.config.bandDraft === 'object' ? this.config.bandDraft : {};

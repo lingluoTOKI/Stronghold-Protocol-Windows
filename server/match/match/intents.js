@@ -5,7 +5,7 @@
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { unitStatsEntry } from '../../../shared/protocol.js';
-import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO } from '../../../shared/constants.js';
+import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, CHAT_COOLDOWN_MS, CHAT_MAX_LEN, GEO } from '../../../shared/constants.js';
 import { deriveSeed } from '../../sim/rng.js';
 import { OK, fail } from './common.js';
 import { onHumanEmote } from '../botEmotes.js';
@@ -40,6 +40,8 @@ export class MatchIntents {
         : this.pickCard(ps, msg.idx);
       case 'g.ready': return ps.setReady(!!msg.ready);
       case 'g.emote': return this.emote(ps, msg.id);
+      // 对局内文字聊天（改编版独有）：文本已在 shared/protocol.js 的 C2S['g.chat'] 校验过
+      case 'g.chat': return this.chat(ps, msg.text);
       // playerId: the player tapped (a shared field names two) — the watch preference (item 56)
       case 'g.watch': return this.watch(ps, msg.fieldId, msg.playerId ?? null);
       case 'g.autoplay': return this.setAutoplay(ps, !!msg.on);
@@ -61,6 +63,21 @@ export class MatchIntents {
     this.broadcast({ t: 'm.emote', playerId: ps.playerId, id });
     // an AI teammate can react to a human's emote (enabled by default: server/match/botEmotes.js, SP_BOT_EMOTES=0 silences it)
     onHumanEmote(this, ps.playerId, id);
+    return OK;
+  }
+
+  /**
+   * 对局内文字聊天（改编版独有；规格 C）：把一条文字消息转发给同一对局的所有席位。文本已在
+   * shared/protocol.js 的 C2S['g.chat'] 校验（1–200 字符、非空白）；这里再做一次截断与简单限流（与表情同思路），
+   * 广播携带发送者 id/昵称/文本/时间戳，客户端按 playerId 归位。
+   */
+  chat(ps, text) {
+    const s = typeof text === 'string' ? text.trim().slice(0, CHAT_MAX_LEN) : '';
+    if (!s) return fail(ERR.BAD_MSG, 'empty chat');
+    const now = this.sched.now();
+    if (now - (ps.lastChatAt || 0) < CHAT_COOLDOWN_MS) return fail(ERR.RATE);
+    ps.lastChatAt = now;
+    this.broadcast({ t: 'm.chat', playerId: ps.playerId, name: ps.name || ps.playerId, text: s, ts: now });
     return OK;
   }
 

@@ -13,14 +13,16 @@
 
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor, ERR } from '../../../shared/constants.js';
-import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo } from '../ui/components.js';
+import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, MATCH_TARGET, modeIdFor, ERR } from '../../../shared/constants.js';
+import { openingBanCounts } from '../../../shared/openingBans.js';
+import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, Modal } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
 import { SettingsButton } from '../ui/settings.js';
 import { PwaInstallButton } from '../ui/device.js';
 import { LoadoutButton } from './loadout.js';
+import { BulletinButton } from './title.js';
 import { net, identity } from '../net.js';
 import { store, useStore, shallowEqual, loadPref, savePref } from '../store.js';
 import { getConfig, getMode, getStage, useData } from '../data.js';
@@ -92,9 +94,11 @@ const MODE_CARDS = [
  * Text for a difficulty card, preferring data/config.json.
  * @param {'solo'|'coop'} roomMode
  * @param {string} difficulty
- * @returns {{ code: string, desc: string, effects: string[], rounds: number, hidden: boolean, stageNote: string }}
+ * @param {number|null} [playerCount] occupied human seats; null while a co-op room has not been assembled (lobby preview)
+ * @returns {{ code: string, desc: string, effects: string[], rounds: number, hidden: boolean, stageNote: string,
+ *   openingBans: { core: number, addon: number }, openingBanNote: string }}
  */
-export function difficultyInfo(roomMode, difficulty) {
+export function difficultyInfo(roomMode, difficulty, playerCount = null) {
   const fallback = MODE_TEXT[roomMode === 'solo' ? 'single' : 'multi'][difficulty] || { code: '', desc: '', effects: [] };
   // modeIdFor() lower-cases the difficulty: never call it with a value the server did not validate.
   const m = DIFFICULTIES.includes(difficulty) ? getMode(modeIdFor(roomMode, difficulty)) : null;
@@ -102,6 +106,15 @@ export function difficultyInfo(roomMode, difficulty) {
     ? m.effectDescList.map((e) => String(e).replace(/^[·•・･\s]+/, '')).filter(Boolean)
     : fallback.effects.map((e) => t(e));
   const rounds = Number.isFinite(m?.lastRound) ? m.lastRound : roomMode === 'solo' && difficulty === 'FUNNY' ? 9 : 14;
+  // 开局 BAN 预览（规格A）：大厅未开局时按当前人数档估算，并在人数未知时给出「5人 / 6人」两档差异提示。
+  const knownCount = roomMode === 'solo' ? 1 : Number.isInteger(playerCount) && playerCount > 0 ? playerCount : null;
+  const configuredBans = getConfig()?.bans;
+  const openingBans = openingBanCounts(difficulty, knownCount ?? 1, configuredBans);
+  const largeRoomNotes = knownCount == null ? [5, 6].map((count) => {
+    const bans = openingBanCounts(difficulty, count, configuredBans);
+    return bans.core !== openingBans.core ? `${count} 人（含 AI）时核心 ${bans.core}` : '';
+  }).filter(Boolean) : [];
+  const conditional = largeRoomNotes.length ? `；${largeRoomNotes.join('；')}` : '';
   return {
     code: typeof m?.code === 'string' ? m.code : fallback.code,
     desc: typeof m?.desc === 'string' ? m.desc : t(fallback.desc),
@@ -109,6 +122,8 @@ export function difficultyInfo(roomMode, difficulty) {
     rounds,
     hidden: difficulty !== 'FUNNY',
     stageNote: stageNote(Array.isArray(m?.stages) && m.stages.length ? m.stages : STAGE_POOL[difficulty]),
+    openingBans,
+    openingBanNote: `开局 BAN：核心 ${openingBans.core} / 附加 ${openingBans.addon}${conditional}`,
   };
 }
 
@@ -234,7 +249,7 @@ function DifficultyCard({ roomMode, difficulty, selected, onSelect }) {
       </span>
     </span>
     <span class="diff-card__desc">${info.desc}</span>
-    <span class="diff-card__effects">${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}${info.stageNote ? html`<span key="stage" class="diff-card__stage"><${Icon} name="rook" />${info.stageNote}</span>` : null}</span>
+    <span class="diff-card__effects"><span key="bans" class="diff-card__bans">${info.openingBanNote}</span>${info.effects.map((e) => html`<span key=${e}>${e}</span>`)}${info.stageNote ? html`<span key="stage" class="diff-card__stage"><${Icon} name="rook" />${info.stageNote}</span>` : null}</span>
     <span class="diff-card__check" aria-hidden="true"><${Icon} name="check" /><span>${t('已选定')}</span></span>
   </button>`;
 }
@@ -254,6 +269,15 @@ export function LobbyScreen() {
   const [recent] = useState(recentRooms);
   const alive = useRef(true);
   const inFlight = useRef(false); // synchronous guard against double clicks (state updates are async)
+  // 大厅实时在线总数（GET /api/online，5s 轮询）
+  const [onlineCount, setOnlineCount] = useState(null);
+  // 公共/快速匹配队列（规格C）：coop 可「直接建房」或进「匹配池」凑 MATCH_TARGET=6 人
+  const [matching, setMatching] = useState(false);
+  const [matchCount, setMatchCount] = useState(1);
+  const [matchTarget, setMatchTarget] = useState(MATCH_TARGET);
+  const [matchWait, setMatchWait] = useState(false); // 30s 超时，玩家三选一（继续等 / AI补位开始 / 立即开始）
+  const [coopCreate, setCoopCreate] = useState(() => (loadPref('lobby.coopCreate', 'match') === 'direct' ? 'direct' : 'match'));
+  const matchState = useRef({ active: false });
   useEffect(() => () => { alive.current = false; }, []);
 
   const online = conn.status === 'online';
@@ -261,6 +285,61 @@ export function LobbyScreen() {
 
   const pickMode = (m) => { setRoomMode(m); savePref('lobby.mode', m); };
   const pickDifficulty = (d) => { setDifficulty(d); savePref('lobby.difficulty', d); };
+  const pickCoopCreate = (v) => { if (matchState.current.active) leaveMatch(); setCoopCreate(v); savePref('lobby.coopCreate', v); };
+
+  // ---- 公共匹配队列（C2S match.enqueue{difficulty} / cancel / topUp / startNow / waitMore）---------------
+  const clearMatch = () => {
+    matchState.current.active = false;
+    setMatching(false); setMatchWait(false); setMatchCount(1); setMatchTarget(MATCH_TARGET);
+  };
+  const leaveMatch = () => {
+    if (matchState.current.active) net.request('match.cancel').catch(() => {}); // best-effort
+    clearMatch();
+  };
+  const startMatch = async () => {
+    if (matching || !online) return;
+    matchState.current.active = true;
+    setMatching(true); setMatchWait(false); setMatchCount(1); setMatchTarget(MATCH_TARGET);
+    try { await net.request('match.enqueue', { difficulty }); }
+    catch (err) { toastError(err); if (alive.current) clearMatch(); }
+  };
+  const topUp = () => { if (matchState.current.active) { setMatchWait(false); net.request('match.topUp').catch((err) => toastError(err)); } };
+  const startNow = () => { if (matchState.current.active) { setMatchWait(false); net.request('match.startNow').catch((err) => toastError(err)); } };
+  const waitMore = () => { if (matchState.current.active) { setMatchWait(false); net.request('match.waitMore').catch((err) => toastError(err)); } };
+  useEffect(() => {
+    // S2C match.status = { difficulty, count, target }
+    const offStatus = net.on('match.status', (m) => {
+      if (!matchState.current.active) return;
+      const target = Number(m.target) > 0 ? Number(m.target) : MATCH_TARGET;
+      setMatchTarget(target);
+      setMatchCount(Math.min(Number(m.count) || 1, target));
+    });
+    // S2C match.timeout = { difficulty }（仅通知超时；保留最后一次 count/target 供三选一弹窗展示）
+    const offTimeout = net.on('match.timeout', () => { if (matchState.current.active) setMatchWait(true); });
+    // S2C match.found = { code, difficulty, target }：服务器随即通过 room.state 把我们带进房
+    const offFound = net.on('match.found', () => { if (matchState.current.active) clearMatch(); });
+    const offState = net.on('room.state', () => { if (matchState.current.active) clearMatch(); });
+    const offClosed = net.on('room.closed', () => { if (matchState.current.active) clearMatch(); });
+    return () => { offStatus(); offTimeout(); offFound(); offState(); offClosed(); };
+  }, []);
+  // 离开大厅时最好退队，免得占着队列
+  useEffect(() => () => { if (matchState.current.active) net.request('match.cancel').catch(() => {}); }, []);
+
+  // 大厅在线人数：GET /api/online → { online: <n> }，5s 轮询
+  useEffect(() => {
+    let live = true;
+    const poll = async () => {
+      try {
+        const r = await fetch('/api/online', { headers: { accept: 'application/json' } });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (live) setOnlineCount(typeof j.online === 'number' ? j.online : null);
+      } catch { /* 网络抖动：保留上一次数字 */ }
+    };
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => { live = false; clearInterval(id); };
+  }, []);
 
   const run = async (kind, fn) => {
     if (inFlight.current) return;
@@ -272,7 +351,10 @@ export function LobbyScreen() {
       if (alive.current) setBusy(null);
     }
   };
-  const create = () => run('create', () => net.request('room.create', { mode: roomMode, difficulty }));
+  const create = () => {
+    if (roomMode === 'coop' && coopCreate === 'match') return startMatch(); // 公共匹配池
+    return run('create', () => net.request('room.create', { mode: roomMode, difficulty })); // 直接建房（solo 或 coop direct）
+  };
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
     // `undefined` — codeArg keeps an event target out of the key and falls back to the input field
@@ -308,7 +390,13 @@ export function LobbyScreen() {
     <header class="topbar">
       <div class="topbar__left">
         <${Button} variant="ghost" size="sm" icon="chevronLeft" onClick=${backToTitle} title=${t('返回标题')}>${t('返回')}<//>
+        <${BulletinButton} />
         <${PingPill} ms=${conn.ping} online=${online} />
+        <div class="online-pill" title=${onlineCount == null ? '在线玩家数加载中…' : `当前 ${onlineCount} 位博士在线`}>
+          <${Icon} name="users" />
+          <span class="num online-pill__n">${onlineCount == null ? '—' : onlineCount}</span>
+          <${MicroLabel}>ONLINE<//>
+        </div>
       </div>
       <div class="topbar__center">
         <${MicroLabel} tone="mint">SIMULATION PROTOCOL SELECT<//>
@@ -364,17 +452,49 @@ export function LobbyScreen() {
           ${DIFFICULTIES.map((d) => html`<${DifficultyCard} key=${d} roomMode=${roomMode} difficulty=${d} selected=${difficulty === d} onSelect=${pickDifficulty} />`)}
         </div>
         <div class="create-box">
+          ${roomMode === 'coop' ? html`<div class="create-box__mode">
+              <span class="create-box__mode-label">${t('建立方式')}</span>
+              <div class="create-box__mode-opts">
+                <button type="button" class=${`create-box__mode-opt${coopCreate === 'direct' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('direct')} aria-pressed=${coopCreate === 'direct' ? 'true' : 'false'}>
+                  <span class="create-box__mode-opt-name">${t('直接建房')}</span>
+                  <span class="create-box__mode-opt-desc">${t('创建 {n} 人房间，邀好友 / 加 AI', { n: MAX_SEATS })}</span>
+                </button>
+                <button type="button" class=${`create-box__mode-opt${coopCreate === 'match' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('match')} aria-pressed=${coopCreate === 'match' ? 'true' : 'false'}>
+                  <span class="create-box__mode-opt-name">${t('快速匹配')}</span>
+                  <span class="create-box__mode-opt-desc">${t('进公共池凑 {n} 人，30s 满员自动开局', { n: MATCH_TARGET })}</span>
+                </button>
+              </div>
+            </div>` : null}
           <${Tooltip} block=${true} text=${online ? null : t('正在连接服务器…')}>
-            <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" loading=${busy === 'create'} disabled=${!online} onClick=${create}>
-              ${roomMode === 'solo' ? t('开始独立模拟') : t('创建同盟')}
+            <${Button} variant="primary" size="xl" block=${true} iconRight=${matching ? null : 'chevrons'} loading=${busy === 'create'} disabled=${!online || matching} onClick=${create}>
+              ${roomMode === 'solo' ? t('开始独立模拟') : coopCreate === 'direct' ? t('创建同盟') : t('快速匹配')}
             <//>
           <//>
+          ${roomMode === 'coop' && matching && !matchWait ? html`<div class="match-queue">
+              <span class="t-lo">${t('正在匹配队友…（满 {target} 人自动开局）', { target: matchTarget })}</span>
+              <span class="num match-queue__count">${matchCount}<span class="t-dim">/${matchTarget}</span></span>
+              <${Button} variant="ghost" size="sm" icon="close" onClick=${leaveMatch}>${t('取消')}<//>
+            </div>` : null}
           <div class="create-box__hint">
             ${online
-              ? html`<span>${roomMode === 'solo' ? t('创建后即可开始模拟') : t('创建后可邀请好友或添加 AI 队友')}</span>`
+              ? html`<span>${roomMode === 'solo' ? t('创建后即可开始模拟')
+                  : coopCreate === 'direct' ? t('创建后可邀请好友或添加 AI 队友')
+                  : t('进入公共匹配池：30 秒内满员自动开局；超时可继续等待或加 AI')}</span>`
               : html`<${Spinner} size="sm" label="CONNECTING" />`}
           </div>
         </div>
+        ${roomMode === 'coop' && matching && matchWait ? html`<${Modal} open=${true} title=${t('等待超时')} micro="MATCHMAKING TIMEOUT" tone="mint" width="5rem" onClose=${leaveMatch}
+            actions=${html`
+              <${Button} variant="secondary" icon="info" onClick=${waitMore}>${t('继续等待')}<//>
+              <${Button} variant="secondary" icon="users" onClick=${topUp}>${t('加 AI 开始')}<//>
+              <${Button} variant="primary" icon="play" onClick=${startNow}>${t('立即开始')}<//>
+              <${Button} variant="ghost" icon="close" onClick=${leaveMatch}>${t('取消')}<//>
+            `}>
+            <div class="match-timeout__body">
+              <span class="t-lo">${t('当前匹配到 {count} 名博士', { count: matchCount })}</span>
+              <span class="num match-timeout__n">${matchCount}<span class="t-dim">/${matchTarget}</span></span>
+            </div>
+          <//>` : null}
       </section>
     </div>
   </div>`;

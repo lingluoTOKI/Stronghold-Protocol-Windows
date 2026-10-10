@@ -10,7 +10,9 @@ export const APP_VERSION = '0.2.3';
  * tools/package.mjs refuses to build a release zip from it without --allow-dev. */
 export const DEV_BUILD = /-dev$/.test(APP_VERSION);
 
-export const MAX_SEATS = 4;
+// 改编版独有：房间支持六人房（公共匹配目标人数同为 6）。注意这是「房间玩家席位数」；
+// 战场可同时上场的干员部署位上限是另一套机制（gamedata deployCap，沿用官服，不随六人房放大）。
+export const MAX_SEATS = 6;
 /**
  * Spectator seats of a co-op room (community report #26, owner's decision 2026-10-04) — a remake feature: the official
  * room has 1–4 players and no spectator seat (there only eliminated players and 联防 bystanders watch, research 09 §3.1).
@@ -242,3 +244,9 @@ export const emoteArtGroup = (id) => { const e = emoteInfo(id); return e ? `emot
 export const emoteArtPath = (id) => { const e = emoteInfo(id); return e ? `/assets/local/emoticon/${e.dir}/${e.picId}.png` : null; };
 export const EMOTE_COOLDOWN_MS = 1000; // activity_table autoChessData.constData.chatCD (s)
 export const EMOTE_BUBBLE_MS = 3000;   // constData.chatTime (s): how long a bubble stays up
+
+// === 改编版独有：公共/快速匹配 + 对局内文字聊天 ===
+export const MATCH_TARGET = 6;          // 快速匹配默认凑齐的目标人数（六人房）
+export const MATCH_TIMEOUT_MS = 30000;  // 排队超时（毫秒）
+export const CHAT_COOLDOWN_MS = 1000;   // 文字聊天冷却（防刷屏）
+export const CHAT_MAX_LEN = 200;        // 单条聊天文字最大长度

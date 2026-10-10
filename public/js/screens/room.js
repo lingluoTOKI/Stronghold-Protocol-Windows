@@ -234,7 +234,8 @@ export function RoomScreen() {
   const coop = room.mode !== 'solo';
   const facts = roomFacts(room, me.playerId);
   const myReady = !!facts.mine?.ready;
-  const info = difficultyInfo(room.mode, room.difficulty);
+  // occupied.length（人+AI 席）传给 difficultyInfo，开局 BAN 预览按当前人数档估算
+  const info = difficultyInfo(room.mode, room.difficulty, facts.occupied.length);
 
   const run = async (kind, fn) => {
     if (inFlight.current) return;
@@ -321,7 +322,7 @@ export function RoomScreen() {
       </div>
     </header>
 
-    <main class=${`seats${coop ? '' : ' seats--solo'}`}>
+    <main class=${`seats${coop ? '' : ' seats--solo'}`} style=${`--seat-count:${facts.seats.length}`}>
       ${facts.seats.map((s, i) => html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
         myId=${me.playerId} busy=${busy} onAddBot=${addBot} onRemoveBot=${removeBot} onKick=${kick} />`)}
       ${coop ? null : html`<aside class="solo-brief brackets">
@@ -330,6 +331,7 @@ export function RoomScreen() {
         <p>${info.desc}</p>
         <ul>
           ${info.effects.map((e) => html`<li key=${e}>${e}</li>`)}
+          <li>${info.openingBanNote}</li>
           <li>${t('共')} <b class="num">${info.rounds}</b> ${tc('rounds', '回合')}${info.hidden ? t('，满足条件时进入隐秘核心') : ''}</li>
           <li>${t('独立模拟中休整期与机变阶段不限时')}</li>
         </ul>
@@ -343,6 +345,7 @@ export function RoomScreen() {
         <div class="room-bar__opts">
           <${DifficultyPicker} room=${room} isHost=${facts.isHost} busy=${busy} onPick=${setDifficulty} />
           <${AiLastToggle} option=${aiLastOption(room, me.playerId)} busy=${busy} onToggle=${setAiLast} />
+          ${coop ? html`<span class="room-bar__bans">${info.openingBanNote}<span class="t-dim"> · ${facts.occupied.length} 人（含 AI）</span></span>` : null}
         </div>
       </div>
       <div class="room-bar__center">

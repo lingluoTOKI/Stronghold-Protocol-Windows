@@ -79,6 +79,7 @@ import { ChoiceOverlay } from '../ui/choiceOverlay.js';
 import { EnemyDrawer } from '../ui/enemyDrawer.js';
 import { Ticker } from '../ui/ticker.js';
 import { EmoteWheel } from '../ui/emotes.js';
+import { ChatDock } from '../ui/chat.js';
 import { EffectsList } from '../ui/effectsList.js';
 import { CombatHud } from '../ui/combatHud.js';
 import { SettingsModal, settingsStore } from '../ui/settings.js';
@@ -185,6 +186,7 @@ function MatchScreen() {
   const [collapsed, setCollapsed] = useState(false);
   const [rewardMin, setRewardMin] = useState(false);
   const [emoteOpen, setEmoteOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);   // 房间文字聊天面板（规格C；与表情轮盘并存）
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
   const [drag, setDrag] = useState(null);                // { uid, kind, id } while dragging a piece
@@ -287,7 +289,7 @@ function MatchScreen() {
     getChess: (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; },
     getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups,
   }), [priv, pub?.stageId, editable, gd.ready, deployField]);
-  live.current = { pub, priv, field, editable, hasPersonalChoice, placeCtx, watching, watchWho, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
+  live.current = { pub, priv, field, editable, hasPersonalChoice, placeCtx, watching, watchWho, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, chatOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------
   // the own prep board: the normal board, or — in the prep of a boss round — the player's half of the boss field
@@ -1046,6 +1048,23 @@ function MatchScreen() {
   const togglePauseRef = useRef(togglePause);
   togglePauseRef.current = togglePause;
 
+  // Client-side combat playback speed (1× / 2× / 4×, own authoritative field only) and "skip this battle": both are
+  // pure local runner calls (no message); the deterministic result still goes out on the existing b.result channel.
+  const cycleSpeed = useCallback(() => { try { battleRunner?.cycleSpeed?.(); } catch { /* no runner */ } }, []);
+  const cycleSpeedRef = useRef(cycleSpeed);
+  cycleSpeedRef.current = cycleSpeed;
+  const skipBattleCb = useCallback(() => { try { battleRunner?.skipBattle?.(); } catch { /* no runner */ } }, []);
+
+  // A mid-battle speed switch re-runs the local sim faster, but the render feed (view.raw.setLocalFeed) was seeded with
+  // the m.field speed at enterBattle — re-sync it the moment the runner's state.speed changes so the interpolation rate
+  // follows immediately instead of only at the next field.
+  const localSpeed = Number.isFinite(battleState?.speed) ? battleState.speed : null;
+  useEffect(() => {
+    if (!view?.raw?.setLocalFeed || !field?.local) return;
+    const speed = Number.isFinite(localSpeed) && localSpeed > 0 ? localSpeed : (field.speed || 2);
+    try { view.raw.setLocalFeed({ on: true, speed }); } catch { /* feed absent */ }
+  }, [view, field?.local, field?.fieldId, field?.speed, localSpeed]);
+
   // a press on the field deselects (a tap on a piece selects it again at release — see pieceClick)
   useEffect(() => {
     const host = hostRef.current;
@@ -1223,12 +1242,20 @@ function MatchScreen() {
       }
       if (act === 'escape') {
         if (L.emoteOpen) setEmoteOpen(false);
+        else if (L.chatOpen) setChatOpen(false);
         else if (L.pen && !L.detail) togglePenRef.current(false);
         else if (L.bondOpen) setBondOpen(null);
         else if (L.detail) setDetail(null);
         else if (L.drawer) setDrawer(null);
         else return;
         e.preventDefault();
+        return;
+      }
+      // battle playback speed (V by default): cycles 1× → 2× → 4× on the own authoritative normal field; works in
+      // combat, before the PREP-only guard below.
+      if (act === 'speed') {
+        e.preventDefault();
+        cycleSpeedRef.current();
         return;
       }
       // the ready key (Space unless rebound) pauses / resumes a solo battle (Space: the official battle key)
@@ -1279,6 +1306,15 @@ function MatchScreen() {
   // the solo pause button: only while the own battle still runs (the server refuses it afterwards)
   const canPause = pauseAvailable(pub, { solo, alive, done: meP?.status === 'done' || localDone });
   live.current.canPause = canPause;
+  // ---- client-side battle playback speed + skip (DESIGN 5.5; pure local, no protocol change) ---------------------
+  // The speed / skip controls only run on the own authoritative NORMAL field while it is on screen (the runner's own
+  // speedControl gate: not a replica / boss / 联防 / watch). They are visible in combat AND prep of a running normal
+  // battle so the countdown under 2× flows smoothly; skip readiness comes straight from the runner state (spawnDone).
+  const battleOwn = !!battleState && !!battleState.own && !battleState.watch && !!battleState.speedControl && !battleState.done
+    && battleState.kind === 'normal' && phase !== PHASE.SETTLE;
+  const speedValue = Number(battleState?.userSpeed) > 0 ? Number(battleState.userSpeed) : (Number(battleState?.speed) > 0 ? Number(battleState.speed) : 2);
+  const speedCfg = battleOwn ? { show: true, value: speedValue, onCycle: cycleSpeed, clock: () => battleRunner?.battleClock?.() ?? null } : null;
+  const skipCfg = battleOwn ? { show: true, ready: !!battleState?.skipReady, onSkip: skipBattleCb } : null;
   // client-side combat: observing a teammate's battle (research 09 §3.1) and the 联防 / 最终攻势 camera halves
   // (an eliminated player auto-observes a teammate's normal field — research 09 "keep-watching" — without asking)
   const watchedFid = watchingOther ? watching : (cc && combat && !alive && battleState && battleState.watch && battleState.kind === 'normal' ? battleState.fieldId : null);
@@ -1406,6 +1442,7 @@ function MatchScreen() {
         readyBusy=${readyBusy} readyCount=${readyCount} playerCount=${solo ? 1 : aliveCount}
         pen=${pen} penAvail=${penAvail} onPen=${togglePen} config=${gd.config} frozenAt=${frozenAt}
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
+        speed=${speedCfg} skip=${skipCfg}
         live=${liveLpNow} spectator=${spectator}
         spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} />
 
@@ -1461,6 +1498,7 @@ function MatchScreen() {
 
       <div class="gm__corner">
         ${spectator ? null : html`<${EmoteWheel} open=${emoteOpen} onToggle=${setEmoteOpen} onSend=${(id) => actions.emote(id)} disabled=${conn.status !== 'online'} />`}
+        <${ChatDock} open=${chatOpen} onToggle=${setChatOpen} disabled=${conn.status !== 'online'} />
         <button type="button" class="gm__gear" aria-label=${t('设置')} title=${t('设置')} onClick=${() => setSettingsOpen(true)}><${GIcon} name="gear" /></button>
         <button type="button" class="gm__gear gm__guide" aria-label=${t('玩法说明')} title=${t('玩法说明')} onClick=${() => openGuide(0)}><${Icon} name="book" /></button>
         <${FullscreenButton} class="gm__gear gm__fs" />

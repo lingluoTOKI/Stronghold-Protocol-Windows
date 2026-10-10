@@ -41,12 +41,13 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 3.8rem));
+  grid-template-columns: repeat(var(--seat-count, 1), minmax(0, 3.8rem));
   grid-template-rows: minmax(0, 6rem);
   justify-content: center;
   align-content: center;
   gap: .3rem;
   padding: .3rem .6rem .24rem;
+  overflow: auto;
 }
 .seats--solo { grid-template-columns: 3.8rem minmax(0, 6.4rem); }
 
@@ -135,8 +136,8 @@
   font-weight: 700;
 }
 .seat__bot-label .icon { width: .16rem; height: .16rem; }
-.seat__who { display: flex; align-items: center; gap: .08rem; max-width: 100%; }
-.seat__name { font-size: calc(.26 * var(--t)); font-weight: 700; max-width: 3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat__who { display: flex; align-items: center; justify-content: center; gap: .08rem; width: 100%; min-width: 0; }
+.seat__name { font-size: calc(.26 * var(--t)); font-weight: 700; max-width: 3rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat__you { flex: none; padding: .01rem .07rem; background: var(--mint-500); color: var(--text-on-mint); font-size: calc(.13 * var(--t)); font-weight: 700; }
 .seat__foot {
   align-self: stretch;
@@ -298,6 +299,7 @@
 .dpick--ro { border: 0; background: none; gap: .18rem; align-items: center; font-size: calc(.14 * var(--t)); }
 /* 「AI 队友最后选择」 (GitHub #338, co-op): one switch styled like a difficulty option, under the difficulty picker */
 .room-bar__opts { display: flex; flex-direction: column; align-items: flex-start; gap: .08rem; min-width: 0; }
+.room-bar__bans { font-size: calc(.12 * var(--t)); color: var(--text-lo); line-height: 1.5; }
 .ailast { display: flex; align-items: center; gap: .12rem; font-size: calc(.14 * var(--t)); }
 .ailast__opt { --d-color: var(--mint-400); height: .36rem; padding: 0 .14rem; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .3); font-size: calc(.15 * var(--t)); letter-spacing: .04em; }
 .ailast__opt:last-child { border-right: 1px solid var(--line-2); }
@@ -313,3 +315,34 @@
 .ready-count__icons .icon.is-on { color: var(--mint-400); filter: drop-shadow(0 0 4px var(--mint-glow)); }
 
 .room-bar .btn--xl { min-width: 3.2rem; letter-spacing: .2em; }
+
+/* The root scale stops shrinking at 40 px. Six co-op seats then need two rows so names,
+   avatars and AI controls stay inside their cards on narrow landscape screens. */
+@media (max-width: 767px) {
+  .seats:not(.seats--solo) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(2.8rem, 1fr));
+    align-content: start;
+    gap: .14rem;
+    padding: .18rem .3rem;
+  }
+  .seats:not(.seats--solo) .seat { gap: .03rem; padding: .08rem .1rem; }
+  .seats:not(.seats--solo) .seat__art { gap: .03rem; }
+  .seats:not(.seats--solo) .seat__art .avatar { --av: 1rem; }
+  .seats:not(.seats--solo) .seat__bot-label { font-size: .12rem; line-height: 1.25; }
+  .seats:not(.seats--solo) .seat__head { gap: .05rem; }
+  .seats:not(.seats--solo) .seat__head > .micro { display: none; }
+  .seats:not(.seats--solo) .seat__name { font-size: .2rem; }
+  .seats:not(.seats--solo) .seat__foot { margin-top: .02rem; padding-top: .04rem; min-height: .36rem; }
+  .seats:not(.seats--solo) .seat__state { font-size: .15rem; }
+  .seats:not(.seats--solo) .seat__radar { width: .7rem; height: .7rem; }
+  .seats:not(.seats--solo) .seat__wait { font-size: .16rem; }
+  .room-bar { gap: .14rem; padding: 0 .3rem; grid-template-columns: minmax(0, 1fr) auto; }
+  .room-bar__left { gap: .1rem; }
+  .room-bar__label { display: none; }
+  .room-bar__center { grid-column: 1; grid-row: 2; align-items: flex-start; }
+  .room-bar__right { grid-column: 2; grid-row: 1 / 3; }
+  .dpick__opt { gap: .04rem; padding: 0 .1rem; font-size: .15rem; }
+  .room-bar .btn--xl { min-width: 2rem; }
+  .room-bar__bans { font-size: max(.12rem, 8px); }
+}

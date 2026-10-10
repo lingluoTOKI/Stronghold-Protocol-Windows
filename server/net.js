@@ -70,7 +70,7 @@ export const NET_DEFAULTS = Object.freeze({
 export const HEAVY_TYPES = new Set(['g.watch', 'room.loadout', 'room.ownership', 'room.diy', 'room.spectate']);
 
 /** Close codes (see header). */
-export const CLOSE = Object.freeze({ REPLACED: 4001, HELLO_TIMEOUT: 4002, POLICY: 1008, SHUTDOWN: 1001 });
+export const CLOSE = Object.freeze({ REPLACED: 4001, HELLO_TIMEOUT: 4002, POLICY: 1008, SHUTDOWN: 1001, KICKED: 4003 });
 
 const WS_OPEN = 1;
 const MAX_RID = 2 ** 31;
@@ -144,6 +144,25 @@ export class SessionRegistry {
     this.now = now;
     /** @type {Map<string, Session>} */ this.byPlayerId = new Map();
     /** @type {Map<string, Session>} */ this.byTokenMap = new Map();
+    /** @type {Map<string, number>} 被封禁 playerId → 封禁到期的 ms 时间戳（admin 踢人，规格 D） */
+    this.banned = new Map();
+  }
+
+  /**
+   * 封禁一名玩家 `ms` 毫秒（admin 踢人）：期间其握手恢复会被拒绝、连接被 CLOSE.KICKED 断开。
+   * @param {string} playerId @param {number} ms
+   */
+  ban(playerId, ms = 0) {
+    if (typeof playerId !== 'string' || !playerId) return;
+    this.banned.set(playerId, this.now() + Math.max(0, ms));
+  }
+
+  /** @param {string} playerId @param {number} [now] @returns {boolean} 该玩家当前是否在封禁期 */
+  isBanned(playerId, now = this.now()) {
+    const until = this.banned.get(playerId);
+    if (until == null) return false;
+    if (now >= until) { this.banned.delete(playerId); return false; }
+    return true;
   }
 
   get size() { return this.byPlayerId.size; }
@@ -208,6 +227,8 @@ export class SessionRegistry {
     const out = [];
     for (const s of this.byPlayerId.values()) if (this.isExpired(s, now)) out.push(s);
     for (const s of out) this.remove(s);
+    // 顺带清掉已过期的封禁记录（admin 踢人窗口到期）
+    for (const [pid, until] of this.banned) if (now >= until) this.banned.delete(pid);
     return out;
   }
 
@@ -649,6 +670,11 @@ export class Network {
     if (!session) {
       session = msg.token ? this.registry.byToken(msg.token) : null;
       if (session) {
+        // admin 踢人：封禁窗口内拒绝其带旧 token 恢复，直接断开（客户端收到 CLOSE.KICKED 停止重连）。
+        if (this.registry.isBanned(session.playerId, now)) {
+          try { conn.close(CLOSE.KICKED, 'admin-kicked'); } catch { /* ignore */ }
+          return;
+        }
         if (session.connected && session.ws && session.ws !== conn.ws
           && (msg.noReplace || (Number.isFinite(msg.claimAt) && session.claimAt != null && msg.claimAt > session.claimAt))) {
           this.reply(conn, errorMsg(ERR.SESSION_IN_USE, rid));

@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>卫戍协议 · 本机服务器监控</title>
+<style>
+  :root{
+    --bg:#0a0f15; --panel:#111c28; --panel2:#162230; --panel3:#0d1620; --line:#213349;
+    --txt:#e8f0f8; --dim:#87a0ba; --muted:#5b7390;
+    --accent:#3fd8a5; --accent2:#3fb6f0; --warn:#ffb84d; --danger:#ff6b6b; --violet:#b18cff;
+    --ok:#3fd8a5; --down:#ff6b6b;
+    --shadow:0 10px 34px rgba(0,0,0,.42);
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:
+      radial-gradient(1000px 540px at 84% -12%, rgba(63,182,240,.12), transparent 62%),
+      radial-gradient(760px 460px at 0% 0%, rgba(63,216,165,.09), transparent 55%),
+      var(--bg);
+    color:var(--txt); font:14px/1.55 "Noto Sans SC", system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+    min-height:100vh; padding:18px;
+  }
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+  .head-l{display:flex;flex-direction:column;gap:2px}
+  h1{font-size:21px;letter-spacing:2px;font-weight:800;line-height:1.2;color:transparent;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text}
+  .head-sub{font-size:11px;color:var(--muted);letter-spacing:1px}
+  .adminbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--dim)}
+  .adminbar input{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 12px;font-size:12px;transition:border-color .2s}
+  .adminbar input:focus{outline:none;border-color:var(--accent)}
+  #baseInput{width:230px}
+  button.primary{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;font-size:12px;transition:all .2s}
+  button.primary:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+  .clock{font-variant-numeric:tabular-nums;font-size:12px;color:var(--accent2);min-width:64px;text-align:right}
+
+  .panel{background:linear-gradient(160deg,var(--panel),var(--panel3));border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+
+  .adminops{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 18px;margin-bottom:14px;font-size:13px}
+  .adminops .ao-label{color:var(--dim);font-weight:700;margin-right:4px}
+  .adminops button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;transition:all .2s}
+  .adminops button.b-kick{background:rgba(255,107,107,.12);border-color:var(--danger);color:var(--danger)}
+  .adminops button:hover{filter:brightness(1.15)}
+  .adminops .ao-result{color:var(--dim);font-size:12px;margin-left:auto;white-space:nowrap}
+
+  .total{display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 24px;margin-bottom:14px}
+  .total .main{display:flex;align-items:center;gap:20px}
+  .total .num{font-size:46px;font-weight:800;line-height:1;color:transparent;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;font-variant-numeric:tabular-nums}
+  .total .label{color:var(--dim);font-size:12px;margin-top:4px}
+  .total .right{display:flex;gap:26px}
+  .total .right div{text-align:center}
+  .total .right .n{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .svrchip{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
+  .svrchip .d{width:8px;height:8px;border-radius:50%}
+  .svrchip.up .d{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .svrchip.down .d{background:var(--down);box-shadow:0 0 8px var(--down)}
+  .svrchip.up{color:var(--ok);border-color:rgba(63,216,165,.4)}
+  .svrchip.down{color:var(--down);border-color:rgba(255,107,107,.4)}
+
+  .svr{padding:20px;position:relative}
+  .svr.offline{opacity:.55}
+  .svr .banner{position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r) var(--r) 0 0;background:var(--ok)}
+  .svr.offline .banner{background:var(--down)}
+  .svr h2{font-size:16px;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+  .svr .url{color:var(--muted);font-size:11px;word-break:break-all;margin-bottom:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .svr .lat{color:var(--accent2);font-size:11px;white-space:nowrap}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);flex:none}
+  .dot.off{background:var(--danger);box-shadow:0 0 10px var(--danger)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;position:relative}
+  .stat .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stat .k{font-size:11px;color:var(--dim);margin-top:2px}
+  .stat.hi .v{color:var(--accent)}
+  .stat.warn .v{color:var(--warn)}
+  .chart{margin-top:12px;height:52px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .chart svg{width:100%;height:100%;display:block}
+  .footer{display:flex;justify-content:space-between;margin-top:10px;color:var(--muted);font-size:11px}
+
+  .rooms{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}
+  .rooms h3{font-size:12px;color:var(--dim);font-weight:500;margin-bottom:10px;display:flex;justify-content:space-between}
+  .rooms .list{max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:2px}
+  .room-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:rgba(22,34,48,.5)}
+  .room-card.is-match{border-color:rgba(255,184,77,.55);background:rgba(255,184,77,.07)}
+  .rc__hd{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px;flex-wrap:wrap}
+  .rc__code{font-weight:700;color:var(--txt);letter-spacing:.5px;font-size:15px;font-variant-numeric:tabular-nums}
+  .rc__tag{font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);color:var(--dim)}
+  .rc__tag.on{color:var(--warn);border-color:rgba(255,184,77,.5);background:rgba(255,184,77,.1)}
+  .rc__meta{color:var(--muted);font-size:11px;margin-left:auto}
+  .rc__body{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .rc__phase{padding:3px 12px;border-radius:12px;font-size:11px;font-weight:600}
+  .rc__phase.p-LOBBY,.rc__phase.p-RESULT{color:var(--dim);border:1px solid var(--line)}
+  .rc__phase.p-INFO_CHECK,.rc__phase.p-BAND_DRAFT,.rc__phase.p-BATTLE_CHECK{color:#5aa7ff;border:1px solid rgba(90,167,255,.4);background:rgba(90,167,255,.1)}
+  .rc__phase.p-ROUND_START,.rc__phase.p-PREP{color:var(--accent);border:1px solid rgba(63,216,165,.4);background:rgba(63,216,165,.1)}
+  .rc__phase.p-COMBAT,.rc__phase.p-FINAL_ASSAULT,.rc__phase.p-HIDDEN_CORE{color:var(--danger);border:1px solid rgba(255,107,107,.4);background:rgba(255,107,107,.12)}
+  .rc__phase.p-SP_DRAFT,.rc__phase.p-UNITE{color:var(--violet);border:1px solid rgba(177,140,255,.4);background:rgba(177,140,255,.1)}
+  .rc__phase.p-SETTLE{color:var(--warn);border:1px solid rgba(255,184,77,.4);background:rgba(255,184,77,.1)}
+  .rc__round{font-size:13px;color:var(--txt);font-weight:600}
+  .rc__ppl{color:var(--dim);font-size:11px}
+  .rc__bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:10px}
+  .rc__bar-in{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--warn));transition:width .4s}
+  .rc__players{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px}
+  .kickroom-mini{margin-left:auto;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:2px 10px;font-size:11px;cursor:pointer;transition:all .2s}
+  .kickroom-mini:hover{background:var(--danger);color:#fff}
+
+  .p{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px}
+  .p .nm{color:var(--txt);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .p .rc{color:var(--accent);font-size:11px}
+  .p .ip{color:var(--dim);font-size:11px}
+  .p button{background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;transition:all .2s}
+  .p button:hover{background:var(--danger);color:#fff}
+  .p button:disabled{opacity:.4;cursor:not-allowed}
+  .empty{color:var(--dim);font-size:11px;opacity:.7;padding:6px 0}
+
+  .upd{color:var(--muted);font-size:11px;text-align:right;margin-top:10px}
+
+  @media(max-width:640px){
+    body{padding:12px}
+    header{align-items:flex-start}
+    h1{font-size:18px}
+    .adminbar input{flex:1;min-width:0}
+    .total{flex-direction:column;align-items:flex-start;gap:14px;padding:14px 16px}
+    .total .num{font-size:38px}
+    .total .right{width:100%;justify-content:space-between;gap:10px}
+    .stats{gap:8px}
+    .stat{padding:9px}
+    .stat .v{font-size:20px}
+    .svr{padding:16px}
+    .p{grid-template-columns:1fr auto auto}
+    .p .ip{display:none}
+    .adminops .ao-result{margin-left:0;white-space:normal}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="head-l">
+    <h1>卫戍协议 · 本机服务器监控</h1>
+    <div class="head-sub">STRONGHOLD PROTOCOL · LOCAL OPS</div>
+  </div>
+  <div class="adminbar">
+    服务器地址:
+    <input id="baseInput" type="text" placeholder="http://127.0.0.1:3000" />
+    admin token:
+    <input id="token" type="password" placeholder="SP_ADMIN_TOKEN（留空=只读）" />
+    <button class="primary" onclick="saveCfg()">保存</button>
+    <span class="clock" id="ts">--:--:--</span>
+  </div>
+</header>
+
+<div class="adminops panel">
+  <span class="ao-label">服务器全局操作</span>
+  <button class="b-kick" onclick="kickAll()">⚠️ 一键踢所有人</button>
+  <span id="adminOpResult" class="ao-result"></span>
+</div>
+
+<div class="total panel">
+  <div class="main">
+    <div>
+      <div class="num" id="totalOnline">--</div>
+      <div class="label">在线连接总数</div>
+    </div>
+    <span class="svrchip" id="svrchip"><span class="d"></span>本机服</span>
+  </div>
+  <div class="right">
+    <div><div class="n" id="totalHumans">--</div><div class="label">真人</div></div>
+    <div><div class="n" id="totalRooms">--</div><div class="label">房间</div></div>
+    <div><div class="n" id="totalMatches">--</div><div class="label">对局中</div></div>
+  </div>
+</div>
+
+<div class="svr panel" id="svr">
+  <div class="banner"></div>
+  <h2><span class="dot" id="dot"></span>本机服务器</h2>
+  <div class="url"><span id="url">--</span><span class="lat" id="lat"></span></div>
+  <div class="stats">
+    <div class="stat hi"><div class="v" id="s_sockets">--</div><div class="k">在线连接</div></div>
+    <div class="stat"><div class="v" id="s_humans">--</div><div class="k">真人</div></div>
+    <div class="stat"><div class="v" id="s_bots">--</div><div class="k">AI</div></div>
+    <div class="stat"><div class="v" id="s_rooms">--</div><div class="k">房间</div></div>
+    <div class="stat warn"><div class="v" id="s_matches">--</div><div class="k">对局</div></div>
+    <div class="stat"><div class="v" id="s_spect">--</div><div class="k">观战</div></div>
+  </div>
+  <div class="chart" id="ch"></div>
+  <div class="footer"><span id="s_uptime">运行 --</span><span id="s_build">--</span></div>
+  <div class="rooms">
+    <h3><span>🏠 房间对局 · 在线玩家（按房间分组）</span><span id="s_rcount"></span></h3>
+    <div class="list" id="roomlist"><div class="empty">输入 admin token 后显示房间与玩家</div></div>
+  </div>
+</div>
+
+<div class="upd" id="updInfo"></div>
+
+<script>
+// 单本机服：默认同源（本页由同一服务器静态托管时），否则用 localStorage 里配置的地址（如 http://127.0.0.1:3000 或局域网 IP:端口）。
+function defaultBase(){
+  if(location.protocol === 'http:' || location.protocol === 'https:') return location.origin;
+  return 'http://127.0.0.1:3000'; // 直接双击打开本文件（file://）时的默认
+}
+function getBase(){ return ($('baseInput').value || '').trim().replace(/\/+$/,'') || defaultBase(); }
+
+const $ = id => document.getElementById(id);
+const history = [];
+
+const PHASE_CN = {
+  LOBBY:'等待中', INFO_CHECK:'确认本局信息', BAND_DRAFT:'选择策略', BATTLE_CHECK:'协议启动',
+  ROUND_START:'回合开始', SP_DRAFT:'机变阶段', PREP:'休整期', COMBAT:'作战中', UNITE:'联防阶段',
+  SETTLE:'结算', RESULT:'对局结束', FINAL_ASSAULT:'最终突袭', HIDDEN_CORE:'隐藏核心'
+};
+const ROUND_REF = 12;
+
+function saveCfg(){
+  localStorage.setItem('sp_monitor_base', $('baseInput').value.trim());
+  localStorage.setItem('sp_admin_token', $('token').value.trim());
+  $('adminOpResult').innerHTML = '<span style="color:#4f8">✅ 已保存（仅存本机浏览器）</span>';
+  tick();
+}
+$('baseInput').value = localStorage.getItem('sp_monitor_base') || '';
+$('token').value = localStorage.getItem('sp_admin_token') || '';
+$('url').textContent = getBase();
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function adminFetch(path){
+  const token = $('token').value.trim();
+  if(!token) throw new Error('NO_TOKEN');
+  const sep = path.includes('?') ? '&' : '?';
+  const r = await fetch(`${getBase()}${path}${sep}token=${encodeURIComponent(token)}`, { cache:'no-store' });
+  return { status: r.status, json: await r.json().catch(()=>({})) };
+}
+
+function fmtUptime(s){
+  if(s==null) return '--';
+  s = Math.floor(s);
+  const d = Math.floor(s/86400); s%=86400;
+  const h = Math.floor(s/3600); s%=3600;
+  const m = Math.floor(s/60);
+  return (d? d+'天 ':'') + (h? h+'时 ':'') + m+'分';
+}
+function drawChart(el, data){
+  const w = el.clientWidth, h = el.clientHeight;
+  if(data.length < 2){ el.innerHTML=''; return; }
+  const max = Math.max(4, ...data);
+  const step = w/(data.length-1);
+  const pts = data.map((v,i)=>`${(i*step).toFixed(1)},${(h - v/max*(h-6) - 3).toFixed(1)}`).join(' ');
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="#4ed8af" stroke-width="2" opacity=".8"/></svg>`;
+}
+
+async function fetchHealth(){
+  const t0 = performance.now();
+  try{
+    const r = await fetch(getBase()+'/api/healthz', {cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const lat = Math.round(performance.now()-t0);
+    $('dot').classList.remove('off');
+    $('svr').classList.remove('offline');
+    $('lat').textContent = lat + 'ms';
+    $('s_sockets').textContent = j.sockets ?? '--';
+    $('s_humans').textContent  = j.humans ?? '--';
+    $('s_bots').textContent    = j.bots ?? '--';
+    $('s_rooms').textContent  = j.rooms ?? '--';
+    $('s_matches').textContent = j.matches ?? '--';
+    $('s_spect').textContent  = j.spectators ?? 0;
+    $('s_uptime').textContent = '运行 ' + fmtUptime(j.uptimeSec);
+    $('s_build').textContent  = 'build ' + (j.build||'--').slice(0,8);
+    history.push(j.sockets||0);
+    if(history.length > 40) history.shift();
+    drawChart($('ch'), history);
+    return j;
+  }catch(e){
+    $('dot').classList.add('off');
+    $('svr').classList.add('offline');
+    $('lat').textContent = '';
+    ['sockets','humans','bots','rooms','matches','spect'].forEach(k=>{ $('s_'+k).textContent='×'; });
+    $('s_uptime').textContent = '离线';
+    return null;
+  }
+}
+
+const state = { rooms:null, groups:new Map(), lobby:[], hint:'' };
+
+async function fetchRooms(){
+  const token = $('token').value.trim();
+  if(!token){ state.rooms=null; state.hint=''; return; }
+  try{
+    const { status, json } = await adminFetch('/api/admin/rooms');
+    if(status === 403){ state.rooms=null; state.hint='token 错误或服务器未配置 SP_ADMIN_TOKEN'; return; }
+    if(status === 404 || status === 405){ state.rooms=null; state.hint=''; return; }
+    if(status !== 200) throw new Error(status);
+    state.rooms = json.rooms || [];
+    state.hint = '';
+  }catch(e){ state.rooms=null; }
+}
+
+async function fetchPlayers(){
+  const token = $('token').value.trim();
+  if(!token){ state.groups=new Map(); state.lobby=[]; return; }
+  try{
+    const { status, json } = await adminFetch('/api/admin/players');
+    if(status === 403){ state.groups=new Map(); state.lobby=[]; return; }
+    if(status === 404 || status === 405){ state.groups=new Map(); state.lobby=[]; return; }
+    if(status !== 200) throw new Error(status);
+    const groups = new Map(); const lobby=[];
+    for(const p of (json.players||[])){
+      if(p.roomCode){
+        if(!groups.has(p.roomCode)) groups.set(p.roomCode, { inMatch: !!p.inMatch, list: [] });
+        groups.get(p.roomCode).list.push(p);
+      } else lobby.push(p);
+    }
+    state.groups=groups; state.lobby=lobby;
+  }catch(e){ state.groups=new Map(); state.lobby=[]; }
+}
+
+function playerRow(p){
+  return `<div class="p">
+    <span class="nm" title="${esc(p.name)}">${esc(p.name)}</span>
+    <span class="rc">${p.roomCode? ('房 '+esc(p.roomCode)) : '大厅'}</span>
+    <span class="ip">${esc(p.addr||'')}${p.lastSeenAgoSec!=null? ' · '+p.lastSeenAgoSec+'s前':''}</span>
+    <button onclick="doKick('${esc(p.playerId)}',${JSON.stringify(p.name).replace(/"/g,'&quot;')})">踢</button>
+  </div>`;
+}
+
+function render(){
+  const box = $('roomlist');
+  const cnt = $('s_rcount');
+  const token = $('token').value.trim();
+  if(!token){ box.innerHTML = '<div class="empty">输入 admin token 后显示房间对局与玩家</div>'; cnt.textContent=''; return; }
+  if(state.hint){ box.innerHTML = `<div class="empty">${esc(state.hint)}</div>`; cnt.textContent=''; return; }
+
+  let html='';
+  let totalHumans=0;
+
+  if(state.rooms===null){
+    // 仅有玩家数据（/rooms 不可用）：按房间分组渲染
+    const groups = [...state.groups.entries()].sort((a,b)=>(b[1].inMatch?1:0)-(a[1].inMatch?1:0));
+    for(const [code,g] of groups){
+      totalHumans += g.list.length;
+      html += `<div class="room-card${g.inMatch?' is-match':''}">
+        <div class="rc__hd"><span class="rc__code">${esc(code)}</span><span class="rc__tag${g.inMatch?' on':''}">${g.inMatch?'对局中':'等待中'}</span><span class="rc__meta">${g.list.length} 人</span><button class="kickroom-mini" onclick="doKickRoom('${esc(code)}')">踢整房</button></div>
+        <div class="rc__players">${g.list.map(playerRow).join('')}</div>
+      </div>`;
+    }
+    if(state.lobby && state.lobby.length){
+      totalHumans += state.lobby.length;
+      html += `<div class="room-card"><div class="rc__hd"><span class="rc__code">大厅（未进房）</span><span class="rc__meta">${state.lobby.length} 人</span></div><div class="rc__players">${state.lobby.map(playerRow).join('')}</div></div>`;
+    }
+    cnt.textContent = html? (totalHumans+' 人') : '';
+    box.innerHTML = html || '<div class="empty">当前无在线玩家</div>';
+    return;
+  }
+
+  const rooms = [...state.rooms].sort((a,b)=>{
+    if((b.inMatch?1:0) !== (a.inMatch?1:0)) return (b.inMatch?1:0)-(a.inMatch?1:0);
+    const rb = (b.round||0), ra = (a.round||0);
+    if(rb !== ra) return rb - ra;
+    const pb = (b.humanCount ?? b.seatCount ?? 0), pa = (a.humanCount ?? a.seatCount ?? 0);
+    return pb - pa;
+  });
+  for(const room of rooms){
+    const code = room.code;
+    const g = state.groups.get(code);
+    const players = g? g.list : [];
+    totalHumans += players.length;
+    const phaseName = room.phase ? (PHASE_CN[room.phase] || room.phase) : '等待中';
+    const phaseCls = room.phase ? ('p-'+room.phase) : 'p-LOBBY';
+    const pct = room.inMatch ? Math.min(100, Math.round((room.round||0)/ROUND_REF*100)) : 0;
+    const human = room.humanCount ?? room.seatCount ?? players.length;
+    const modeName = esc(room.mode||'');
+    html += `<div class="room-card${room.inMatch?' is-match':''}">
+      <div class="rc__hd">
+        <span class="rc__code">${esc(code)}</span>
+        <span class="rc__tag${room.inMatch?' on':''}">${room.inMatch?'对局中':'等待中'}</span>
+        <span class="rc__meta">${esc(room.difficulty||'')} · 第${room.matchNo||0}局</span>
+        <button class="kickroom-mini" onclick="doKickRoom('${esc(code)}')">踢整房</button>
+      </div>
+      <div class="rc__body">
+        <span class="rc__phase ${phaseCls}">${phaseName}</span>
+        <span class="rc__round">回合 ${room.round||0}</span>
+        <span class="rc__ppl">${human} 人 · ${modeName}</span>
+      </div>
+      ${room.inMatch?`<div class="rc__bar"><div class="rc__bar-in" style="width:${pct}%"></div></div>`:''}
+      ${players.length?`<div class="rc__players">${players.map(playerRow).join('')}</div>`:''}
+    </div>`;
+  }
+  if(state.lobby && state.lobby.length){
+    totalHumans += state.lobby.length;
+    html += `<div class="room-card"><div class="rc__hd"><span class="rc__code">大厅（未进房）</span><span class="rc__meta">${state.lobby.length} 人</span></div><div class="rc__players">${state.lobby.map(playerRow).join('')}</div></div>`;
+  }
+  cnt.textContent = rooms.length + ' 房 · ' + totalHumans + ' 人';
+  box.innerHTML = html || '<div class="empty">当前无房间</div>';
+}
+
+async function doKick(playerId, name){
+  if(!confirm(`确认踢掉玩家「${name}」？\n将立即断线，且一段时间内无法自动重连。`)) return;
+  try{
+    const token = $('token').value.trim();
+    const r = await fetch(`${getBase()}/api/admin/kick?token=${encodeURIComponent(token)}&playerId=${encodeURIComponent(playerId)}`);
+    const j = await r.json().catch(()=>({}));
+    if(r.ok && j.ok){ alert(`已踢掉 ${name}${j.banSec? '（'+j.banSec+'s 内无法重连）':''}`); tick(); }
+    else alert('踢人失败: ' + (j.error || j.detail || r.status));
+  }catch(e){ alert('踢人请求失败: ' + e.message); }
+}
+
+async function doKickRoom(roomCode){
+  const token = $('token').value.trim();
+  try{
+    const r = await fetch(`${getBase()}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const ps = (j.players||[]).filter(p=>p.roomCode===roomCode);
+    if(!ps.length){ alert('该房间已无在线玩家'); tick(); return; }
+    if(!confirm(`确认踢掉房间 ${roomCode} 内全部 ${ps.length} 名玩家？\n将立即断线。`)) return;
+    let ok=0, fail=0;
+    for(const p of ps){
+      const kr = await fetch(`${getBase()}/api/admin/kick?token=${encodeURIComponent(token)}&playerId=${encodeURIComponent(p.playerId)}`);
+      if(kr.ok) ok++; else fail++;
+    }
+    alert(`房间 ${roomCode}：已踢 ${ok} 人` + (fail? `，失败 ${fail} 人`:''));
+    tick();
+  }catch(e){ alert('整房踢人失败: ' + e.message); }
+}
+
+async function kickAll(){
+  if(!confirm('确认执行：踢掉本机服务器上所有在线玩家？此操作不可撤销！')) return;
+  const out = $('adminOpResult');
+  out.textContent = '执行中…';
+  try{
+    const token = $('token').value.trim();
+    const r = await fetch(`${getBase()}/api/admin/kickall?token=${encodeURIComponent(token)}`);
+    const j = await r.json().catch(()=>({}));
+    if(r.ok && j.ok){ out.innerHTML = `<span style="color:#4f8">✅ 已踢出全部 ${j.kicked||0} 名在线玩家</span>`; }
+    else out.innerHTML = `<span style="color:#f88">⚠️ 执行失败: ${esc(j.error||j.detail||r.status)}</span>`;
+  }catch(e){ out.innerHTML = `<span style="color:#f88">⚠️ 执行失败: ${esc(e.message)}</span>`; }
+  tick();
+}
+
+async function tick(){
+  if(document.hidden) return;
+  $('url').textContent = getBase();
+  const j = await fetchHealth();
+  await fetchRooms();
+  await fetchPlayers();
+  if(j){
+    $('totalOnline').textContent = j.sockets||0;
+    $('totalHumans').textContent  = j.humans||0;
+    $('totalRooms').textContent   = j.rooms||0;
+    $('totalMatches').textContent  = j.matches||0;
+  }else{
+    ['totalOnline','totalHumans','totalRooms','totalMatches'].forEach(k=>{ $(k).textContent='--'; });
+  }
+  const chip = $('svrchip');
+  chip.className = 'svrchip ' + (j ? 'up' : 'down');
+  $('ts').textContent = new Date().toLocaleTimeString('zh-CN');
+  render();
+  $('updInfo').textContent = '上次刷新 ' + new Date().toLocaleTimeString('zh-CN');
+}
+
+// 页面隐藏时暂停轮询，恢复可见时立即刷新一次
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) tick(); });
+
+tick();
+setInterval(tick, 3000);
+window.addEventListener('resize', ()=>{ if(history.length) drawChart($('ch'), history); });
+</script>
+</body>
+</html>

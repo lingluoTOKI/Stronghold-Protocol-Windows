@@ -11,9 +11,9 @@
 // pure CSS/SVG (radar, ridgelines, glow), so it never issues a request that can 404.
 
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
-import { useMemo, useState } from '../../vendor/hooks.module.js';
+import { useMemo, useState, useEffect } from '../../vendor/hooks.module.js';
 import { NAME_MAX_LEN, APP_VERSION, DEV_BUILD } from '../../../shared/constants.js';
-import { html, Button, Icon, MicroLabel, TextField, PingPill } from '../ui/components.js';
+import { html, Button, Icon, MicroLabel, TextField, PingPill, Modal } from '../ui/components.js';
 import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
 import { toast } from '../ui/toasts.js';
@@ -187,6 +187,117 @@ const STATUS_TEXT = {
   online: N_('已连接服务器'), reconnecting: N_('连接中断，正在重连'), closed: N_('连接已关闭'),
 };
 
+// ---- 公告栏 / 紧急公告（规格C：GET /api/announcements，服务端渲染根 announcements.json）----------------------
+
+// 上架 / 下架时间过滤：startAt 之前不显示、expireAt 之后自动隐藏（缺省不限）。
+function inSchedule(it) {
+  const now = Date.now();
+  if (it.startAt && now < Number(it.startAt)) return false;
+  if (it.expireAt && now > Number(it.expireAt)) return false;
+  return true;
+}
+
+/** 全局紧急公告宿主：挂载在应用根，任何界面（标题 / 房间 / 对局…）都轮询；一旦管理员发布「强制弹窗」紧急公告，
+ *  立刻弹出独立 URGENT NOTICE。弹过一次的 forceId 记在 localStorage，不再重复弹。 */
+export function UrgentNoticeHost() {
+  const FORCE_SEEN_KEY = 'sp.bulletinForceSeen';
+  const readForceSeen = () => { try { return JSON.parse(localStorage.getItem(FORCE_SEEN_KEY) || '[]'); } catch { return []; } };
+  const [urgentOpen, setUrgentOpen] = useState(false);
+  const [urgent, setUrgent] = useState(null);
+  useEffect(() => {
+    let dead = false;
+    const load = () => {
+      fetch('/api/announcements', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (dead || !d || !Array.isArray(d.items)) return;
+          // 存在已上架、force:true 且尚未弹过的项 → 立即弹出紧急公告。
+          const forced = d.items.filter(inSchedule).find((it) => it.force && it.forceId && !readForceSeen().includes(it.forceId));
+          if (forced) { setUrgent(forced); setUrgentOpen(true); }
+        })
+        .catch(() => { /* 拉不到就不弹，静默重试 */ });
+    };
+    load();
+    // HTTP 无推送，靠短轮询（公告接口很轻，10s 一次）。
+    const iv = setInterval(load, 10000);
+    return () => { dead = true; clearInterval(iv); };
+  }, []);
+  const closeUrgent = () => {
+    setUrgentOpen(false);
+    if (urgent && urgent.forceId) {
+      const list = readForceSeen();
+      if (!list.includes(urgent.forceId)) { list.push(urgent.forceId); localStorage.setItem(FORCE_SEEN_KEY, JSON.stringify(list)); }
+    }
+    setUrgent(null);
+  };
+  return html`${urgentOpen && urgent ? html`
+    <div class="urgent-toast" role="alert">
+      <div class="urgent-toast__head">
+        <span class="urgent-toast__tag">注意</span>
+        ${urgent.time ? html`<span class="urgent-toast__time">${urgent.time}</span>` : null}
+        <button class="urgent-toast__close" aria-label="关闭" onClick=${closeUrgent}>×</button>
+      </div>
+      <div class="urgent-toast__title">${urgent.title || '紧急公告'}</div>
+      <div class="urgent-toast__content">${urgent.content || ''}</div>
+    </div>` : null}`;
+}
+
+/** 公告栏按钮（更新日志）：标题 / 房间界面的邮件图标，玩家手动点开看普通公告；
+ *  紧急公告走全局 UrgentNoticeHost（任何界面都弹），不混进日志。 */
+export function BulletinButton() {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [hasNew, setHasNew] = useState(false);
+  const SEEN_KEY = 'sp.bulletinSeen';
+  useEffect(() => {
+    let dead = false;
+    const load = () => {
+      fetch('/api/announcements', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (dead || !d || !Array.isArray(d.items)) return;
+          setData(d);
+          const seen = localStorage.getItem(SEEN_KEY);
+          setHasNew(!!d.updatedAt && seen !== d.updatedAt);
+        })
+        .catch(() => { if (!dead) setFailed(true); });
+    };
+    load();
+    const iv = setInterval(load, 60000);
+    return () => { dead = true; clearInterval(iv); };
+  }, []);
+  const markSeen = () => { if (data && data.updatedAt) { localStorage.setItem(SEEN_KEY, data.updatedAt); setHasNew(false); } };
+  const closeModal = () => { setOpen(false); markSeen(); };
+  // 按 time 字符串降序（YYYY-MM-DD 即按日期）；只展示普通公告（force 紧急公告走全局弹窗）。
+  const items = (data && Array.isArray(data.items) ? data.items : [])
+    .slice()
+    .filter(inSchedule)
+    .filter((it) => !it.force)
+    .sort((a, b) => String((b && b.time) || '').localeCompare(String((a && a.time) || '')));
+  return html`<span class="bulletin-btn">
+    <${Button} variant="ghost" size="sm" icon="mail" class=${`bulletin-btn__icon${hasNew ? ' has-new' : ''}`}
+      title="服务器更新公告" aria-label="服务器更新公告"
+      onClick=${() => { const n = !open; setOpen(n); if (n) markSeen(); }} aria-expanded=${open}>
+    <//>
+    <${Modal} open=${open} onClose=${closeModal} title="服务器更新公告"
+      micro="SERVER BULLETIN" class="bulletin-modal-box">
+      ${failed ? html`<div class="bulletin-modal__empty">暂无法连接公告服务</div>` : null}
+      ${!failed && !data ? html`<div class="bulletin-modal__empty">加载中…</div>` : null}
+      <div class="bulletin-modal__when">最近更新：${(data && data.updatedAt) || '—'}</div>
+      ${items.map((it, i) => html`<div class="bulletin-modal__item" key=${i}>
+        <div class="bulletin-modal__row">
+          ${it.version ? html`<span class="bulletin-modal__ver">v${it.version}</span>` : null}
+          ${it.time ? html`<span class="bulletin-modal__time">${it.time}</span>` : null}
+          <span class="bulletin-modal__title">${it.title || ''}</span>
+        </div>
+        ${it.content ? html`<div class="bulletin-modal__content">${it.content}</div>` : null}
+      </div>`)}
+      ${!failed && data && !items.length ? html`<div class="bulletin-modal__empty">暂无公告</div>` : null}
+    <//>
+  </span>`;
+}
+
 /** Title screen component. */
 export function TitleScreen() {
   const conn = useStore((s) => s.connection, shallowEqual);
@@ -278,6 +389,7 @@ export function TitleScreen() {
           <span>${STATUS_TEXT[conn.status] ? t(STATUS_TEXT[conn.status]) : conn.status}</span>
           ${conn.status === 'online' ? html`<${PingPill} ms=${conn.ping} />` : null}
           <${GuideButton} class="title-guide" label=${t('玩法说明')} />
+          <${BulletinButton} />
           <button type="button" class="title-settings fsbtn tapx" aria-label=${t('设置')} title=${t('设置')}
             onClick=${() => setSettingsOpen(true)}><${GIcon} name="gear" /></button>
           <${FullscreenButton} class="title-fs" />

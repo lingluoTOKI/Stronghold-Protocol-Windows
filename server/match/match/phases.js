@@ -10,6 +10,10 @@ import { pairPlayers } from '../finalAssault.js';
 import { botPickBand } from '../bot.js';
 import { OK, fail, DELAYS, BAND_TURN_SECONDS } from './common.js';
 
+// 六人座合作奖励（改编版独有；规格 A）：在这些回合每位存活玩家各得一枚信标道具（见 startRound）。
+const SIX_PLAYER_BEACON_ROUNDS = new Set([10, 12, 14]);
+const ROUND_BEACON_ITEM = 'chess_item_5_04_e_a';
+
 export class MatchPhases {
   enterInfoCheck() {
     this.phase = PHASE.INFO_CHECK;
@@ -279,6 +283,17 @@ export class MatchPhases {
     for (const ps of this.order) {
       if (ps.alive) continue;
       try { this.dispatcher.dispatchEliminated(ps, 'onRoundStart', { round: r }); } catch (e) { this.reportError('dispatch onRoundStart (eliminated)', e); }
+    }
+    // 六人座合作奖励：R10/R12/R14 每位存活玩家得一枚信标。按回合打计数器，重连 / 重复进回合不会重复发；
+    // 道具上标 sixPlayerBeaconRound，R14 那枚在 builtinMeta 里领到后立即转为干员（领完即进商店）。
+    if (!this.isSolo && this.startingPlayerCount === 6 && SIX_PLAYER_BEACON_ROUNDS.has(r)) {
+      for (const ps of alive) {
+        const key = `sixPlayerBeacon:${r}`;
+        if (ps.counters[key]) continue;
+        ps.counters[key] = 1;
+        const beacon = ps.acquireItem(ROUND_BEACON_ITEM, { source: 'sixPlayerBeacon' });
+        if (beacon) beacon.meta.sixPlayerBeaconRound = r;
+      }
     }
     for (const ps of alive) ps.recompute();
     this.setDeadline(DELAYS.ROUND_START / 1000, () => this.afterRoundStart(), { silent: this.soloUntimed });

@@ -29,6 +29,8 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+// --zip 用自己写的 zip 写入器：系统 tar / Compress-Archive 在中文 Windows 上会按 GBK 写文件名且不置 UTF-8 标志
+import { zipDir } from './zipdir.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IS_WIN = process.platform === 'win32';
@@ -56,6 +58,12 @@ const ASSET_DIRS = ['public/assets', 'public/fonts', 'public/vendor'];
 /** 版本库里有、但便携包不要的（测试代码，省体积）。 */
 const SKIP_TRACKED = ['test/'];
 
+/**
+ * 仓库根的**原地**启动器：它们假设 `%HERE%` 就是游戏根、node 在 `%HERE%node\`。便携包里游戏在 `app\`，
+ * 包根另有一份由 bat() 生成、指向 `app\scripts\launcher.mjs` 的对应脚本，所以这几个不再拷进 `app\`。
+ */
+const SKIP_ROOT_FILES = ['启动游戏.bat', '本机当服务器.bat', '连接服务器.bat'];
+
 /** 包根要带的许可证 / 声明。 */
 const LEGAL_FILES = ['LICENSE', 'NOTICE.md', 'THIRD-PARTY-NOTICES.md'];
 
@@ -68,7 +76,7 @@ const LEGAL_FILES = ['LICENSE', 'NOTICE.md', 'THIRD-PARTY-NOTICES.md'];
 const LOCAL_ASSET_MANIFEST = path.join('data', 'local-assets.json');
 
 function parseArgs(argv) {
-  const o = { out: '', node: true, force: false, nodeSpec: '', sha256: '' };
+  const o = { out: '', node: true, force: false, nodeSpec: '', sha256: '', zip: false, webfonts: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const [k, v] = a.split('=');
@@ -77,6 +85,8 @@ function parseArgs(argv) {
     else if (k === '--node-version') o.nodeSpec = String(val() || '');
     else if (k === '--sha256') o.sha256 = String(val() || '').toLowerCase();
     else if (a === '--no-node') o.node = false;
+    else if (a === '--zip') o.zip = true;
+    else if (a === '--keep-webfonts') o.webfonts = true;
     else if (a === '--force') o.force = true;
     else if (a === '-h' || a === '--help') o.help = true;
   }
@@ -86,7 +96,9 @@ function parseArgs(argv) {
 const HELP = `node scripts/make-windows-bundle.mjs — 生成 Windows 开箱即用便携包
 
   --out <dir>        产物目录（默认 <仓库上一级>/Stronghold-Protocol-Windows）
+  --zip              额外压成 <out>.zip（内置 UTF-8 zip 写入器，中文文件名不乱码）
   --no-node          不下载便携版 Node（目标机器需自备 Node 22+）
+  --keep-webfonts    保留 index.html 里的 Google Fonts 外链（默认去掉）
   --force            目录已存在时先删掉（只肯删空目录，或上一次打的便携包；其余情况拒绝）
   --node-version X   换一个 Node 版本（默认 ${NODE_PIN.version}）；换版本必须同时给 --sha256
   --sha256 <hash>    该版本 win-x64.zip 的 sha256（取自官方 SHASUMS256.txt）
@@ -95,8 +107,8 @@ const HELP = `node scripts/make-windows-bundle.mjs — 生成 Windows 开箱即�
   因此 .env / .venv / .claude / scripts/service.env.cmd 这些本机文件不会被打进去。
   data/local-assets.json 存在时（本机提取过 3D 棋盘贴图）会一起收，否则贴图进了包也用不上。
 
-  不压缩、不改 index.html、不装开始界面：包里的 启动游戏.bat 就是
-  \`app\\scripts\\launch.mjs --no-setup\`（素材已在包里，不需要联网准备）。
+  包根带三个 .bat：启动游戏.bat（打开启动器菜单）、本机当服务器.bat（直接开服）、
+  连接服务器.bat（输入地址连别人的服）。默认去掉 Google Fonts 外链（包内自带 /fonts）。
 `;
 
 /**
@@ -297,6 +309,19 @@ export function psSingleQuote(s) {
 }
 
 /**
+ * 便携包默认去掉 index.html 里的 Google Fonts 外链（preconnect + css2 stylesheet）。
+ * 包内已自带 /fonts，而 Google Fonts 在国内通常不可达 —— 留着只是白等十几个请求。
+ * 只删这两条 <link>，其余原样；找不到就原样返回。
+ * @param {string} html
+ * @returns {{ html: string, removed: number }}
+ */
+export function stripWebfonts(html) {
+  let removed = 0;
+  const out = html.replace(/^[ \t]*<link[^>]*fonts\.(googleapis|gstatic)\.com[^>]*>\r?\n?/gm, () => { removed++; return ''; });
+  return { html: out, removed };
+}
+
+/**
  * 把 zip 解到 dir（必须是已存在的空目录）。
  *
  * 三种解压器按平台兜底：`tar`（Windows 10+ 的 bsdtar、macOS 的 bsdtar 都认得 zip）、`unzip`（GNU tar
@@ -396,11 +421,15 @@ export function bundleReadme({ version, withNode }) {
     ? `node\\node.exe            便携版 Node ${version}（官方 x64，已经 sha256 校验）
 node\\LICENSE-node.txt    Node 自己的许可证（MIT）
 app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
-启动游戏.bat             app\\scripts\\launch.mjs --no-setup
+启动游戏.bat             打开启动器菜单（本机当服务器 / 连接服务器 / 设置）
+本机当服务器.bat         直接在这台电脑开服
+连接服务器.bat           输入地址连别人的服务器
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md`
     : `app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
-启动游戏.bat             app\\scripts\\launch.mjs --no-setup
+启动游戏.bat             打开启动器菜单（本机当服务器 / 连接服务器 / 设置）
+本机当服务器.bat         直接在这台电脑开服
+连接服务器.bat           输入地址连别人的服务器
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 
@@ -432,9 +461,9 @@ Noto Sans SC 这类网页字体（\`index.html\` 里那条外链这次没有改�
 ## 怎么玩
 
 \`\`\`
-本机当服务器   双击 启动游戏.bat：在这台电脑开服，浏览器自动打开；
-               控制台会打印「发给朋友」的局域网地址（形如 http://192.168.1.23:3000）
-连别人的服务器 不需要这个包，直接用浏览器打开对方的网址就行
+启动游戏.bat    打开启动器菜单：[1]本机当服务器  [2]连接服务器  [3]设置  [4]查看状态
+本机当服务器.bat  直接在这台电脑开服，浏览器自动打开；控制台会打印「发给朋友」的局域网地址
+连接服务器.bat    输入别人的服务器地址，用浏览器直接打开对方的网页
 \`\`\`
 
 第一次开服时 Windows 防火墙可能弹窗，勾选**允许专用网络**（否则朋友连不上）。
@@ -500,8 +529,10 @@ async function main() {
 
   // 1) 游戏代码：只收 git 跟踪的文件
   const all = trackedFiles();
-  const wanted = all.filter((rel) => !SKIP_TRACKED.some((p) => rel === p || rel.startsWith(p)));
-  console.log(`  · 复制游戏本体（git 跟踪的 ${wanted.length} 个文件，略过 ${all.length - wanted.length} 个 test/ 文件）…`);
+  const wanted = all
+    .filter((rel) => !SKIP_TRACKED.some((p) => rel === p || rel.startsWith(p)))
+    .filter((rel) => !SKIP_ROOT_FILES.includes(rel.split('/').pop()));
+  console.log(`  · 复制游戏本体（git 跟踪的 ${wanted.length} 个文件，略过 ${all.length - wanted.length} 个 test/ 与根启动器文件）…`);
   const copied = await copyFiles(wanted, appDir);
   console.log(`    完成：${copied.files} 个文件 / ${MB(copied.bytes)}`);
 
@@ -536,6 +567,18 @@ async function main() {
   const deps = await dirSize(path.join(appDir, 'node_modules'));
   console.log(`    完成：${deps.files} 个文件 / ${MB(deps.bytes)}（只含生产依赖）`);
 
+  // 3b) 默认去掉 Google Fonts 外链（包内自带 /fonts；--keep-webfonts 保留）
+  if (!o.webfonts) {
+    const page = path.join(appDir, 'public', 'index.html');
+    if (fs.existsSync(page)) {
+      const { html, removed } = stripWebfonts(await fsp.readFile(page, 'utf8'));
+      if (removed) {
+        await fsp.writeFile(page, html);
+        console.log(`    去掉 ${removed} 条 Google Fonts 外链（--keep-webfonts 可保留）`);
+      }
+    }
+  }
+
   // 4) 便携版 Node（每次都从校验过的 zip 重新解压）
   let nodeInfo = { version: '（未打包，目标机器需自备 Node 22+）', bytes: 0 };
   if (o.node) {
@@ -556,12 +599,34 @@ async function main() {
     await fsp.copyFile(src, path.join(out, f));
   }
 
-  await fsp.writeFile(path.join(out, '启动游戏.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launch.mjs" --no-setup %*'), 'latin1');
+  // 6) 包根的三个启动 .bat（指向 app\scripts\launcher.mjs 启动器）
+  await fsp.writeFile(path.join(out, '启动游戏.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" %*'), 'latin1');
+  await fsp.writeFile(path.join(out, '本机当服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode local %*'), 'latin1');
+  await fsp.writeFile(path.join(out, '连接服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode connect %*'), 'latin1');
   await fsp.writeFile(path.join(out, 'README-开箱即用.md'), bundleReadme({ version: nodeVersion, withNode: !!o.node }), 'utf8');
 
   const total = await dirSize(out);
   console.log(`\n✔ 便携包已生成：${out}\n  ${total.files} 个文件 / ${MB(total.bytes)}`);
-  console.log('  双击「启动游戏.bat」即可（本机开服，浏览器自动打开）。');
+  console.log('  双击「启动游戏.bat」打开启动器菜单（本机当服务器 / 连接服务器 / 设置）。');
+
+  if (o.zip) {
+    const zipPath = `${out}.zip`;
+    await fsp.rm(zipPath, { force: true });
+    console.log(`\n  · 压缩 ${zipPath}（大包，几分钟）…`);
+    let last = 0;
+    const t0 = Date.now();
+    const r = await zipDir(out, zipPath, {
+      onProgress: (done, totalEntries) => {
+        const now = Date.now();
+        if (now - last < 4000) return;
+        last = now;
+        const pct = Math.floor((done / totalEntries) * 100);
+        console.log(`    ${String(pct).padStart(3)}%  ${done}/${totalEntries} 个条目（${Math.round((now - t0) / 1000)}s）`);
+      },
+    });
+    const zb = (await fsp.stat(zipPath)).size;
+    console.log(`  ✔ ${zipPath}（${MB(zb)}，${r.files} 个文件 / ${r.dirs} 个目录，压缩率 ${(100 - (zb / r.rawBytes) * 100).toFixed(1)}%）`);
+  }
   return 0;
 }
 

@@ -196,6 +196,11 @@ const ITEM_HANDLERS = {
       // piece (0.2.0): its DIY slot is bound to this player's roster (no teammate's shop or slot can hold that operator),
       // so nothing is sent [ASSUMED: the official text names no 自选 case]
       const to = ctx.chessRecord(original)?.diyFor ? null : mostBondMate(ctx, bonds);
+      // 只有六人座 R14 那枚信标是立即发放：最终攻势后没有下一次整备，直接把原干员（含精英）发给盟约队友。
+      // 立即发放失败则保留上游的下回合定时重试；普通/购买来的信标仍按下回合时机走。
+      if (to && ev.item.meta?.sixPlayerBeaconRound === 14) {
+        if (to.grantChess(original)) { to.giftTicker(ctx.name, original); return; }
+      }
       if (to) ctx.addEffect({ id: `gift:${ev.item.uid}`, key: 'effect:builtin_gift', hidden: true, battle: false, params: { toPlayerId: to.playerId, chessId: original, bonds } });
     },
   },

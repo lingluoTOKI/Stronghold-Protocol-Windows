@@ -242,7 +242,18 @@ export class Match {
     this.broadcastFn = opts.broadcast;
     this.onEndFn = opts.onEnd;
     this.data = opts.data && typeof opts.data === 'object' ? opts.data : {};
-    this.gd = new GameData(this.data, this.modeId);
+    // 六人座：开局占用席位数（人座 + AI 座，按 playerId 去重）一次性数出并传给 GameData。没有它
+    // startingPlayerCount 会退成 1，导致大房间悬赏补三张、六人血池翻倍与开局少 BAN 全部走单人分支。
+    // （choices.js largeRoomBountyCards / gamedata.js 六人血池与 openingBanCounts。）
+    const seenSeatIds = new Set();
+    let startingSeatCount = 0;
+    for (const s of opts.seats) {
+      if (!s || typeof s.playerId !== 'string' || seenSeatIds.has(s.playerId)) continue;
+      seenSeatIds.add(s.playerId);
+      startingSeatCount++;
+    }
+    this.startingPlayerCount = startingSeatCount;
+    this.gd = new GameData(this.data, this.modeId, this.startingPlayerCount);
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
     /** 「AI 队友最后选择」 (opts.aiPicksLast, GitHub #338): humans draft before AI seats (MatchPhases.humansFirst) */

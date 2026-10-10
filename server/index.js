@@ -23,6 +23,7 @@
 // The server only auto-listens when this file is the process entry point.
 
 import http from 'node:http';
+import path from 'node:path';
 import { getData, loadData } from './data.js';
 import { ROOT, listenAddress, bindCandidates, serveDirs, makeLogger, parseTrustProxy } from './http/config.js';
 import { WS_MAX_PAYLOAD, createSessionStack, attachWebSocket } from './http/websocket.js';
@@ -31,6 +32,7 @@ import { createPackRegistry } from './packs.js';
 import { MIME, COMPRESSIBLE, acceptsGzip, parseRange } from './http/files.js';
 import { BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag } from './http/buildTag.js';
 import { createRequestHandler } from './http/routes.js';
+import { createAnnouncements } from './http/announcements.js';
 import { answerClientError } from './http/common.js';
 import { lanUrls, displayHost, isProcessEntry, runMain } from './http/boot.js';
 
@@ -73,7 +75,10 @@ export async function startServer(opts = {}) {
   resetBuildTag();
   buildTag();
 
-  const server = http.createServer(createRequestHandler({ serveStatic, health: { startedAt, network, registry, lobby }, log }));
+  // 服务器公告栏（改编独有）：根目录 announcements.json，按 mtime 懒热读；缺失即空公告。
+  const announcements = createAnnouncements(path.join(ROOT, 'announcements.json'));
+
+  const server = http.createServer(createRequestHandler({ serveStatic, health: { startedAt, network, registry, lobby }, log, announcements }));
   server.on('clientError', answerClientError);
   const wss = attachWebSocket(server, { network, log });
 

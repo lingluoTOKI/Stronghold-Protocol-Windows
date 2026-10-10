@@ -99,7 +99,7 @@
 //     a player seat (the seat is kept and given back on resume).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
+import { ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, MATCH_TARGET, MATCH_TIMEOUT_MS } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
@@ -265,6 +265,13 @@ export class Lobby {
     this.graceTimers = new Map();
     /** @type {Map<string, NodeJS.Timeout>} deferred (coalesced) resyncs by playerId */
     this.resyncTimers = new Map();
+    // ---- 公共/快速匹配队列（改编独有；规格 C）：按难度一个 FIFO 桶，凑满 MATCH_TARGET 人即开 ----
+    /** @type {Map<string, string[]>} difficulty → 排队 playerId 列表（FIFO 桶） */
+    this.matchPool = new Map();
+    /** @type {Map<string, { difficulty: string, queuedAt: number, session: import('./net.js').Session }>} playerId → 排队元数据 */
+    this.matchMeta = new Map();
+    /** @type {Map<string, NodeJS.Timeout>} playerId → 匹配等待超时计时器 */
+    this.matchTimers = new Map();
     /** per-network limit warnings: at most one log line per 10 s (the rest are counted) */
     this.limitLog = { at: -Infinity, suppressed: 0 };
   }
@@ -350,9 +357,198 @@ export class Lobby {
       case 'room.diy': return this.diy(session, msg);
       case 'room.spectate': return this.spectate(session, msg);
       case 'room.removeSpectator': return this.removeSpectator(session, msg);
+      // 公共/快速匹配（改编独有；规格 C）
+      case 'match.enqueue': return this.matchEnqueue(session, msg);
+      case 'match.cancel': return this.matchCancel(session);
+      case 'match.topUp': return this.matchTopUp(session);
+      case 'match.startNow': return this.matchStartNow(session);
+      case 'match.waitMore': return this.matchWaitMore(session);
       default:
         if (typeof msg.t === 'string' && msg.t.startsWith('g.')) return this.routeGame(session, msg);
         return fail(ERR.BAD_MSG, `unhandled type ${String(msg.t).slice(0, 32)}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // 公共/快速匹配（改编独有；规格 C）：按难度一个 FIFO 桶。凑满 MATCH_TARGET 人即建房并立即开始；
+  // MATCH_TIMEOUT_MS 超时后玩家选择 match.waitMore（再等一个窗口）/ match.topUp（用 AI 补到 MATCH_TARGET 并开）/
+  // match.startNow（用当前排队人数直接开）。匹配房固定上限 MATCH_TARGET 人。
+  // ---------------------------------------------------------------------------------------------------
+
+  /** @param {import('./net.js').Session} session @param {{ difficulty: string, target?: number }} msg */
+  matchEnqueue(session, { difficulty }) {
+    // 仅合作匹配：在房间里的先退出来（同 create/join）；对局进行中必须先结束。
+    const cur = this.roomOf(session);
+    if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
+    if (cur) this.removeMember(cur, session.playerId);
+    // 幂等：重复排队只更新难度 / 重置计时器
+    this.matchRemove(session.playerId, { keepPool: true });
+    const pid = session.playerId;
+    if (!this.matchPool.has(difficulty)) this.matchPool.set(difficulty, []);
+    const bucket = this.matchPool.get(difficulty);
+    if (!bucket.includes(pid)) bucket.push(pid);
+    this.matchMeta.set(pid, { difficulty, queuedAt: this.now(), session });
+    this.startMatchTimer(pid, difficulty);
+    this.log.info(`[lobby] match ${pid.slice(0, 8)} queued (${difficulty}), ${bucket.length}/${MATCH_TARGET}`);
+    this.broadcastMatchStatus(difficulty);
+    this.tryMatch(difficulty);
+    return OK;
+  }
+
+  /** @param {import('./net.js').Session} session */
+  matchCancel(session) {
+    if (!this.matchMeta.has(session.playerId)) return fail(ERR.ALREADY, 'you are not matching');
+    this.matchRemove(session.playerId);
+    return OK;
+  }
+
+  /** 超时后选择用 AI 补位并立即开始。@param {import('./net.js').Session} session */
+  matchTopUp(session) {
+    const meta = this.matchMeta.get(session.playerId);
+    if (!meta) return fail(ERR.ALREADY, 'you are not matching');
+    return this.resolveMatch(meta.difficulty, { fillAI: true });
+  }
+
+  /** 超时后选择用当前排队人数立即开始（不用 AI）。@param {import('./net.js').Session} session */
+  matchStartNow(session) {
+    const meta = this.matchMeta.get(session.playerId);
+    if (!meta) return fail(ERR.ALREADY, 'you are not matching');
+    return this.resolveMatch(meta.difficulty, { fillAI: false });
+  }
+
+  /** 超时后选择继续再等一个 MATCH_TIMEOUT_MS 窗口。@param {import('./net.js').Session} session */
+  matchWaitMore(session) {
+    const meta = this.matchMeta.get(session.playerId);
+    if (!meta) return fail(ERR.ALREADY, 'you are not matching');
+    this.startMatchTimer(session.playerId, meta.difficulty);
+    return OK;
+  }
+
+  /** 把玩家从桶与元数据中移除。@returns {boolean} 之前是否在排队 */
+  matchRemove(playerId, { keepPool = false } = {}) {
+    const meta = this.matchMeta.get(playerId);
+    if (!meta) return false;
+    const bucket = this.matchPool.get(meta.difficulty);
+    if (bucket) {
+      const i = bucket.indexOf(playerId);
+      if (i >= 0) bucket.splice(i, 1);
+      if (bucket.length === 0) this.matchPool.delete(meta.difficulty);
+    }
+    this.matchMeta.delete(playerId);
+    this.clearMatchTimer(playerId);
+    if (!keepPool) this.broadcastMatchStatus(meta.difficulty);
+    return true;
+  }
+
+  /** (重)设某玩家的匹配等待计时器。 */
+  startMatchTimer(playerId, difficulty) {
+    this.clearMatchTimer(playerId);
+    const t = setTimeout(() => {
+      this.matchTimers.delete(playerId);
+      const meta = this.matchMeta.get(playerId);
+      if (!meta || meta.difficulty !== difficulty) return;
+      const bucket = this.matchPool.get(difficulty) || [];
+      if (meta.session && meta.session.connected) {
+        sendSession(meta.session, { t: 'match.timeout', difficulty, count: bucket.length, target: MATCH_TARGET });
+      }
+    }, MATCH_TIMEOUT_MS);
+    this.matchTimers.set(playerId, t);
+  }
+
+  clearMatchTimer(playerId) {
+    const t = this.matchTimers.get(playerId);
+    if (t) { clearTimeout(t); this.matchTimers.delete(playerId); }
+  }
+
+  /** 从整桶建房并立即开始（超时后的选择：fillAI=true 补 AI 到 MATCH_TARGET）。 */
+  resolveMatch(difficulty, { fillAI = false } = {}) {
+    const bucket = this.matchPool.get(difficulty);
+    if (!bucket || bucket.length === 0) return fail(ERR.ALREADY, 'no one else is queued');
+    const sessions = bucket.map((pid) => this.matchMeta.get(pid)?.session).filter(Boolean);
+    if (sessions.length === 0) { this.matchPool.delete(difficulty); return fail(ERR.ALREADY, 'no one else is queued'); }
+    for (const pid of bucket) { this.matchMeta.delete(pid); this.clearMatchTimer(pid); }
+    this.matchPool.delete(difficulty);
+    this.broadcastMatchStatus(difficulty);
+    const target = fillAI ? MATCH_TARGET : sessions.length;
+    const room = this.formMatchRoom(difficulty, sessions, target);
+    if (!room) {
+      // 回滚：谁都没进去，放回桶里继续等
+      for (const s of sessions) if (s.connected) this.matchEnqueue(s, { difficulty });
+      return fail(ERR.INTERNAL, 'could not form a room');
+    }
+    for (const s of sessions) if (s.connected) sendSession(s, { t: 'match.found', code: room.code, difficulty, target });
+    return this.startMatch(room);
+  }
+
+  /** 桶自行凑满 MATCH_TARGET 人：建房、广播并立即开始。 */
+  tryMatch(difficulty) {
+    const bucket = this.matchPool.get(difficulty);
+    if (!bucket || bucket.length < MATCH_TARGET) return;
+    const sessions = bucket.map((pid) => this.matchMeta.get(pid)?.session).filter(Boolean);
+    if (sessions.length < MATCH_TARGET) return;
+    for (const pid of bucket) { this.matchMeta.delete(pid); this.clearMatchTimer(pid); }
+    this.matchPool.delete(difficulty);
+    this.broadcastMatchStatus(difficulty);
+    const room = this.formMatchRoom(difficulty, sessions, MATCH_TARGET);
+    if (!room) {
+      for (const s of sessions) if (s.connected) this.matchEnqueue(s, { difficulty });
+      return;
+    }
+    for (const s of sessions) if (s.connected) sendSession(s, { t: 'match.found', code: room.code, difficulty, target: MATCH_TARGET });
+    this.startMatch(room);
+  }
+
+  /**
+   * 建一个合作房并把这些 session 坐进去（第一个是房主）。所有匹配进来的人都已 ready（自动开始）。
+   * topUp 时用 AI 把空座补到 target。@returns {Room | null}
+   */
+  formMatchRoom(difficulty, sessions, target) {
+    if (this.rooms.size >= this.opts.maxRooms) return null;
+    const code = this.genCode();
+    if (!code) return null;
+    const room = new Room(code, 'coop', difficulty, this.now());
+    room.seats[0] = this.humanSeat(0, sessions[0]);
+    room.seats[0].ready = true; // 匹配进来的人都已 ready（自动开始）
+    room.hostId = sessions[0].playerId;
+    this.rooms.set(code, room);
+    sessions[0].roomCode = code;
+    sessions[0].notice = null;
+    sessions[0].pendingResult = null;
+    for (let i = 1; i < sessions.length; i++) {
+      const s = sessions[i];
+      const idx = room.freeSeat();
+      if (idx < 0) break;
+      room.seats[idx] = this.humanSeat(idx, s);
+      room.seats[idx].ready = true;
+      s.roomCode = code;
+      s.notice = null;
+      s.pendingResult = null;
+    }
+    // topUp：用 AI 把空座补到 target
+    const used = new Set(room.seats.filter((x) => x && x.isBot).map((x) => x.name));
+    let seated = room.seats.filter((x) => x && x.seat != null).length;
+    while (room.freeSeat() >= 0 && seated < target) {
+      const idx = room.freeSeat();
+      const name = BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`;
+      let playerId;
+      do playerId = 'ai_' + randomBytes(4).toString('hex'); while (room.seatOf(playerId));
+      room.seats[idx] = { seat: idx, playerId, name, isBot: true, ready: true, connected: true, left: false };
+      used.add(name);
+      seated++;
+    }
+    this.log.info(`[lobby] match ${code} formed (${difficulty}) by ${sessions.map((s) => s.name).join(', ')}`);
+    this.broadcastState(room);
+    return room;
+  }
+
+  /** 把某难度桶当前排队人数广播给桶内所有人。 */
+  broadcastMatchStatus(difficulty) {
+    const bucket = this.matchPool.get(difficulty) || [];
+    for (const pid of bucket) {
+      const meta = this.matchMeta.get(pid);
+      if (meta && meta.session && meta.session.connected) {
+        sendSession(meta.session, { t: 'match.status', difficulty, count: bucket.length, target: MATCH_TARGET });
+      }
     }
   }
 
@@ -392,6 +588,8 @@ export class Lobby {
     this.graceTimers.clear();
     for (const t of this.resyncTimers.values()) clearTimeout(t);
     this.resyncTimers.clear();
+    for (const t of this.matchTimers.values()) clearTimeout(t);
+    this.matchTimers.clear();
   }
 
   // ---------------------------------------------------------------------------------------------------
