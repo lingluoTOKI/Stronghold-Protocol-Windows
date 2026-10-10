@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>卫戍协议 · 服务器监控大屏</title>
+<style>
+  :root{
+    --bg:#0a0f15; --panel:#111c28; --panel2:#162230; --panel3:#0d1620; --line:#213349;
+    --txt:#e8f0f8; --dim:#87a0ba; --muted:#5b7390;
+    --accent:#3fd8a5; --accent2:#3fb6f0; --warn:#ffb84d; --danger:#ff6b6b; --violet:#b18cff;
+    --ok:#3fd8a5; --down:#ff6b6b;
+    --grad:linear-gradient(135deg,#13283d,#0e1722);
+    --shadow:0 10px 34px rgba(0,0,0,.42);
+    --r:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:
+      radial-gradient(1000px 540px at 84% -12%, rgba(63,182,240,.12), transparent 62%),
+      radial-gradient(760px 460px at 0% 0%, rgba(63,216,165,.09), transparent 55%),
+      radial-gradient(700px 500px at 100% 100%, rgba(177,140,255,.06), transparent 60%),
+      var(--bg);
+    color:var(--txt); font:14px/1.55 "Noto Sans SC", system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+    min-height:100vh; padding:18px;
+  }
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+  .head-l{display:flex;flex-direction:column;gap:2px}
+  h1{font-size:21px;letter-spacing:2px;font-weight:800;line-height:1.2;color:transparent;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text}
+  .head-sub{font-size:11px;color:var(--muted);letter-spacing:1px}
+  .adminbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--dim)}
+  .adminbar input{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:8px 12px;width:210px;font-size:12px;transition:border-color .2s}
+  .adminbar input:focus{outline:none;border-color:var(--accent)}
+  button.primary{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;font-size:12px;transition:all .2s}
+  button.primary:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+  .clock{font-variant-numeric:tabular-nums;font-size:12px;color:var(--accent2);min-width:64px;text-align:right}
+
+  .panel{background:linear-gradient(160deg,var(--panel),var(--panel3));border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+
+  /* ============ 公告编辑器 ============ */
+  .ann-editor{padding:16px 18px;margin-bottom:14px}
+  .ann-editor__hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .ann-editor__hd .t{font-size:15px;font-weight:700;color:var(--warn);letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+  .ann-editor__grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:12px}
+  .ann-editor label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--dim)}
+  .ann-editor input,.ann-editor textarea{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;transition:border-color .2s}
+  .ann-editor input:focus,.ann-editor textarea:focus{outline:none;border-color:var(--accent)}
+  .ann-editor textarea{resize:vertical;min-height:64px}
+  .ann-editor .chk{flex-direction:row;align-items:center;gap:8px;font-size:12px;color:var(--txt);align-self:end}
+  .ann-editor .chk input{width:auto;accent-color:var(--warn)}
+  .ann-editor__actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  .ann-editor button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;transition:all .2s}
+  .ann-editor button.b-pub{background:linear-gradient(135deg,rgba(255,184,77,.2),rgba(255,184,77,.08));border-color:rgba(255,184,77,.55);color:var(--warn)}
+  .ann-editor button.b-clr{background:rgba(255,107,107,.12);border-color:var(--danger);color:var(--danger)}
+  .ann-editor button:hover{filter:brightness(1.15);transform:translateY(-1px)}
+  .ann-targets{display:inline-flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .ann-targets label{flex-direction:row;align-items:center;gap:5px;font-size:11px;color:var(--dim);cursor:pointer}
+  .ann-targets input{width:auto;accent-color:var(--warn)}
+
+  /* ============ 服务器全局操作 ============ */
+  .adminops{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 18px;margin-bottom:14px;font-size:13px}
+  .adminops .ao-label{color:var(--dim);font-weight:700;margin-right:4px}
+  .adminops button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 16px;cursor:pointer;font-size:13px;transition:all .2s}
+  .adminops button.b-kick{background:rgba(255,107,107,.12);border-color:var(--danger);color:var(--danger)}
+  .adminops button:hover{filter:brightness(1.15)}
+  .adminops .ao-result{color:var(--dim);font-size:12px;margin-left:auto;white-space:nowrap}
+
+  .lt-banner{background:rgba(255,184,77,.1);border:1px dashed rgba(255,184,77,.5);color:var(--warn);border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:13px}
+
+  /* ============ 总览 ============ */
+  .total{display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 24px;margin-bottom:14px}
+  .total .main{display:flex;align-items:center;gap:20px}
+  .total .num{font-size:46px;font-weight:800;line-height:1;color:transparent;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;font-variant-numeric:tabular-nums}
+  .total .label{color:var(--dim);font-size:12px;margin-top:4px}
+  .total .right{display:flex;gap:26px}
+  .total .right div{text-align:center}
+  .total .right .n{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .svrchips{display:flex;gap:8px;flex-wrap:wrap}
+  .svrchip{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
+  .svrchip .d{width:8px;height:8px;border-radius:50%}
+  .svrchip.up .d{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .svrchip.down .d{background:var(--down);box-shadow:0 0 8px var(--down)}
+  .svrchip.up{color:var(--ok);border-color:rgba(63,216,165,.4)}
+  .svrchip.down{color:var(--down);border-color:rgba(255,107,107,.4)}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
+  .grid.single{grid-template-columns:1fr}
+  .grid.local{grid-template-columns:1fr 1fr}
+  .svr{padding:20px;position:relative}
+  .svr.offline{opacity:.55}
+  .svr .banner{position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r) var(--r) 0 0;background:var(--ok)}
+  .svr.offline .banner{background:var(--down)}
+  .svr h2{font-size:16px;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+  .svr h2 .role{font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;letter-spacing:.5px}
+  .role.main{color:var(--accent);border:1px solid rgba(63,216,165,.45);background:rgba(63,216,165,.1)}
+  .role.alliance{color:var(--violet);border:1px solid rgba(177,140,255,.45);background:rgba(177,140,255,.1)}
+  .role.backup{color:var(--dim);border:1px solid var(--line);background:rgba(34,48,71,.4)}
+  .svr .url{color:var(--muted);font-size:11px;word-break:break-all;margin-bottom:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .svr .lat{color:var(--accent2);font-size:11px;white-space:nowrap}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);flex:none}
+  .dot.off{background:var(--danger);box-shadow:0 0 10px var(--danger)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;position:relative}
+  .stat .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stat .k{font-size:11px;color:var(--dim);margin-top:2px}
+  .stat.hi .v{color:var(--accent)}
+  .stat.warn .v{color:var(--warn)}
+  .chart{margin-top:12px;height:52px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .chart svg{width:100%;height:100%;display:block}
+  .footer{display:flex;justify-content:space-between;margin-top:10px;color:var(--muted);font-size:11px}
+
+  /* ============ 房间对局 ============ */
+  .rooms{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}
+  .rooms h3{font-size:12px;color:var(--dim);font-weight:500;margin-bottom:10px;display:flex;justify-content:space-between}
+  .rooms .list{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:2px}
+  .room-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:rgba(22,34,48,.5)}
+  .room-card.is-match{border-color:rgba(255,184,77,.55);background:rgba(255,184,77,.07)}
+  .rc__hd{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px;flex-wrap:wrap}
+  .rc__code{font-weight:700;color:var(--txt);letter-spacing:.5px;font-size:15px;font-variant-numeric:tabular-nums}
+  .rc__tag{font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);color:var(--dim)}
+  .rc__tag.on{color:var(--warn);border-color:rgba(255,184,77,.5);background:rgba(255,184,77,.1)}
+  .rc__meta{color:var(--muted);font-size:11px;margin-left:auto}
+  .rc__body{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .rc__phase{padding:3px 12px;border-radius:12px;font-size:11px;font-weight:600}
+  .rc__phase.p-LOBBY,.rc__phase.p-RESULT{color:var(--dim);border:1px solid var(--line)}
+  .rc__phase.p-INFO_CHECK,.rc__phase.p-BAND_DRAFT,.rc__phase.p-BATTLE_CHECK{color:#5aa7ff;border:1px solid rgba(90,167,255,.4);background:rgba(90,167,255,.1)}
+  .rc__phase.p-ROUND_START,.rc__phase.p-PREP{color:var(--accent);border:1px solid rgba(63,216,165,.4);background:rgba(63,216,165,.1)}
+  .rc__phase.p-COMBAT,.rc__phase.p-FINAL_ASSAULT,.rc__phase.p-HIDDEN_CORE{color:var(--danger);border:1px solid rgba(255,107,107,.4);background:rgba(255,107,107,.12)}
+  .rc__phase.p-SP_DRAFT,.rc__phase.p-UNITE{color:var(--violet);border:1px solid rgba(177,140,255,.4);background:rgba(177,140,255,.1)}
+  .rc__phase.p-SETTLE{color:var(--warn);border:1px solid rgba(255,184,77,.4);background:rgba(255,184,77,.1)}
+  .rc__round{font-size:13px;color:var(--txt);font-weight:600}
+  .rc__ppl{color:var(--dim);font-size:11px}
+  .rc__bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:10px}
+  .rc__bar-in{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--warn));transition:width .4s}
+  .rc__players{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px}
+  .kickroom-mini{margin-left:auto;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:2px 10px;font-size:11px;cursor:pointer;transition:all .2s}
+  .kickroom-mini:hover{background:var(--danger);color:#fff}
+
+  /* ============ 在线玩家 ============ */
+  .players{margin-top:14px;border-top:1px dashed var(--line);padding-top:10px}
+  .players h3{font-size:12px;color:var(--dim);font-weight:500;margin-bottom:10px;display:flex;justify-content:space-between}
+  .players .list{max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px}
+  .p{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px}
+  .p .nm{color:var(--txt);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .p .rc{color:var(--accent);font-size:11px}
+  .p .ip{color:var(--dim);font-size:11px}
+  .p button{background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;transition:all .2s}
+  .p button:hover{background:var(--danger);color:#fff}
+  .p button:disabled{opacity:.4;cursor:not-allowed}
+  .empty{color:var(--dim);font-size:11px;opacity:.7;padding:6px 0}
+  .rg{background:rgba(24,34,49,.4);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:10px}
+  .rg.is-match{border-color:rgba(255,184,77,.45)}
+  .rg__hd{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px}
+  .rg__tt{font-weight:600;color:var(--txt);letter-spacing:.5px}
+  .rg__tag{font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);color:var(--dim)}
+  .rg__tag.on{color:var(--warn);border-color:rgba(255,184,77,.5);background:rgba(255,184,77,.1)}
+  .rg__cnt{color:var(--dim);font-size:11px;margin-left:auto}
+
+  .upd{color:var(--muted);font-size:11px;text-align:right;margin-top:10px}
+
+  @media(max-width:1180px){ .grid{grid-template-columns:1fr 1fr} }
+  @media(max-width:820px){
+    .grid{grid-template-columns:1fr}
+    .ann-editor__grid{grid-template-columns:1fr 1fr}
+  }
+  @media(max-width:640px){
+    body{padding:12px}
+    header{align-items:flex-start}
+    h1{font-size:18px}
+    .adminbar{width:100%}
+    .adminbar input{flex:1;width:100%;min-width:0}
+    .ann-editor__grid{grid-template-columns:1fr}
+    .total{flex-direction:column;align-items:flex-start;gap:14px;padding:14px 16px}
+    .total .num{font-size:38px}
+    .total .right{width:100%;justify-content:space-between;gap:10px}
+    .total .right .n{font-size:18px}
+    .stats{gap:8px}
+    .stat{padding:9px}
+    .stat .v{font-size:20px}
+    .svr{padding:16px}
+    .p{grid-template-columns:1fr auto auto}
+    .p .ip{display:none}
+    .adminops .ao-result{margin-left:0;white-space:normal}
+    .ann-editor__actions .chk{order:-1;width:100%}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="head-l">
+    <h1>卫戍协议 · 联机监控大屏</h1>
+    <div class="head-sub">STRONGHOLD PROTOCOL · SERVER OPS</div>
+  </div>
+  <div class="adminbar">
+    admin token:
+    <input id="token" type="password" placeholder="SP_ADMIN_TOKEN（留空=只读）" />
+    <button class="primary" onclick="saveToken()">保存</button>
+    <button class="primary" onclick="toggleIpMode()" id="ipModeBtn">IP: 星号屏蔽</button>
+    <button class="primary" onclick="toggleLocalTest()" id="localTestBtn">本地测试: 关</button>
+    <span class="clock" id="ts">--:--:--</span>
+  </div>
+</header>
+
+<div id="localTestBanner" class="lt-banner" style="display:none">🧪 本地测试模式：以本机跑起的服务器为数据源（默认 127.0.0.1:3000 与 127.0.0.1:3001），不连公网；请在 admin token 框输入对应本地服务器的 token。</div>
+
+<div class="ann-editor panel">
+  <div class="ann-editor__hd">
+    <span class="t">📢 公告编辑器</span>
+    <span class="ann-targets">
+      <label><input type="checkbox" id="annT0" checked /> 上海·主服(3000)</label>
+      <label><input type="checkbox" id="annT1" /> 3001·独立部署</label>
+      <label><input type="checkbox" id="annT2" checked /> 杭州·备用服</label>
+    </span>
+    <span id="annLast" style="color:var(--dim);font-size:11px"></span>
+  </div>
+  <div class="ann-editor__grid">
+    <label>公告标题 <input id="annTitle" value="服务器即将更新维护" /></label>
+    <label>上架时间（留空=立即） <input id="annStart" type="datetime-local" /></label>
+    <label>下架时间（留空=永久） <input id="annExpire" type="datetime-local" /></label>
+  </div>
+  <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)">公告正文
+    <textarea id="annContent" rows="3">服务器即将进行版本更新维护，更新期间可能出现短暂断线。
+请提前保存好对局进度，如遇断线请稍后重新连接。
+给您带来不便敬请谅解。</textarea>
+  </label>
+  <div class="ann-editor__actions">
+    <label class="chk"><input id="annForce" type="checkbox" checked /> 强制弹窗（玩家进游戏必弹）</label>
+    <button class="b-pub" onclick="publishAnnounce()">发布公告</button>
+    <button class="b-clr" onclick="announceClearAll()">撤回全部强制公告</button>
+    <button onclick="resetAnnounce()">清空表单</button>
+    <span id="annMsg" style="color:var(--dim);font-size:12px;margin-left:auto"></span>
+  </div>
+</div>
+
+<div class="adminops panel">
+  <span class="ao-label">服务器全局操作</span>
+  <button class="b-kick" onclick="kickAll()">⚠️ 一键踢所有人（封禁10分钟）</button>
+  <span id="adminOpResult" class="ao-result"></span>
+</div>
+
+<div class="total panel">
+  <div class="main">
+    <div>
+      <div class="num" id="totalOnline">--</div>
+      <div class="label" id="totalLabel">三台服务器在线连接总数</div>
+    </div>
+    <div class="svrchips" id="svrchips"></div>
+  </div>
+  <div class="right">
+    <div><div class="n" id="totalHumans">--</div><div class="label">真人</div></div>
+    <div><div class="n" id="totalRooms">--</div><div class="label">房间</div></div>
+    <div><div class="n" id="totalMatches">--</div><div class="label">对局中</div></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="svr panel" id="svr0">
+    <div class="banner"></div>
+    <h2><span class="dot" id="dot0"></span>上海 · 主服<span class="role main">主服</span></h2>
+    <div class="url"><span id="url0">http://101.132.104.41:3000</span><span class="lat" id="lat0"></span></div>
+    <div class="stats">
+      <div class="stat hi"><div class="v" id="s0_sockets">--</div><div class="k">在线连接</div></div>
+      <div class="stat"><div class="v" id="s0_humans">--</div><div class="k">真人</div></div>
+      <div class="stat"><div class="v" id="s0_bots">--</div><div class="k">AI</div></div>
+      <div class="stat"><div class="v" id="s0_rooms">--</div><div class="k">房间</div></div>
+      <div class="stat warn"><div class="v" id="s0_matches">--</div><div class="k">对局</div></div>
+      <div class="stat"><div class="v" id="s0_spect">--</div><div class="k">观战</div></div>
+    </div>
+    <div class="chart" id="ch0"></div>
+    <div class="footer"><span id="s0_uptime">运行 --</span><span id="s0_build">--</span></div>
+    <div class="rooms">
+      <h3><span>🏠 房间对局 · 在线玩家</span><span id="s0_rcount"></span></h3>
+      <div class="list" id="s0_roomlist"><div class="empty">输入 admin token 后显示</div></div>
+    </div>
+  </div>
+
+  <div class="svr panel" id="svr1">
+    <div class="banner"></div>
+    <h2><span class="dot" id="dot1"></span>3001 · 独立部署<span class="role alliance">独立</span></h2>
+    <div class="url"><span id="url1">http://101.132.104.41:3001</span><span class="lat" id="lat1"></span></div>
+    <div class="stats">
+      <div class="stat hi"><div class="v" id="s1_sockets">--</div><div class="k">在线连接</div></div>
+      <div class="stat"><div class="v" id="s1_humans">--</div><div class="k">真人</div></div>
+      <div class="stat"><div class="v" id="s1_bots">--</div><div class="k">AI</div></div>
+      <div class="stat"><div class="v" id="s1_rooms">--</div><div class="k">房间</div></div>
+      <div class="stat warn"><div class="v" id="s1_matches">--</div><div class="k">对局</div></div>
+      <div class="stat"><div class="v" id="s1_spect">--</div><div class="k">观战</div></div>
+    </div>
+    <div class="chart" id="ch1"></div>
+    <div class="footer"><span id="s1_uptime">运行 --</span><span id="s1_build">--</span></div>
+    <div class="rooms">
+      <h3><span>🏠 房间对局 · 在线玩家</span><span id="s1_rcount"></span></h3>
+      <div class="list" id="s1_roomlist"><div class="empty">输入 admin token 后显示</div></div>
+    </div>
+  </div>
+
+  <div class="svr panel" id="svr2">
+    <div class="banner"></div>
+    <h2><span class="dot" id="dot2"></span>杭州 · 备用服<span class="role backup">备用</span></h2>
+    <div class="url"><span id="url2">http://116.62.39.28:3000</span><span class="lat" id="lat2"></span></div>
+    <div class="stats">
+      <div class="stat hi"><div class="v" id="s2_sockets">--</div><div class="k">在线连接</div></div>
+      <div class="stat"><div class="v" id="s2_humans">--</div><div class="k">真人</div></div>
+      <div class="stat"><div class="v" id="s2_bots">--</div><div class="k">AI</div></div>
+      <div class="stat"><div class="v" id="s2_rooms">--</div><div class="k">房间</div></div>
+      <div class="stat warn"><div class="v" id="s2_matches">--</div><div class="k">对局</div></div>
+      <div class="stat"><div class="v" id="s2_spect">--</div><div class="k">观战</div></div>
+    </div>
+    <div class="chart" id="ch2"></div>
+    <div class="footer"><span id="s2_uptime">运行 --</span><span id="s2_build">--</span></div>
+    <div class="rooms">
+      <h3><span>🏠 房间对局 · 在线玩家</span><span id="s2_rcount"></span></h3>
+      <div class="list" id="s2_roomlist"><div class="empty">输入 admin token 后显示</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="upd" id="updInfo"></div>
+
+<script>
+// 主服（上海 3000）/ 3001 独立部署 / 备用服（杭州）：域名访问走同源 HTTPS 反代（/alliance、/backup），否则直连 IP:端口。
+const onDomain = location.hostname === 'game.lingluotoki.dpdns.org';
+const MAIN_BASE = onDomain ? location.origin : 'http://101.132.104.41:3000';
+const ALLIANCE_BASE = onDomain ? location.origin + '/alliance' : 'http://101.132.104.41:3001';
+const BACKUP_BASE = onDomain ? location.origin + '/backup' : 'http://116.62.39.28:3000';
+const SRVS = [
+  { base: MAIN_BASE,    el:'0', role:'main',     label:'上海 · 主服',       url:'http://101.132.104.41:3000' },
+  { base: ALLIANCE_BASE, el:'1', role:'alliance', label:'3001 · 独立部署',   url:'http://101.132.104.41:3001' },
+  { base: BACKUP_BASE,  el:'2', role:'backup',   label:'杭州 · 备用服',     url:'http://116.62.39.28:3000' },
+];
+// 公告目标：主服 + 备用服（两台都是莱茵版 0.2.2，内容一致，公告需要同步）
+// 3001 是独立部署、版本落后，不纳入公告推送。
+const ANNOUNCE_SRVS = [SRVS[0], SRVS[2]];
+
+let ipPlain = localStorage.getItem('sp_ip_plain') === '1';
+const MASK_HOST = '***.***.***.***';
+let localTest = localStorage.getItem('sp_local_test') === '1';
+let localBase  = localStorage.getItem('sp_local_base')  || 'http://127.0.0.1:3000';
+let localBase2 = localStorage.getItem('sp_local_base2') || 'http://127.0.0.1:3001';
+// 本地测试：本机同时跑 3000（莱茵）与 3001（盟约）两台，都纳入监控
+function activeSrvs(){
+  if(!localTest) return SRVS;
+  return [
+    { base: localBase,  el:'0', role:'main',     label:'上海 · 主服',     url:localBase  },
+    { base: localBase2, el:'1', role:'alliance', label:'3001 · 独立部署', url:localBase2 },
+  ];
+}
+function announceSrvs(){
+  if(localTest){
+    // 本地测试：勾选「主服」= 本地3000、「盟约」= 本地3001；「备用」不适用
+    const targets = [];
+    if($('annT0').checked) targets.push({ base: localBase,  el:'0' });
+    if($('annT1').checked) targets.push({ base: localBase2, el:'1' });
+    return targets;
+  }
+  const sel = [$('annT0').checked, $('annT1').checked, $('annT2').checked];
+  return SRVS.filter((s,i)=> sel[i] && ANNOUNCE_SRVS.includes(s));
+}
+
+const history = { 0:[], 1:[], 2:[] };
+const $ = id => document.getElementById(id);
+let lastUpdated = null;
+
+const PHASE_CN = {
+  LOBBY:'等待中', INFO_CHECK:'确认本局信息', BAND_DRAFT:'选择策略', BATTLE_CHECK:'协议启动',
+  ROUND_START:'回合开始', SP_DRAFT:'机变阶段', PREP:'休整期', COMBAT:'作战中', UNITE:'联防阶段',
+  SETTLE:'结算', RESULT:'对局结束', FINAL_ASSAULT:'最终突袭', HIDDEN_CORE:'隐藏核心'
+};
+const ROUND_REF = 12;
+
+function saveToken(){
+  localStorage.setItem('sp_admin_token', $('token').value.trim());
+  $('annMsg').innerHTML = '<span style="color:#4f8">✅ token 已保存（仅存本机浏览器）</span>';
+}
+$('token').value = localStorage.getItem('sp_admin_token') || '';
+
+function maskHost(url){ return url.replace(/^(https?:\/\/)[^/:]+/, `$1${MASK_HOST}`); }
+function maskAddr(s){ return /^\d{1,3}(\.\d{1,3}){3}$/.test(s || '') ? MASK_HOST : s; }
+
+function renderIpMode(){
+  const act = activeSrvs();
+  act.forEach((s,i)=>{
+    const el = $('url'+s.el);
+    if(el) el.textContent = ipPlain ? s.base : maskHost(s.base);
+  });
+  $('ipModeBtn').textContent = ipPlain ? 'IP: 明文（点击屏蔽）' : 'IP: 星号屏蔽（点击看明文）';
+  document.querySelectorAll('.p .ip').forEach((el) => {
+    el.textContent = ipPlain ? el.dataset.raw : maskAddr(el.dataset.raw);
+  });
+}
+function toggleIpMode(){
+  ipPlain = !ipPlain;
+  localStorage.setItem('sp_ip_plain', ipPlain ? '1' : '0');
+  renderIpMode();
+}
+
+function toggleLocalTest(){
+  localTest = !localTest;
+  localStorage.setItem('sp_local_test', localTest ? '1' : '0');
+  renderLocalTest();
+  tick();
+}
+function renderLocalTest(){
+  const on = localTest;
+  $('localTestBtn').textContent = '本地测试: ' + (on ? '开' : '关');
+  $('localTestBanner').style.display = on ? '' : 'none';
+  document.querySelector('.grid').classList.toggle('single', on);
+  document.querySelector('.grid').classList.toggle('local', on);
+  // 本地测试：显示 3000 + 3001 两台，隐藏备用卡；正常模式三台全显
+  ['1','2'].forEach(el=>{ const n=$('svr'+el); if(n) n.style.display = (on && el==='2') ? 'none' : ''; });
+  const totalLabel = $('totalLabel');
+  if(totalLabel) totalLabel.textContent = on ? '本地测试服务器在线连接总数' : '三台服务器在线连接总数';
+  renderIpMode();
+}
+
+async function adminFetch(svr, path){
+  const token = $('token').value.trim();
+  if(!token) throw new Error('请先输入并保存 admin token');
+  const sep = path.includes('?') ? '&' : '?';
+  const r = await fetch(`${svr.base}${path}${sep}token=${encodeURIComponent(token)}`, { cache:'no-store' });
+  return await r.json().catch(()=>({}));
+}
+
+function dtToMs(v){ if(!v) return undefined; const d = new Date(v); return isNaN(d.getTime()) ? undefined : d.getTime(); }
+
+// ============ 公告编辑器 ============
+async function publishAnnounce(){
+  const title = ($('annTitle').value || '').trim() || '服务器更新公告';
+  const content = ($('annContent').value || '').trim();
+  if(!content){ alert('请输入公告正文'); return; }
+  const force = $('annForce').checked;
+  const startAt = dtToMs($('annStart').value);
+  const expireAt = dtToMs($('annExpire').value);
+  if(startAt && expireAt && expireAt <= startAt){ alert('下架时间必须晚于上架时间'); return; }
+  const targets = announceSrvs();
+  if(!targets.length){ alert('请至少勾选一个公告目标服务器'); return; }
+  let path = `/api/admin/announce?title=${encodeURIComponent(title)}&content=${encodeURIComponent(content)}&force=${force?'true':'false'}`;
+  if(startAt) path += `&startAt=${startAt}`;
+  if(expireAt) path += `&expireAt=${expireAt}`;
+  const mode = force ? '强制弹窗公告' : '普通公告';
+  if(!confirm(`确认发布【${mode}】到 ${targets.length} 台服务器？\n标题：${title}\n上架：${$('annStart').value || '立即'}${expireAt? '  下架：'+$('annExpire').value : ''}`)) return;
+  const msg = $('annMsg');
+  msg.textContent = '发布中…';
+  let ok=0, fail=0; const msgs=[];
+  for(const svr of targets){
+    try{ const j = await adminFetch(svr, path); if(j.ok) ok++; else { fail++; msgs.push(`${svr.base}: ${j.error||'发布失败'}`); } }
+    catch(e){ fail++; msgs.push(`${svr.base}: ${e.message}`); }
+  }
+  msg.innerHTML = ok
+    ? `<span style="color:#4f8">✅ ${mode}已发布到 ${ok} 台服务器${force? '，客户端进游戏即强制弹窗':''}</span>`
+    : `<span style="color:#f44">❌ 发布失败（${fail} 台）</span>`;
+  msg.title = msgs.join('\n');
+  tick();
+}
+
+async function announceClearAll(){
+  const targets = announceSrvs();
+  if(!targets.length){ alert('请至少勾选一个公告目标服务器'); return; }
+  if(!confirm(`确认撤回全部强制公告（${targets.length} 台服务器）？\n客户端将不再强制弹出更新弹窗（普通公告保留）。`)) return;
+  const msg = $('annMsg');
+  msg.textContent = '撤回中…';
+  let ok=0, fail=0, removed=0; const msgs=[];
+  for(const svr of targets){
+    try{ const j = await adminFetch(svr, '/api/admin/announce-clear'); if(j.ok){ ok++; removed += j.removed||0; } else { fail++; msgs.push(`${svr.base}: ${j.error||'撤回失败'}`); } }
+    catch(e){ fail++; msgs.push(`${svr.base}: ${e.message}`); }
+  }
+  msg.innerHTML = ok
+    ? `<span style="color:#4f8">✅ 已撤回 ${ok} 台服务器的强制公告（移除 ${removed} 条）</span>`
+    : `<span style="color:#f44">❌ 撤回失败（${fail} 台）</span>`;
+  msg.title = msgs.join('\n');
+  tick();
+}
+
+function resetAnnounce(){
+  $('annTitle').value = '服务器即将更新维护';
+  $('annContent').value = '服务器即将进行版本更新维护，更新期间可能出现短暂断线。\n请提前保存好对局进度，如遇断线请稍后重新连接。\n给您带来不便敬请谅解。';
+  $('annStart').value = ''; $('annExpire').value = ''; $('annForce').checked = true;
+  $('annMsg').textContent = '';
+}
+
+// ============ 一键踢所有人 ============
+async function kickAll(){
+  const act = activeSrvs();
+  if(!confirm(`确认执行：踢掉 ${act.length} 台服务器上所有在线玩家，并在 10 分钟内禁止重连？此操作不可撤销！`)) return;
+  const out = $('adminOpResult');
+  out.textContent = '执行中…';
+  let total=0, fail=0; const msgs=[];
+  for(const svr of act){
+    try{ const j = await adminFetch(svr, '/api/admin/kickall'); if(j.ok) total += j.kicked||0; else { fail++; msgs.push(`${svr.base}: ${j.error||'执行失败'}`); } }
+    catch(e){ fail++; msgs.push(`${svr.base}: ${e.message}`); }
+  }
+  out.innerHTML = fail
+    ? `<span style="color:#f88">⚠️ 已踢 ${total} 人，${fail} 台服务器执行失败</span>`
+    : `<span style="color:#4f8">✅ 已踢出全部 ${total} 名在线玩家，10 分钟内禁止重连</span>`;
+  out.title = msgs.join('\n');
+  tick();
+}
+
+function fmtUptime(s){
+  if(s==null) return '--';
+  s = Math.floor(s);
+  const d = Math.floor(s/86400); s%=86400;
+  const h = Math.floor(s/3600); s%=3600;
+  const m = Math.floor(s/60);
+  return (d? d+'天 ':'') + (h? h+'时 ':'') + m+'分';
+}
+function drawChart(el, data){
+  const w = el.clientWidth, h = el.clientHeight;
+  if(data.length < 2){ el.innerHTML=''; return; }
+  const max = Math.max(4, ...data);
+  const step = w/(data.length-1);
+  const pts = data.map((v,i)=>`${(i*step).toFixed(1)},${(h - v/max*(h-6) - 3).toFixed(1)}`).join(' ');
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="#4ed8af" stroke-width="2" opacity=".8"/></svg>`;
+}
+
+async function fetchHealth(svr){
+  const el = svr.el;
+  const t0 = performance.now();
+  try{
+    const r = await fetch(svr.base+'/healthz', {cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const lat = Math.round(performance.now()-t0);
+    $('dot'+el).classList.remove('off');
+    $('svr'+el).classList.remove('offline');
+    $('lat'+el).textContent = lat + 'ms';
+    $('s'+el+'_sockets').textContent = j.sockets ?? '--';
+    $('s'+el+'_humans').textContent  = j.humans ?? '--';
+    $('s'+el+'_bots').textContent    = j.bots ?? '--';
+    $('s'+el+'_rooms').textContent  = j.rooms ?? '--';
+    $('s'+el+'_matches').textContent = j.matches ?? '--';
+    $('s'+el+'_spect').textContent  = j.spectators ?? 0;
+    $('s'+el+'_uptime').textContent = '运行 ' + fmtUptime(j.uptimeSec);
+    $('s'+el+'_build').textContent  = 'build ' + (j.build||'--').slice(0,8);
+    history[el].push(j.sockets||0);
+    if(history[el].length > 40) history[el].shift();
+    drawChart($('ch'+el), history[el]);
+    return j;
+  }catch(e){
+    $('dot'+el).classList.add('off');
+    $('svr'+el).classList.add('offline');
+    $('lat'+el).textContent = '';
+    ['sockets','humans','bots','rooms','matches','spect'].forEach(k=>{ $('s'+el+'_'+k).textContent='×'; });
+    $('s'+el+'_uptime').textContent = '离线';
+    return null;
+  }
+}
+
+// ============ 房间对局 + 在线玩家 合并渲染 ============
+const roomData = {
+  0:{ rooms:null, groups:new Map(), lobby:[], playersUnsupported:false },
+  1:{ rooms:null, groups:new Map(), lobby:[], playersUnsupported:false },
+  2:{ rooms:null, groups:new Map(), lobby:[], playersUnsupported:false },
+};
+
+async function fetchRooms(svr){
+  const el = svr.el;
+  const token = $('token').value.trim();
+  const d = roomData[el];
+  if(!token){ d.rooms=null; renderCombined(el); return; }
+  try{
+    const r = await fetch(`${svr.base}/api/admin/rooms?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    if(r.status === 403){ renderCombined(el,'token 错误或服务器未配置 SP_ADMIN_TOKEN'); return; }
+    if(r.status === 404 || r.status === 405){ d.rooms=null; renderCombined(el); return; }
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    d.rooms = j.rooms || [];
+  }catch(e){ d.rooms=null; }
+  renderCombined(el);
+}
+
+async function fetchPlayers(svr){
+  const el = svr.el;
+  const token = $('token').value.trim();
+  const d = roomData[el];
+  if(!token){ d.groups=new Map(); d.lobby=[]; renderCombined(el); return; }
+  try{
+    const r = await fetch(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    if(r.status === 403){ d.groups=new Map(); d.lobby=[]; renderCombined(el); return; }
+    if(r.status === 404 || r.status === 405){ d.playersUnsupported=true; d.groups=new Map(); d.lobby=[]; renderCombined(el); return; }
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const groups = new Map(); const lobby=[];
+    for(const p of (j.players||[])){
+      if(p.roomCode){
+        if(!groups.has(p.roomCode)) groups.set(p.roomCode, { inMatch: !!p.inMatch, list: [] });
+        groups.get(p.roomCode).list.push(p);
+      } else lobby.push(p);
+    }
+    d.groups=groups; d.lobby=lobby; d.playersUnsupported=false;
+  }catch(e){ d.playersUnsupported=true; }
+  renderCombined(el);
+}
+
+function renderCombined(el, hint){
+  const box = $('s'+el+'_roomlist');
+  const cnt = $('s'+el+'_rcount');
+  const d = roomData[el];
+  const token = $('token').value.trim();
+  if(!token){ box.innerHTML = '<div class="empty">输入 admin token 后显示房间对局与玩家</div>'; cnt.textContent=''; return; }
+  if(hint){ box.innerHTML = `<div class="empty">${hint}</div>`; cnt.textContent=''; return; }
+
+  let html='';
+  let totalHumans=0;
+
+  if(d.rooms===null){
+    if(d.playersUnsupported){ box.innerHTML='<div class="empty">该服未开启管理接口（无法查看玩家、不可踢人）</div>'; cnt.textContent=''; return; }
+    const groups = [...d.groups.entries()].sort((a,b)=>(b[1].inMatch?1:0)-(a[1].inMatch?1:0));
+    for(const [code,g] of groups){
+      totalHumans += g.list.length;
+      html += `<div class="room-card${g.inMatch?' is-match':''}">
+        <div class="rc__hd"><span class="rc__code">${esc(code)}</span><span class="rc__tag${g.inMatch?' on':''}">${g.inMatch?'对局中':'等待中'}</span><span class="rc__meta">${g.list.length} 人</span><button class="kickroom-mini" onclick="doKickRoom('${el}','${esc(code)}')">踢整房</button></div>
+        <div class="rc__players">${g.list.map(p=>playerRow(el,p)).join('')}</div>
+      </div>`;
+    }
+    if(d.lobby && d.lobby.length){
+      totalHumans += d.lobby.length;
+      html += `<div class="room-card"><div class="rc__hd"><span class="rc__code">大厅（未进房）</span><span class="rc__meta">${d.lobby.length} 人</span></div><div class="rc__players">${d.lobby.map(p=>playerRow(el,p)).join('')}</div></div>`;
+    }
+    cnt.textContent = html? (totalHumans+' 人') : '';
+    box.innerHTML = html || '<div class="empty">当前无在线玩家</div>';
+    return;
+  }
+
+  // rooms 可用：按「对局中优先 → 回合数倒序 → 玩家数倒序」排序，信息更清楚
+  const rooms = [...d.rooms].sort((a,b)=>{
+    if((b.inMatch?1:0) !== (a.inMatch?1:0)) return (b.inMatch?1:0)-(a.inMatch?1:0);
+    const rb = (b.round||0), ra = (a.round||0);
+    if(rb !== ra) return rb - ra;
+    const pb = (b.humanCount ?? b.seatCount ?? 0), pa = (a.humanCount ?? a.seatCount ?? 0);
+    return pb - pa;
+  });
+  for(const room of rooms){
+    const code = room.code;
+    const g = d.groups.get(code);
+    const players = g? g.list : [];
+    totalHumans += players.length;
+    const phaseName = room.phase ? (PHASE_CN[room.phase] || room.phase) : '等待中';
+    const phaseCls = room.phase ? ('p-'+room.phase) : 'p-LOBBY';
+    const pct = room.inMatch ? Math.min(100, Math.round((room.round||0)/ROUND_REF*100)) : 0;
+    const human = room.humanCount ?? room.seatCount ?? players.length;
+    const modeName = esc(room.mode||'');
+    html += `<div class="room-card${room.inMatch?' is-match':''}">
+      <div class="rc__hd">
+        <span class="rc__code">${esc(code)}</span>
+        <span class="rc__tag${room.inMatch?' on':''}">${room.inMatch?'对局中':'等待中'}</span>
+        <span class="rc__meta">${room.rhine?'莱茵':'原版'} · ${esc(room.difficulty||'')} · 第${room.matchNo||0}局</span>
+        <button class="kickroom-mini" onclick="doKickRoom('${el}','${esc(code)}')">踢整房</button>
+      </div>
+      <div class="rc__body">
+        <span class="rc__phase ${phaseCls}">${phaseName}</span>
+        <span class="rc__round">回合 ${room.round||0}</span>
+        <span class="rc__ppl">${human} 人 · ${modeName}</span>
+      </div>
+      ${room.inMatch?`<div class="rc__bar"><div class="rc__bar-in" style="width:${pct}%"></div></div>`:''}
+      ${players.length?`<div class="rc__players">${players.map(p=>playerRow(el,p)).join('')}</div>`:''}
+    </div>`;
+  }
+  if(d.lobby && d.lobby.length){
+    totalHumans += d.lobby.length;
+    html += `<div class="room-card"><div class="rc__hd"><span class="rc__code">大厅（未进房）</span><span class="rc__meta">${d.lobby.length} 人</span></div><div class="rc__players">${d.lobby.map(p=>playerRow(el,p)).join('')}</div></div>`;
+  }
+  cnt.textContent = d.rooms.length + ' 房 · ' + totalHumans + ' 人';
+  box.innerHTML = html || '<div class="empty">当前无房间</div>';
+}
+
+function playerRow(el, p){
+  return `<div class="p">
+    <span class="nm" title="${esc(p.name)}">${esc(p.name)}</span>
+    <span class="rc">${p.roomCode? ('房 '+esc(p.roomCode)) : '大厅'}</span>
+    <span class="ip" data-raw="${esc(p.addr)}">${esc(ipPlain? p.addr : maskAddr(p.addr))}${p.lastSeenAgoSec!=null? ' · '+p.lastSeenAgoSec+'s前':''}</span>
+    <button onclick="doKick('${el}','${esc(p.playerId)}',${JSON.stringify(p.name).replace(/"/g,'&quot;')})">踢</button>
+  </div>`;
+}
+
+function esc(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function kickOne(svr, playerId){
+  const token = $('token').value.trim();
+  return await fetch(`${svr.base}/api/admin/kick?token=${encodeURIComponent(token)}&playerId=${encodeURIComponent(playerId)}`);
+}
+
+async function doKick(el, playerId, name){
+  if(!confirm(`确认踢掉玩家「${name}」？\n将立即断线，且 10 分钟内无法自动重连 / 刷新恢复。`)) return;
+  const svr = SRVS[+el];
+  try{
+    const r = await kickOne(svr, playerId);
+    const j = await r.json().catch(()=>({}));
+    if(r.ok && j.ok){ alert(`已踢掉 ${name}（${j.banSec||600}s 内无法重连）`); tick(); }
+    else alert('踢人失败: ' + (j.error || j.detail || r.status));
+  }catch(e){ alert('踢人请求失败: ' + e.message); }
+}
+
+async function doKickRoom(el, roomCode){
+  const svr = SRVS[+el];
+  const token = $('token').value.trim();
+  try{
+    const r = await fetch(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const ps = (j.players||[]).filter(p=>p.roomCode===roomCode);
+    if(!ps.length){ alert('该房间已无在线玩家'); tick(); return; }
+    if(!confirm(`确认踢掉房间 ${roomCode} 内全部 ${ps.length} 名玩家？\n将立即断线，且 10 分钟内无法重连。`)) return;
+    let ok=0, fail=0;
+    for(const p of ps){ const kr = await kickOne(svr, p.playerId); if(kr.ok) ok++; else fail++; }
+    alert(`房间 ${roomCode}：已踢 ${ok} 人` + (fail? `，失败 ${fail} 人`:''));
+    tick();
+  }catch(e){ alert('整房踢人失败: ' + e.message); }
+}
+
+function renderSvrChips(healthArr){
+  const chipBox = $('svrchips');
+  const act = activeSrvs();
+  let html = '';
+  act.forEach((s,i)=>{
+    const j = healthArr[i];
+    const cls = j ? 'up' : 'down';
+    const name = s.role==='main' ? '上海' : s.role==='alliance' ? '3001' : s.role==='backup' ? '杭州' : '本地';
+    const val = j ? j.sockets : '×';
+    html += `<span class="svrchip ${cls}"><span class="d"></span>${name}: ${val}</span>`;
+  });
+  chipBox.innerHTML = html;
+}
+
+async function tick(){
+  if(document.hidden){ lastUpdated = null; return; }
+  const act = activeSrvs();
+  const health = await Promise.all(act.map(fetchHealth));
+  await Promise.all(act.map(fetchRooms));
+  await Promise.all(act.map(fetchPlayers));
+  let tSock=0,tHum=0,tRoom=0,tMatch=0,ok=0;
+  health.forEach(j=>{ if(!j) return; ok++; tSock+=j.sockets||0; tHum+=j.humans||0; tRoom+=j.rooms||0; tMatch+=j.matches||0; });
+  $('totalOnline').textContent  = ok? tSock : '--';
+  $('totalHumans').textContent    = ok? tHum  : '--';
+  $('totalRooms').textContent    = ok? tRoom : '--';
+  $('totalMatches').textContent   = ok? tMatch: '--';
+  $('ts').textContent = new Date().toLocaleTimeString('zh-CN');
+  renderSvrChips(health);
+  lastUpdated = new Date();
+  $('updInfo').textContent = '上次刷新 ' + lastUpdated.toLocaleTimeString('zh-CN');
+}
+
+// 性能优化：页面隐藏时暂停轮询（避免对服务器产生无效请求），恢复可见时立即刷新一次
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden) tick();
+});
+
+renderIpMode();
+renderLocalTest();
+tick();
+setInterval(tick, 3000);
+window.addEventListener('resize', ()=>{ ['0','1','2'].forEach(el=>{ if(history[el].length) drawChart($('ch'+el),history[el]); }); });
+</script>
+</body>
+</html>
