@@ -62,3 +62,5 @@ _merge_chat.ps1
 本机当服务器.bat
 连接服务器.bat
 stronghold.service
+# local temp scripts
+.testtmp/

@@ -207,15 +207,15 @@
   </div>
 </header>
 
-<div id="localTestBanner" class="lt-banner" style="display:none">🧪 本地测试模式：以本机跑起的服务器为数据源（默认 127.0.0.1:3000 收编版 + 127.0.0.1:3001 盟约版），不连公网；请在 admin token 框输入对应本地服务器的 token。</div>
+<div id="localTestBanner" class="lt-banner" style="display:none">🧪 本地测试模式：以本机跑起的服务器为数据源（默认 127.0.0.1:3000 与 127.0.0.1:3001），不连公网；请在 admin token 框输入对应本地服务器的 token。</div>
 
 <div class="ann-editor panel">
   <div class="ann-editor__hd">
     <span class="t">📢 公告编辑器</span>
     <span class="ann-targets">
-      <label><input type="checkbox" id="annT0" checked /> 主服(3000)</label>
-      <label><input type="checkbox" id="annT1" checked /> 盟约(3001)</label>
-      <label><input type="checkbox" id="annT2" /> 备用(116.62)</label>
+      <label><input type="checkbox" id="annT0" checked /> 上海·主服(3000)</label>
+      <label><input type="checkbox" id="annT1" /> 3001·独立部署</label>
+      <label><input type="checkbox" id="annT2" checked /> 杭州·备用服</label>
     </span>
     <span id="annLast" style="color:var(--dim);font-size:11px"></span>
   </div>
@@ -262,7 +262,7 @@
 <div class="grid">
   <div class="svr panel" id="svr0">
     <div class="banner"></div>
-    <h2><span class="dot" id="dot0"></span>收编版（莱茵盟约）<span class="role main">主服</span></h2>
+    <h2><span class="dot" id="dot0"></span>上海 · 主服<span class="role main">主服</span></h2>
     <div class="url"><span id="url0">http://101.132.104.41:3000</span><span class="lat" id="lat0"></span></div>
     <div class="stats">
       <div class="stat hi"><div class="v" id="s0_sockets">--</div><div class="k">在线连接</div></div>
@@ -282,7 +282,7 @@
 
   <div class="svr panel" id="svr1">
     <div class="banner"></div>
-    <h2><span class="dot" id="dot1"></span>盟约服（3001）<span class="role alliance">盟约</span></h2>
+    <h2><span class="dot" id="dot1"></span>3001 · 独立部署<span class="role alliance">独立</span></h2>
     <div class="url"><span id="url1">http://101.132.104.41:3001</span><span class="lat" id="lat1"></span></div>
     <div class="stats">
       <div class="stat hi"><div class="v" id="s1_sockets">--</div><div class="k">在线连接</div></div>
@@ -302,7 +302,7 @@
 
   <div class="svr panel" id="svr2">
     <div class="banner"></div>
-    <h2><span class="dot" id="dot2"></span>纯原版（备用服）<span class="role backup">备用</span></h2>
+    <h2><span class="dot" id="dot2"></span>杭州 · 备用服<span class="role backup">备用</span></h2>
     <div class="url"><span id="url2">http://116.62.39.28:3000</span><span class="lat" id="lat2"></span></div>
     <div class="stats">
       <div class="stat hi"><div class="v" id="s2_sockets">--</div><div class="k">在线连接</div></div>
@@ -324,18 +324,19 @@
 <div class="upd" id="updInfo"></div>
 
 <script>
-// 主服 / 盟约服 / 备用服 地址自动适配：域名访问走同源 HTTPS 反代（/alliance、/backup），否则直连 IP:端口。
+// 主服（上海 3000）/ 3001 独立部署 / 备用服（杭州）：域名访问走同源 HTTPS 反代（/alliance、/backup），否则直连 IP:端口。
 const onDomain = location.hostname === 'game.lingluotoki.dpdns.org';
 const MAIN_BASE = onDomain ? location.origin : 'http://101.132.104.41:3000';
 const ALLIANCE_BASE = onDomain ? location.origin + '/alliance' : 'http://101.132.104.41:3001';
 const BACKUP_BASE = onDomain ? location.origin + '/backup' : 'http://116.62.39.28:3000';
 const SRVS = [
-  { base: MAIN_BASE,    el:'0', role:'main',     label:'收编版（莱茵盟约）', url:'http://101.132.104.41:3000' },
-  { base: ALLIANCE_BASE, el:'1', role:'alliance', label:'盟约服（3001）',     url:'http://101.132.104.41:3001' },
-  { base: BACKUP_BASE,  el:'2', role:'backup',   label:'纯原版（备用服）',   url:'http://116.62.39.28:3000' },
+  { base: MAIN_BASE,    el:'0', role:'main',     label:'上海 · 主服',       url:'http://101.132.104.41:3000' },
+  { base: ALLIANCE_BASE, el:'1', role:'alliance', label:'3001 · 独立部署',   url:'http://101.132.104.41:3001' },
+  { base: BACKUP_BASE,  el:'2', role:'backup',   label:'杭州 · 备用服',     url:'http://116.62.39.28:3000' },
 ];
-// 公告目标：主服 + 盟约服（备用服为纯原版，不部署公告功能）
-const ANNOUNCE_SRVS = [SRVS[0], SRVS[1]];
+// 公告目标：主服 + 备用服（两台都是莱茵版 0.2.2，内容一致，公告需要同步）
+// 3001 是独立部署、版本落后，不纳入公告推送。
+const ANNOUNCE_SRVS = [SRVS[0], SRVS[2]];
 
 let ipPlain = localStorage.getItem('sp_ip_plain') === '1';
 const MASK_HOST = '***.***.***.***';
@@ -346,8 +347,8 @@ let localBase2 = localStorage.getItem('sp_local_base2') || 'http://127.0.0.1:300
 function activeSrvs(){
   if(!localTest) return SRVS;
   return [
-    { base: localBase,  el:'0', role:'main',     label:'收编版（莱茵盟约）', url:localBase  },
-    { base: localBase2, el:'1', role:'alliance', label:'盟约服（3001）',     url:localBase2 },
+    { base: localBase,  el:'0', role:'main',     label:'上海 · 主服',     url:localBase  },
+    { base: localBase2, el:'1', role:'alliance', label:'3001 · 独立部署', url:localBase2 },
   ];
 }
 function announceSrvs(){
@@ -609,7 +610,7 @@ function renderCombined(el, hint){
   let totalHumans=0;
 
   if(d.rooms===null){
-    if(d.playersUnsupported){ box.innerHTML='<div class="empty">该服未开启管理接口（纯原版备用服不可踢人）</div>'; cnt.textContent=''; return; }
+    if(d.playersUnsupported){ box.innerHTML='<div class="empty">该服未开启管理接口（无法查看玩家、不可踢人）</div>'; cnt.textContent=''; return; }
     const groups = [...d.groups.entries()].sort((a,b)=>(b[1].inMatch?1:0)-(a[1].inMatch?1:0));
     for(const [code,g] of groups){
       totalHumans += g.list.length;
@@ -720,7 +721,7 @@ function renderSvrChips(healthArr){
   act.forEach((s,i)=>{
     const j = healthArr[i];
     const cls = j ? 'up' : 'down';
-    const name = s.role==='main' ? '主服' : s.role==='alliance' ? '盟约' : s.role==='backup' ? '备用' : '本地';
+    const name = s.role==='main' ? '上海' : s.role==='alliance' ? '3001' : s.role==='backup' ? '杭州' : '本地';
     const val = j ? j.sockets : '×';
     html += `<span class="svrchip ${cls}"><span class="d"></span>${name}: ${val}</span>`;
   });

@@ -153,6 +153,78 @@ function HotkeySection({ keys, touchUi }) {
   </section>`;
 }
 
+/** 服务器名的显示文案（msgid），按 App 给的 id 取 —— 服务器名不进语言包以外的地方。 */
+const SERVER_NAMES = { main: N_('上海 · 主服'), backup: N_('杭州 · 备用服') };
+/** App 里当前生效的是哪台（自动探测选中主服时也报 'main'）。 */
+const serverLabel = (s) => t(SERVER_NAMES[s.id] || s.label || s.id);
+
+/**
+ * 服务器选择（仅安卓 / Windows 本机客户端里有）。
+ *
+ * 为什么要有：这两端是「本机素材 + 反向代理到线上服务器」，页面与素材一个字节都不出网，
+ * 只有 /ws 与 /api/… 转发给上游。上游那台被限流时玩家只会看到「正在重连」，
+ * 而备用服切换以前藏在 App 的长按手势里 —— 玩家根本找不到。
+ *
+ * 怎么判断「我在本机客户端里」：只有本机服务器实现了 `/api/app-server`，线上服务器没有
+ * （会走 /api/* 反代，最终 404）。所以**请求成功 = 在客户端里**，纯浏览器玩家看不到这一栏
+ * —— 这很关键：网页版的服务器是页面自己来的地方，切了没有任何意义，只会让人困惑。
+ *
+ * 切换由本机服务器落盘并重启 App，页面会被重新加载到新服务器，所以这里只管发请求。
+ */
+function ServerSection() {
+  const [state, setState] = useState(null);   // { current, candidates } | 'none'
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState(null);
+
+  useLayoutEffect(() => {
+    let alive = true;
+    const ac = new AbortController();
+    fetch('/api/app-server', { signal: ac.signal, cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive) setState(d && d.ok && d.app ? d : 'none'); })
+      .catch(() => { if (alive) setState('none'); });
+    return () => { alive = false; ac.abort(); };
+  }, []);
+
+  if (state === null) return null;                       // 还没探出来：不占位，避免闪一下
+  if (state === 'none') return null;                     // 不在客户端里（网页版）：整栏不显示
+
+  const pick = (id) => {
+    if (busy) return;
+    setBusy(true);
+    setNote(t('正在切换…'));
+    fetch('/api/app-server', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.ok) setNote(t('已切换，正在重启…'));
+        else { setBusy(false); setNote(t('切换失败，请重试')); }
+      })
+      .catch(() => {
+        // App 正在重启，这个请求会断开 —— 那正是成功的表现
+        setNote(t('已切换，正在重启…'));
+      });
+  };
+
+  const cur = state.current;
+  return html`<section class="set-server" aria-labelledby="set-server-title">
+    <div class="set-row">
+      <span class="set-row__label" id="set-server-title">${t('服务器')}<${MicroLabel}>SERVER<//></span>
+      <div class="set-seg" role="radiogroup" aria-label=${t('服务器')} data-testid="server-pick">
+        ${state.candidates.map((c) => html`<button key=${c.id} type="button" role="radio"
+          aria-checked=${cur === c.id ? 'true' : 'false'} class=${cur === c.id ? 'is-on' : ''}
+          disabled=${busy} onClick=${() => pick(c.id)}>${serverLabel(c)}</button>`)}
+      </div>
+    </div>
+    <p class="set-hint" role="status" aria-live="polite">${note
+      ? note
+      : t('连不上或卡顿时可切到备用服；素材在本机，切换不会重新下载')}</p>
+  </section>`;
+}
+
 /**
  * Settings modal.
  * @param {{ open: boolean, onClose: Function }} props
@@ -192,6 +264,7 @@ export function SettingsModal({ open, onClose }) {
         </div>
       </div>
       <${HotkeySection} keys=${s.keys} touchUi=${touchUi} />
+      <${ServerSection} />
       <p class="set-hint">${touchUi ? t('触屏操作：点击单位选中（撤退 / 出售）· 长按单位或卡牌查看详情 · 拖动部署后滑动选择朝向') : t('右键查看详情')}</p>
     </div>
   <//>`;

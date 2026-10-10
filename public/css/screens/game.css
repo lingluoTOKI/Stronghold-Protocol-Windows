@@ -591,6 +591,13 @@
 .set-seg button:last-child { border-right: 0; }
 .set-seg button.is-on { background: var(--mint-500); color: var(--text-on-mint); font-weight: 700; }
 .set-hint { margin-top: .06rem; font-size: .14rem; color: var(--text-dim); line-height: 1.8; }
+/* 服务器 (ui/settings.js ServerSection): 只在安卓 / Windows 本机客户端里出现
+   （那两端才是「本机素材 + 反代到线上」，网页版的服务器由页面来源决定，切了没意义）。
+   与 .set-keys 同样用一条上边框和上面的音频设置分开。 */
+.set-server { display: flex; flex-direction: column; padding-top: .1rem; border-top: 1px solid var(--line); }
+.set-server .set-seg button { min-width: 1.1rem; }
+.set-server .set-seg button:disabled { opacity: .5; }
+.set-server .set-hint { margin-top: .08rem; }
 .set-hint kbd, .lvcard__key, .toolbtn kbd { font-family: var(--font-num); font-size: .11rem; border: 1px solid var(--line-2); padding: 0 .04rem; color: var(--text-lo); background: rgba(0, 0, 0, .3); }
 /* 快捷键 (ui/settings.js HotkeySection): each shortcut with its key — click the key, press the new one; two columns,
    one under 768 px (phones in landscape) */
