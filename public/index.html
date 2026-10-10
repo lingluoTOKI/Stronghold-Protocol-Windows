@@ -2,6 +2,24 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
+  <!-- One-time upgrade cleanup: unregister stale service worker from the old build and drop all
+       caches, so players are never stuck on removed/cached JS (e.g. old stadium.js) after a deploy. -->
+  <script>
+  (function () {
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (rs) {
+          rs.forEach(function (r) { r.unregister(); });
+        }).catch(function () {});
+      }
+      if (window.caches && caches.keys) {
+        caches.keys().then(function (ks) {
+          ks.forEach(function (k) { caches.delete(k); });
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  })();
+  </script>
   <!-- A landscape game: no page zoom (iOS additionally needs the gesture handling of js/ui/device.js), full-bleed behind
        notches (viewport-fit=cover; css/devices.css keeps the HUD inside the safe area). -->
   <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
