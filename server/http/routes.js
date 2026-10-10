@@ -47,7 +47,7 @@ export function healthReport({ startedAt, network, registry, lobby }) {
  *           health: Parameters<typeof healthReport>[0], log: object }} deps
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, announcements = null }) {
+export function createRequestHandler({ serveStatic, health, log, announcements = null, announcePublish = null, announceClear = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
@@ -126,6 +126,38 @@ export function createRequestHandler({ serveStatic, health, log, announcements =
         });
       }
       sendJson(req, res, 200, { ok: true, count: out.length, rooms: out });
+      return;
+    }
+
+    // ---- 公告发布 / 撤回（监控大屏运维接口，token 走 query）----
+    // 发布一条公告：force 缺省 true（玩家进游戏强制弹窗）；显式 force=false 作为普通公告进公告栏。
+    if (parts.rawPath === '/api/admin/announce') {
+      if (!adminAuthorized()) { sendError(req, res, 403, '拒绝 · Forbidden'); return; }
+      if (!announcePublish) { sendError(req, res, 501, '服务器不支持发布公告 · announce disabled'); return; }
+      const q = new URLSearchParams(parts.query || '');
+      const title = (q.get('title') || '').trim() || '服务器更新公告';
+      const content = (q.get('content') || '').trim();
+      if (!content) { sendError(req, res, 400, '公告正文不能为空 · content required'); return; }
+      const startAt = q.get('startAt');
+      const expireAt = q.get('expireAt');
+      const forceRaw = q.get('force');
+      const force = forceRaw !== 'false' && forceRaw !== '0';
+      const r = announcePublish(title, content, {
+        force,
+        startAt: (startAt && /^\d+$/.test(startAt)) ? Number(startAt) : undefined,
+        expireAt: (expireAt && /^\d+$/.test(expireAt)) ? Number(expireAt) : undefined,
+      });
+      if (!r.ok) { sendError(req, res, 500, r.error || 'announce write failed'); return; }
+      sendJson(req, res, 200, { ok: true, updatedAt: r.updatedAt, forceId: r.forceId });
+      return;
+    }
+    // 撤回全部强制公告：删除 announcements.json 里所有 force 项（普通公告保留）。
+    if (parts.rawPath === '/api/admin/announce-clear') {
+      if (!adminAuthorized()) { sendError(req, res, 403, '拒绝 · Forbidden'); return; }
+      if (!announceClear) { sendError(req, res, 501, '服务器不支持撤回公告 · announce-clear disabled'); return; }
+      const r = announceClear();
+      if (!r.ok) { sendError(req, res, 500, r.error || 'announce clear failed'); return; }
+      sendJson(req, res, 200, { ok: true, updatedAt: r.updatedAt, removed: r.removed });
       return;
     }
 

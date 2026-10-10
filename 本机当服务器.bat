@@ -1,9 +1,24 @@
 @echo off
-chcp 65001 >nul
 setlocal
-cd /d "%~dp0"
-REM 在本机当服务器：监听 0.0.0.0，局域网内朋友用 http://<本机IP>:3000 加入
-set HOST=0.0.0.0
-echo [本机开服] 监听 0.0.0.0:3000，控制台会打印可分享的局域网地址。
-node scripts\launcher.mjs --mode local %*
-pause
+set "HERE=%~dp0"
+
+set "SP_ADMIN_TOKEN=tYP6cVr7KO8eTlDLZbF2xwhI"
+set "PORT=3000"
+
+echo.
+echo ============================================
+echo   Stronghold Protocol - Local Server (Local Test)
+echo   URL:   http://127.0.0.1:%PORT%
+echo   Admin Token: %SP_ADMIN_TOKEN%
+echo   In monitor.html use the same token and turn Local Test ON.
+echo ============================================
+echo.
+
+set "NODE="
+if exist "%HERE%node\node.exe" set "NODE=%HERE%node\node.exe"
+if not defined NODE set "NODE=node"
+
+"%NODE%" "%HERE%server\index.js"
+set "CODE=%ERRORLEVEL%"
+if not "%CODE%"=="0" pause
+exit /b %CODE%

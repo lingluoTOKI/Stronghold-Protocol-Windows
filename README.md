@@ -18,6 +18,16 @@
 
 English summary: [below](#english).
 
+## 联机增强版说明（Alliance Edition）
+
+本仓库在**官服 0.2.3 纯净基线**之上，额外保留了自托管联机增强功能：**6 人合作**（9 张悬赏、合作信标、共享首领血池、按人数补偿 BAN）、**1×/2×/4× 倍速**、**跳过本场**、**可拖拽聊天 / 表情**、**服务器公告栏**、**在线人数**、**公共快速匹配**、**监控大屏（踢人 / 公告）**、**PC 与安卓联机脚本**。本版**不含莱茵生命资料片**（它将作为相互隔离的独立插件，稳定后再回归），原版房即纯官服内容。
+
+- 本次完整更新记录：[docs/CHANGELOG-ALLIANCE.md](docs/CHANGELOG-ALLIANCE.md)
+- 以后同步上游、又不丢失独有功能的提示词与流程：[docs/UPSTREAM-SYNC-PROMPT.md](docs/UPSTREAM-SYNC-PROMPT.md)
+- 独有功能落点清单：[docs/FEATURES-ALLIANCE.md](docs/FEATURES-ALLIANCE.md) ；莱茵剥离说明：[docs/RHINE-REMOVAL.md](docs/RHINE-REMOVAL.md)
+- 在线游玩：主服 <http://game.lingluotoki.dpdns.org> ；备用纯原版 <http://116.62.39.28:3000>
+
+
 | 同盟房间 | 策略轮选 | 休整期（商店 / 盟约） |
 |---|---|---|
 | ![房间](docs/img/room.jpg) | ![策略](docs/img/band-draft.jpg) | ![休整期](docs/img/prep.jpg) |

@@ -244,6 +244,29 @@ export function UrgentNoticeHost() {
 
 /** 公告栏按钮（更新日志）：标题 / 房间界面的邮件图标，玩家手动点开看普通公告；
  *  紧急公告走全局 UrgentNoticeHost（任何界面都弹），不混进日志。 */
+function fmtBulletinTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return String(ts);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// 公告正文是纯文本（含 \n、【小节】、· 列表）。按行渲染以获得小节标题 / 列表缩进层次；字符串仍由 preact 转义，不解析 HTML。
+function renderBulletinContent(content) {
+  if (!content) return null;
+  return String(content).split('\n').map((line, i) => {
+    if (!line.trim()) return html`<div class="bulletin-modal__line is-blank" key=${i}></div>`;
+    const bm = line.match(/^\s*(·)\s*/);
+    if (bm) {
+      return html`<div class="bulletin-modal__line is-bullet" key=${i}><span class="bulletin-modal__dot">·</span><span class="bulletin-modal__body">${line.slice(bm[0].length)}</span></div>`;
+    }
+    const hm = line.match(/^(【[^】]*】)([\s\S]*)$/);
+    if (hm) return html`<div class="bulletin-modal__line" key=${i}><span class="bulletin-modal__head">${hm[1]}</span>${hm[2]}</div>`;
+    return html`<div class="bulletin-modal__line" key=${i}>${line}</div>`;
+  });
+}
+
 export function BulletinButton() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
@@ -284,14 +307,14 @@ export function BulletinButton() {
       micro="SERVER BULLETIN" class="bulletin-modal-box">
       ${failed ? html`<div class="bulletin-modal__empty">暂无法连接公告服务</div>` : null}
       ${!failed && !data ? html`<div class="bulletin-modal__empty">加载中…</div>` : null}
-      <div class="bulletin-modal__when">最近更新：${(data && data.updatedAt) || '—'}</div>
+      <div class="bulletin-modal__when">最近更新：${(data && fmtBulletinTime(data.updatedAt)) || '—'}</div>
       ${items.map((it, i) => html`<div class="bulletin-modal__item" key=${i}>
         <div class="bulletin-modal__row">
           ${it.version ? html`<span class="bulletin-modal__ver">v${it.version}</span>` : null}
           ${it.time ? html`<span class="bulletin-modal__time">${it.time}</span>` : null}
           <span class="bulletin-modal__title">${it.title || ''}</span>
         </div>
-        ${it.content ? html`<div class="bulletin-modal__content">${it.content}</div>` : null}
+        ${it.content ? html`<div class="bulletin-modal__content">${renderBulletinContent(it.content)}</div>` : null}
       </div>`)}
       ${!failed && data && !items.length ? html`<div class="bulletin-modal__empty">暂无公告</div>` : null}
     <//>

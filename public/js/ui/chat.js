@@ -27,12 +27,10 @@ export function ensureChatCss(doc = globalThis.document) {
   const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = [
-    /* 独立「聊天」触发按钮：与官方 .ewheel__btn 同高同描边，但标题为「聊天」、永不与表情轮盘混淆 */
+    /* 触发按钮外观直接沿用官方 .ewheel__btn（在 game.css / emotes.css 中），这里只补定位与未读点；
+       与左下角「交流」按钮合并，玩家无感知，不再与官方表情轮盘并列 */
     '.chat-dock{position:relative;display:flex;align-items:flex-end;}',
-    '.chat-dock__launch{position:relative;display:flex;align-items:center;gap:.06rem;height:.42rem;padding:0 .14rem;flex:none;background:rgba(8,11,10,.85);border:1px solid var(--line-2,#3e4b45);color:var(--text-md,#c3cbc7);font-family:var(--font-mono,ui-monospace,Menlo,Consolas,monospace);font-size:max(.14rem,12px);letter-spacing:.12em;cursor:pointer;transition:border-color .15s,color .15s,background .15s;}',
-    '.chat-dock__launch:hover{border-color:var(--mint-700,#2a9e7f);color:var(--mint-400,#59f4ca);background:var(--mint-a10,rgba(78,216,175,.1));}',
-    '.chat-dock__launch.is-on{border-color:var(--mint-500,#4ed8af);color:var(--mint-400,#59f4ca);background:var(--mint-a10,rgba(78,216,175,.12));}',
-    '.chat-dock__launch .icon{width:.2rem;height:.2rem;}',
+    '.chat-dock__btn{position:relative;}',
     '.chat-dock__badge{position:absolute;top:-.05rem;right:-.05rem;min-width:.18rem;height:.18rem;padding:0 .04rem;background:var(--danger,#ff5d5d);color:#fff;font-family:var(--font-mono,ui-monospace,monospace);font-size:max(.11rem,9px);font-weight:700;line-height:1.15;text-align:center;box-shadow:0 0 0 2px rgba(6,9,7,.92);}',
     /* 弹出面板：深底 / 细边 / pop-in，顶部一条终端光条 */
     '.chat-dock__panel{position:absolute;bottom:calc(100% + .12rem);left:0;width:min(3.7rem,86vw);max-width:94vw;max-height:82vh;z-index:950;display:flex;flex-direction:column;overflow:hidden;color:var(--text-md,#c3cbc7);font-family:var(--font-mono,ui-monospace,Menlo,Consolas,monospace);font-size:max(.14rem,12px);background:linear-gradient(180deg,rgba(20,26,24,.98),rgba(9,13,11,.98));border:1px solid var(--line-2,#3e4b45);box-shadow:0 .1rem .3rem rgba(0,0,0,.65),inset 0 0 .001rem rgba(89,244,202,.08);animation:pop-in var(--t-med,200ms) var(--ease-out,cubic-bezier(.2,.8,.2,1));}',
@@ -290,10 +288,10 @@ export function ChatDock({ open, onToggle, disabled = false }) {
 
   return html`
     <div class="chat-dock">
-      <button type="button" class=${cx('chat-dock__launch', open && 'is-on')}
+      <button type="button" class=${cx('ewheel__btn', 'chat-dock__btn', open && 'is-on')}
         aria-expanded=${open ? 'true' : 'false'} aria-haspopup="dialog" disabled=${disabled}
-        onClick=${() => onToggle(!open)} title="房间聊天（与表情轮盘相互独立）">
-        <${GIcon} name="emote" /><span>聊天</span>
+        onClick=${() => onToggle(!open)} title="房间聊天 / 交流">
+        <${GIcon} name="emote" /><span class="ewheel__label">交流</span>
         ${!open && unread > 0 ? html`<span class="chat-dock__badge">${unread > 99 ? '99+' : unread}</span>` : null}
       </button>
 

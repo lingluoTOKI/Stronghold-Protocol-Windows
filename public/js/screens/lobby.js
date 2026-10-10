@@ -426,6 +426,20 @@ export function LobbyScreen() {
           ${MODE_CARDS.map((c) => html`<${ModeCard} key=${c.id} card=${c} selected=${roomMode === c.id} onSelect=${pickMode} />`)}
         </div>
 
+        ${roomMode === 'coop' ? html`<div class="lobby-create-mode create-box__mode">
+          <span class="create-box__mode-label">${t('建立方式')}</span>
+          <div class="create-box__mode-opts">
+            <button type="button" class=${`create-box__mode-opt${coopCreate === 'direct' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('direct')} aria-pressed=${coopCreate === 'direct' ? 'true' : 'false'}>
+              <span class="create-box__mode-opt-name">${t('直接建房')}</span>
+              <span class="create-box__mode-opt-desc">${t('创建 {n} 人房间，邀好友 / 加 AI', { n: MAX_SEATS })}</span>
+            </button>
+            <button type="button" class=${`create-box__mode-opt${coopCreate === 'match' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('match')} aria-pressed=${coopCreate === 'match' ? 'true' : 'false'}>
+              <span class="create-box__mode-opt-name">${t('快速匹配')}</span>
+              <span class="create-box__mode-opt-desc">${t('进公共池凑 {n} 人，30s 满员自动开局', { n: MATCH_TARGET })}</span>
+            </button>
+          </div>
+        </div>` : null}
+
         <div class="section-label"><span class="section-label__idx num">03</span>${t('加入同盟')}<${MicroLabel}>JOIN WITH ALLIANCE KEY<//></div>
         <${Panel} class="join-panel" tone="amber">
           <div class="join-row">
@@ -452,19 +466,6 @@ export function LobbyScreen() {
           ${DIFFICULTIES.map((d) => html`<${DifficultyCard} key=${d} roomMode=${roomMode} difficulty=${d} selected=${difficulty === d} onSelect=${pickDifficulty} />`)}
         </div>
         <div class="create-box">
-          ${roomMode === 'coop' ? html`<div class="create-box__mode">
-              <span class="create-box__mode-label">${t('建立方式')}</span>
-              <div class="create-box__mode-opts">
-                <button type="button" class=${`create-box__mode-opt${coopCreate === 'direct' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('direct')} aria-pressed=${coopCreate === 'direct' ? 'true' : 'false'}>
-                  <span class="create-box__mode-opt-name">${t('直接建房')}</span>
-                  <span class="create-box__mode-opt-desc">${t('创建 {n} 人房间，邀好友 / 加 AI', { n: MAX_SEATS })}</span>
-                </button>
-                <button type="button" class=${`create-box__mode-opt${coopCreate === 'match' ? ' is-on' : ''}`} onClick=${() => pickCoopCreate('match')} aria-pressed=${coopCreate === 'match' ? 'true' : 'false'}>
-                  <span class="create-box__mode-opt-name">${t('快速匹配')}</span>
-                  <span class="create-box__mode-opt-desc">${t('进公共池凑 {n} 人，30s 满员自动开局', { n: MATCH_TARGET })}</span>
-                </button>
-              </div>
-            </div>` : null}
           <${Tooltip} block=${true} text=${online ? null : t('正在连接服务器…')}>
             <${Button} variant="primary" size="xl" block=${true} iconRight=${matching ? null : 'chevrons'} loading=${busy === 'create'} disabled=${!online || matching} onClick=${create}>
               ${roomMode === 'solo' ? t('开始独立模拟') : coopCreate === 'direct' ? t('创建同盟') : t('快速匹配')}

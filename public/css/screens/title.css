@@ -287,7 +287,13 @@ html[data-script="alphabetic"] .title-login .btn--xl { letter-spacing: .3em; }
 .bulletin-modal__ver { color: #17f9b7; font-weight: 700; font-size: max(.22rem, 12px); }
 .bulletin-modal__time { color: #6d8f80; font-size: max(.2rem, 11px); }
 .bulletin-modal__title { color: #e8f5ee; font-weight: 600; font-size: max(.26rem, 14px); }
-.bulletin-modal__content { margin: max(.1rem, 5px) 0 0; color: #b7ccc1; font-size: max(.2rem, 12px); line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; word-break: break-word; }
+.bulletin-modal__content { margin: max(.1rem, 5px) 0 0; color: #b7ccc1; font-size: max(.2rem, 12px); line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; }
+.bulletin-modal__line { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.bulletin-modal__line.is-blank { height: .6em; }
+.bulletin-modal__line.is-bullet { display: flex; gap: .5em; align-items: baseline; }
+.bulletin-modal__dot { color: #17f9b7; flex: 0 0 auto; }
+.bulletin-modal__body { flex: 1 1 auto; min-width: 0; }
+.bulletin-modal__head { color: #e8f5ee; font-weight: 700; }
 .bulletin-modal__empty { color: #6d8f80; font-size: max(.22rem, 12px); text-align: center; padding: max(.3rem, 16px) 0; }
 @media (max-width: 767px), (max-height: 460px) {
   .bulletin-modal-box .modal__head { padding: max(.18rem, 10px) max(.24rem, 12px) max(.04rem, 2px); }
