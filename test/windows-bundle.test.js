@@ -181,6 +181,19 @@ describe('make-windows-bundle.mjs: --upstream（联机模式写进包内配置�
     const without = bundleReadme({ version: 'v22.23.3', withNode: true });
     assert.ok(!/连接主服务器\.bat/.test(without), '没配上游就不该提这个 bat');
   });
+
+  test('配了上游的包不再提 连接服务器.bat（包只服务那一台，少一个会点错的入口）', async () => {
+    const { bundleReadme } = await mod('scripts/make-windows-bundle.mjs');
+    for (const withNode of [true, false]) {
+      const withUp = bundleReadme({ version: 'v22.23.3', withNode, upstream: 'http://a.example:3000' });
+      assert.ok(!/连接服务器\.bat/.test(withUp), `withNode=${withNode}: 有上游就不该列 连接服务器.bat`);
+      assert.ok(!/\[2\]连接服务器/.test(withUp), `withNode=${withNode}: 菜单说明也不该列它`);
+      assert.match(withUp, /\[2\]联机/, `withNode=${withNode}: 菜单第 2 项是联机`);
+      const without = bundleReadme({ version: 'v22.23.3', withNode });
+      assert.match(without, /连接服务器\.bat/, `withNode=${withNode}: 没上游时照旧列出`);
+      assert.match(without, /\[2\]连接服务器/, `withNode=${withNode}: 没上游时菜单照旧`);
+    }
+  });
 });
 
 describe('make-windows-bundle.mjs: PowerShell 单引号转义', () => {

@@ -192,6 +192,20 @@ describe('上游不可达', () => {
   });
 });
 
+describe('scripts/launcher.mjs：菜单项', () => {
+  test('配了上游时第 2 项是「联机」，没配时是「连接服务器」（且不出现「未配置地址」那一行）', async () => {
+    const { menuItems } = await mod('scripts/launcher.mjs');
+    const on = menuItems({ upstream: 'http://101.132.104.41:3000' });
+    assert.deepEqual(on.map((i) => i.mode), ['local', 'proxy', 'settings', 'status']);
+    assert.equal(on[1].name, '联机');
+    assert.match(on[1].hint, /101\.132\.104\.41:3000/);
+    const off = menuItems({ upstream: '' });
+    assert.deepEqual(off.map((i) => i.mode), ['local', 'connect', 'settings', 'status']);
+    assert.ok(!JSON.stringify(off).includes('联机'), '没有上游就不列联机');
+    assert.ok(!JSON.stringify(off).includes('未配置'), '也不该出现「本包未配置地址」这种对玩家无意义的一行');
+  });
+});
+
 describe('scripts/launcher.mjs：联机模式的上游地址只来自配置', () => {
   test('配置里没有 upstream / 地址非法时拒绝启动', async () => {
     const { runProxy } = await mod('scripts/launcher.mjs');
@@ -201,7 +215,7 @@ describe('scripts/launcher.mjs：联机模式的上游地址只来自配置', ()
 
   test('不接受调用方传入的服务器地址（凭证按 origin 存，地址必须写死在包里）', () => {
     const src = readFileSync(path.join(ROOT, 'scripts', 'launcher.mjs'), 'utf8');
-    assert.match(src, /if \(o\.mode === 'proxy'\) return runProxy\(cfg, \{ open: o\.open, yes: o\.yes \}\)/);
+    assert.match(src, /runProxy\(cfg, \{ open: o\.open, yes: o\.yes \}\)/);
     assert.ok(!/runProxy\([^)]*o\.server/.test(src), '联机模式不得把 --server 吃进去');
     assert.match(src, /上游地址\*\*只\*\*从 launcher\.config\.json 读/);
   });

@@ -114,7 +114,7 @@ const HELP = `node scripts/make-windows-bundle.mjs — 生成 Windows 开箱即�
 
   包根带三个 .bat：启动游戏.bat（打开启动器菜单）、本机当服务器.bat（直接开服）、
   连接服务器.bat（输入地址连别人的服）。默认去掉 Google Fonts 外链（包内自带 /fonts）。
-  给了 --upstream 再多一个 连接主服务器.bat：本机素材 + 只把 /ws 与 /api/* 转发给那台服务器。
+  给了 --upstream 时：换成 启动游戏.bat / 本机当服务器.bat / 连接主服务器.bat（不再放 连接服务器.bat）。
 `;
 
 /**
@@ -452,10 +452,20 @@ function bat(body) {
  * 所以先算好片段再拼，别在模板里嵌套引号。
  */
 export function bundleReadme({ version, withNode, upstream = '' }) {
-  const proxyTree = upstream ? '\n连接主服务器.bat         联机：本机素材 + 只把 /ws 与 /api/* 转发给中心服务器' : '';
+  // 配了中心服务器（--upstream）的包只留「联机」这一个入口：那条「输入地址连别人的服务器」的 bat 对
+  // 玩家是多余的，还容易点错（自己填地址也会把凭证指向别处，见 scripts/launcher.mjs 头部）。
+  const menuBat = upstream
+    ? '启动游戏.bat             打开启动器菜单（本机当服务器 / 联机 / 设置）'
+    : '启动游戏.bat             打开启动器菜单（本机当服务器 / 连接服务器 / 设置）';
+  const otherBat = upstream ? '' : '\n连接服务器.bat           输入地址连别人的服务器';
+  const proxyBat = upstream ? '\n连接主服务器.bat         联机：本机素材 + 只把 /ws 与 /api/* 转发给中心服务器' : '';
   const proxyHow = upstream
-    ? `\n连接主服务器.bat  联机（推荐）：本机素材照常从磁盘读，只把 /ws 与 /api/* 转发给 ${upstream}，首屏最快\n                  —— 开服方就是这个包对应的中心服务器；本包必须与它**同一版本**，不一致时页面会提示刷新\n`
+    ? `\n连接主服务器.bat  联机（推荐）：本机素材照常从磁盘读，只把 /ws 与 /api/* 转发给 ${upstream}，首屏最快\n                  —— 本包必须与它**同一版本**，不一致时页面会提示刷新\n`
     : '';
+  const menuHow = upstream
+    ? '启动游戏.bat    打开启动器菜单：[1]本机当服务器  [2]联机  [3]设置  [4]查看状态'
+    : '启动游戏.bat    打开启动器菜单：[1]本机当服务器  [2]连接服务器  [3]设置  [4]查看状态';
+  const otherHow = upstream ? '' : '\n连接服务器.bat    输入别人的服务器地址，用浏览器直接打开对方的网页';
   const nodeNeed = withNode
     ? `目标机器**不需要安装 Node**：包内的 \`node\\node.exe\` 就是便携版 Node ${version}。`
     : '这个包**没有带便携版 Node**，请先在这台机器上安装 Node 22 或 24（LTS）。';
@@ -464,15 +474,13 @@ export function bundleReadme({ version, withNode, upstream = '' }) {
     ? `node\\node.exe            便携版 Node ${version}（官方 x64，已经 sha256 校验）
 node\\LICENSE-node.txt    Node 自己的许可证（MIT）
 app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
-启动游戏.bat             打开启动器菜单（本机当服务器 / 连接服务器 / 联机 / 设置）
-本机当服务器.bat         直接在这台电脑开服
-连接服务器.bat           输入地址连别人的服务器${proxyTree}
+${menuBat}
+本机当服务器.bat         直接在这台电脑开服${otherBat}${proxyBat}
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md`
     : `app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
-启动游戏.bat             打开启动器菜单（本机当服务器 / 连接服务器 / 联机 / 设置）
-本机当服务器.bat         直接在这台电脑开服
-连接服务器.bat           输入地址连别人的服务器${proxyTree}
+${menuBat}
+本机当服务器.bat         直接在这台电脑开服${otherBat}${proxyBat}
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 
@@ -504,9 +512,8 @@ Noto Sans SC 这类网页字体（\`index.html\` 里那条外链这次没有改�
 ## 怎么玩
 
 \`\`\`
-启动游戏.bat    打开启动器菜单：[1]本机当服务器  [2]连接服务器  [3]联机  [4]设置  [5]查看状态
-本机当服务器.bat  直接在这台电脑开服，浏览器自动打开；控制台会打印「发给朋友」的局域网地址
-连接服务器.bat    输入别人的服务器地址，用浏览器直接打开对方的网页${proxyHow}
+${menuHow}
+本机当服务器.bat  直接在这台电脑开服，浏览器自动打开；控制台会打印「发给朋友」的局域网地址${otherHow}${proxyHow}
 \`\`\`
 
 第一次开服时 Windows 防火墙可能弹窗，勾选**允许专用网络**（否则朋友连不上）。
@@ -654,7 +661,8 @@ async function main() {
   // 6) 包根的启动 .bat（指向 app\scripts\launcher.mjs 启动器）
   await fsp.writeFile(path.join(out, '启动游戏.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" %*'), 'latin1');
   await fsp.writeFile(path.join(out, '本机当服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode local %*'), 'latin1');
-  await fsp.writeFile(path.join(out, '连接服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode connect %*'), 'latin1');
+  // 配了中心服务器时不再放这条：本包只服务那一台，多一个「自己填地址连别人」的入口只会让玩家点错
+  if (!o.upstream) await fsp.writeFile(path.join(out, '连接服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode connect %*'), 'latin1');
 
   // 6b) --upstream：把中心服务器写进包内启动器配置，并加一个「联机」bat。
   // bat 里**不带地址**（只 --mode proxy）：地址只从 launcher.config.json 读，玩家改不了，

@@ -341,28 +341,51 @@ async function settings(cfg) {
   }
 }
 
-/** 交互菜单（开始界面）。 */
+/**
+ * 菜单项（纯函数，便于测试菜单里到底有哪几项）。
+ *
+ * **配了中心服务器**（`upstream`，打包时写入）的包第 2 项是「联机」；没配的那种（仓库里直接跑）第 2 项是
+ * 「连接服务器」——不列「联机」，免得出现「本包未配置地址」这种对玩家无意义的一行。
+ * @param {{ port?: number, host?: string, upstream?: string }} cfg
+ * @returns {{ name: string, hint: string, mode: string }[]}
+ */
+export function menuItems(cfg) {
+  const upstream = String(cfg?.upstream || '').trim();
+  return [
+    { name: '本机当服务器', hint: '在这台电脑开服，浏览器自动打开，可把局域网地址发给朋友', mode: 'local' },
+    upstream
+      ? { name: '联机', hint: `本机素材 + 只把 /ws 与 /api/* 转发给 ${upstream}`, mode: 'proxy' }
+      : { name: '连接服务器', hint: '用浏览器直接打开别人的服务器（页面与素材从对方下载）', mode: 'connect' },
+    { name: '设置', hint: '端口 / 局域网共享', mode: 'settings' },
+    { name: '查看状态', hint: '', mode: 'status' },
+  ];
+}
+
+/** 交互菜单（开始界面）：打印一遍表头与菜单项，然后按编号或模式名分发。 */
 async function menu(cfg) {
+  const run = {
+    local: () => runLocal(cfg),
+    proxy: () => runProxy(cfg),
+    connect: () => connect(cfg),
+    settings: () => settings(cfg),
+    status: async () => { await showStatus(cfg); await pause(); },
+  };
+  // 键位说明与中文名对齐：一个汉字按两列算，提示从第 20 列开始
+  const pad = (s) => s + ' '.repeat(Math.max(2, 18 - s.length * 2));
   for (;;) {
+    const items = menuItems(cfg);
     console.log(`\n${line()}`);
-    console.log(`  ${c.bold('卫戍协议 · Stronghold Protocol')}  ${c.dim('启动器')}`);
+    console.log(`  ${c.bold('卫戍协议 · Stronghold Protocol')}  ${c.dim(`启动器 · Node ${process.versions.node}${nodeExe() !== process.execPath ? ' · 便携版' : ''}`)}`);
     console.log(`  ${c.dim(`端口 ${cfg.port} · 局域网共享 ${cfg.host === '0.0.0.0' ? '开' : '关'}`)}`);
     console.log('');
-    console.log(`   ${c.cyan('[1]')} 本机当服务器      ${c.dim('在这台电脑开服，浏览器自动打开，可把局域网地址发给朋友')}`);
-    console.log(`   ${c.cyan('[2]')} 连接服务器        ${c.dim('用浏览器直接打开别人的服务器（页面与素材从对方下载）')}`);
-    console.log(`   ${c.cyan('[3]')} 联机              ${c.dim(cfg.upstream ? `本机素材 + 只把 /ws 与 /api/* 转发给 ${cfg.upstream}` : '本机素材 + 连中心服务器（本包未配置地址）')}`);
-    console.log(`   ${c.cyan('[4]')} 设置              ${c.dim('端口 / 局域网共享')}`);
-    console.log(`   ${c.cyan('[5]')} 查看状态`);
-    console.log(`   ${c.cyan('[0]')} 退出`);
+    for (const [i, it] of items.entries()) console.log(`   ${c.cyan(`[${i + 1}]`)} ${pad(it.name)}${c.dim(it.hint)}`);
+    console.log(`   ${c.cyan('[0]')} ${pad('退出')}`);
     console.log(line());
-    const a = (await ask('选择：')).toLowerCase();
-    if (a === '1' || a === 'local') await runLocal(cfg);
-    else if (a === '2' || a === 'connect') await connect(cfg);
-    else if (a === '3' || a === 'proxy') await runProxy(cfg);
-    else if (a === '4' || a === 'settings') await settings(cfg);
-    else if (a === '5' || a === 'status') { await showStatus(cfg); await pause(); }
-    else if (a === '0' || a === 'q' || a === 'exit') return 0;
-    else if (a) console.log(`${warn} 请输入 0-5`);
+    const a = (await ask('选择：', '1')).toLowerCase();
+    if (a === '0' || a === 'q' || a === 'exit') return 0;
+    const hit = /^\d+$/.test(a) ? items[Number(a) - 1] : items.find((it) => it.mode === a);
+    if (hit) { await run[hit.mode](); continue; }
+    console.log(`${warn} 请输入 0-${items.length}`);
   }
 }
 
@@ -401,16 +424,19 @@ async function main() {
   const cfg = loadConfig();
   if (o.port) cfg.port = o.port;
 
-  console.log(`\n${line()}`);
-  console.log(`  ${c.bold('卫戍协议 · Stronghold Protocol')}  ${c.dim(`启动器 · Node ${process.versions.node}${nodeExe() !== process.execPath ? ' · 便携版' : ''}`)}`);
-  console.log(line());
+  // 表头只在直接指定 --mode（或非交互用法）时打一次；菜单自带表头，否则会连打两遍
+  const banner = () => {
+    console.log(`\n${line()}`);
+    console.log(`  ${c.bold('卫戍协议 · Stronghold Protocol')}  ${c.dim(`启动器 · Node ${process.versions.node}${nodeExe() !== process.execPath ? ' · 便携版' : ''}`)}`);
+    console.log(line());
+  };
 
-  if (o.mode === 'local') return runLocal(cfg, { open: o.open });
-  if (o.mode === 'proxy') return runProxy(cfg, { open: o.open, yes: o.yes });
-  if (o.mode === 'connect') return connect(cfg, o.server, { open: o.open, yes: o.yes });
-  if (o.mode === 'status') { const code = await showStatus(cfg); if (!process.stdin.isTTY) return code; await pause(); return code; }
-  if (o.mode === 'settings') { await settings(cfg); return 0; }
-  if (!process.stdin.isTTY) { console.log(HELP); return 0; }   // 非交互（脚本/CI）：打印用法而不是卡在菜单
+  if (o.mode === 'local') { banner(); return runLocal(cfg, { open: o.open }); }
+  if (o.mode === 'proxy') { banner(); return runProxy(cfg, { open: o.open, yes: o.yes }); }
+  if (o.mode === 'connect') { banner(); return connect(cfg, o.server, { open: o.open, yes: o.yes }); }
+  if (o.mode === 'status') { banner(); const code = await showStatus(cfg); if (!process.stdin.isTTY) return code; await pause(); return code; }
+  if (o.mode === 'settings') { banner(); await settings(cfg); return 0; }
+  if (!process.stdin.isTTY) { banner(); console.log(HELP); return 0; }   // 非交互（脚本/CI）：打印用法而不是卡在菜单
   saveConfig(cfg);
   return menu(cfg);
 }
