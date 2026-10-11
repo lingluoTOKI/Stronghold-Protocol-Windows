@@ -192,6 +192,15 @@ describe('上游不可达', () => {
   });
 });
 
+describe('scripts/launch.mjs：端口上已经有服务器时', () => {
+  test('联机模式不复用它（否则页面像在联机、实际全打本机）；本机开服照旧只开浏览器', async () => {
+    const { existingServerAction } = await mod('scripts/launch.mjs');
+    assert.equal(existingServerAction({ SP_PROXY_TO: 'http://101.132.104.41:3000' }), 'refuse');
+    assert.equal(existingServerAction({ SP_PROXY_TO: '  ' }), 'open');
+    assert.equal(existingServerAction({}), 'open');
+  });
+});
+
 describe('scripts/launcher.mjs：菜单项', () => {
   test('配了上游时第 2 项是「联机」，没配时是「连接服务器」（且不出现「未配置地址」那一行）', async () => {
     const { menuItems } = await mod('scripts/launcher.mjs');

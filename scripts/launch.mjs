@@ -80,6 +80,25 @@ function printShare(port) {
   console.log(`${line}\n`);
 }
 
+/**
+ * 端口上已经有一个我们的服务器时该怎么办。
+ *
+ * 联机模式（SP_PROXY_TO）**绝不能复用**它：那个进程多半是本机开服（没有代理），复用它等于页面看起来在
+ * 联机、实际 /ws 与 /api/* 全打了本机，玩家会以为"已经连上中心服务器"。所以只认端口上真的是联机模式的
+ * 那一份（拿 /healthz 的 app 之外再问一次中心才知道，代价太高）——直接报冲突让玩家换端口或停掉旧的。
+ * @returns {'open' | 'refuse'} open = 复用并只开浏览器
+ */
+export function existingServerAction(env = process.env) {
+  return String(env.SP_PROXY_TO || '').trim() ? 'refuse' : 'open';
+}
+
+function portInUseHint(port) {
+  console.error(`${mark.err} 端口 ${port} 上已经有一个服务器在跑，而且它不是联机模式。`);
+  console.error('  直接用它会连上那个进程（本机开服），不是中心服务器。二选一：');
+  console.error(`    · 停掉它：回到那个窗口按 Ctrl+C（或在任务管理器结束 node.exe）`);
+  console.error(`    · 换个端口：编辑 app\\scripts\\launcher.config.json 的 "port"（例如 3005）`);
+}
+
 async function waitHealthy(port, child, timeoutMs = 30000) {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until && child.exitCode === null) {
@@ -101,6 +120,7 @@ async function main() {
 
   const before = await probePort(o.port, o.host);
   if (before.state === 'ours') {
+    if (existingServerAction() === 'refuse') { portInUseHint(o.port); return 1; }
     console.log(`${mark.ok} 服务器已经在运行（端口 ${o.port}），直接打开浏览器。`);
     if (fs.existsSync(path.join(ROOT, UPDATE_FILE))) {
       console.log(c.warn(`  解压过的更新包还没有应用：正在运行的仍是旧版本。先停止它（关掉它的窗口；开机自启用 install-service-windows.ps1 -Restart），再重新启动即可。`));
