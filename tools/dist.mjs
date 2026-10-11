@@ -178,6 +178,23 @@ async function record(outDir, file, lines) {
   console.log(`  ${mark.ok} ${path.basename(file)}  ${human(fs.statSync(file).size)}  ${c.dim(h.slice(0, 16) + '…')}`);
 }
 
+/**
+ * Move a finished artifact into the artifact directory.
+ *
+ * `fs.rename` cannot cross volumes on Windows (EXDEV): the package stage is a temp dir, usually on C:, while the
+ * repository lives wherever it lives. Fall back to copy + unlink there.
+ */
+function moveInto(src, dst) {
+  try {
+    fs.renameSync(src, dst);
+  } catch (e) {
+    if (e?.code !== 'EXDEV') throw e;
+    fs.copyFileSync(src, dst);
+    fs.rmSync(src, { force: true });
+  }
+  return dst;
+}
+
 // ---------------------------------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------------------------------
@@ -274,7 +291,7 @@ async function main(argv) {
       const zip = fs.readdirSync(stage).find((f) => f.endsWith('.zip'));
       if (!zip) throw new Error(`package.mjs 没产出 zip（${stage}）`);
       const dst = path.join(o.out, name('windows') + '.zip');
-      fs.renameSync(path.join(stage, zip), dst);
+      moveInto(path.join(stage, zip), dst);
       await record(o.out, dst, lines);
       fs.rmSync(stage, { recursive: true, force: true });
     }
@@ -285,7 +302,7 @@ async function main(argv) {
   console.log(`\n${c.bold('产物')}`);
   if (o.apk) {
     const dst = path.join(o.out, name('android') + '.apk');
-    fs.renameSync(APK_OUT, dst);
+    moveInto(APK_OUT, dst);
     await record(o.out, dst, lines);
   }
   fs.writeFileSync(path.join(o.out, 'SHA256SUMS.txt'), lines.join('\n') + '\n', 'utf8');
