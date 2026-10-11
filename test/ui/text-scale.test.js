@@ -60,6 +60,8 @@ const NOT_SCALED = [
   /\.gm__/, /\.roundbox/, /\.capsule/, /\.lp\b/, /\.lp--/, /\.misstag/, /\.bossbar/, /\.readywrap/,
   /\.bstrip/, /\.bslot/, /\.effect/, /\.efftip/, /\.ebubble/, /\.ticker/, /\.dpbox/, /\.vswitch/,
   /\.specpill/, /\.otwarn/, /\.team/, /\.enemybtn/, /\.readybtn/, /\.ewheel/, /\.fwheel/, /\.chud/, /\.toolbtn/,
+  // the top bar's 倍速 / 跳过 buttons and the 本阶段不可调倍速 tag: the same fixed .6rem button boxes as .toolbtn / .readybtn
+  /\.speedbtn/, /\.skipbtn/, /\.gtop__nospeed/,
   /\.shopbar/, /\.scard/, /\.scr\b/,
   // text inside a fixed-height bar (the HP bar of the detail card, the boss bar's fill)
   /\.dhp\b/,
