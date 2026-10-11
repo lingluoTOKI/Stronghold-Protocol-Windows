@@ -390,10 +390,18 @@ class MainActivity : Activity() {
         renderDiag(line.startsWith("ERROR") || line.contains("失败"))
     }
 
-    /** 能力探测结果：单独占一行，且不随其它消息被覆盖（它是诊断里最重要的一条）。 */
+    /**
+     * 能力探测结果：单独占一行，且不随其它消息被覆盖。
+     *
+     * **只有真出问题时才自动弹出来** —— 探测每进一次图都跑，无条件弹就是"每次开页面都蹦一条"
+     * （玩家反馈"你这个报错弹窗也太普遍了"）。一切正常时它静默存在，玩家点右下角构建字样随时能看。
+     * 「模块不可用」不算问题：那是模块探测的时机问题（PIXI 可能还没加载完），不是游戏坏了。
+     */
     private fun setProbe(line: String) {
         diagProbe = line
-        renderDiag(true)
+        val broken = listOf("失败", "WebGL1=false", "硬件加速=false", "清单=0", "loadBoardArt=null", "MAX_TEXTURE_SIZE=?")
+            .any { line.contains(it) }
+        if (broken) renderDiag(true)
     }
 
     private fun renderDiag(problem: Boolean) {

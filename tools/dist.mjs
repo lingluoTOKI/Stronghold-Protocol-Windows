@@ -185,6 +185,8 @@ async function record(outDir, file, lines) {
  * repository lives wherever it lives. Fall back to copy + unlink there.
  */
 function moveInto(src, dst) {
+  // Rebuilding on the same day produces the same name, and Windows rename will not overwrite an existing file.
+  fs.rmSync(dst, { force: true });
   try {
     fs.renameSync(src, dst);
   } catch (e) {
@@ -305,7 +307,15 @@ async function main(argv) {
     moveInto(APK_OUT, dst);
     await record(o.out, dst, lines);
   }
-  fs.writeFileSync(path.join(o.out, 'SHA256SUMS.txt'), lines.join('\n') + '\n', 'utf8');
+  // Merge with what is already there: a --apk run must not drop the Windows line of an earlier --win run.
+  const sumsFile = path.join(o.out, 'SHA256SUMS.txt');
+  const fresh = new Map(lines.map((l) => [l.slice(66), l]));
+  if (fs.existsSync(sumsFile)) {
+    for (const l of fs.readFileSync(sumsFile, 'utf8').split(/\r?\n/)) {
+      if (/^\w{64} {2}\S/.test(l) && !fresh.has(l.slice(66))) fresh.set(l.slice(66), l);
+    }
+  }
+  fs.writeFileSync(sumsFile, [...fresh.values()].join('\n') + '\n', 'utf8');
   console.log(`  ${mark.ok} SHA256SUMS.txt`);
   console.log(`\n完成：${o.out}\n`);
   return 0;
