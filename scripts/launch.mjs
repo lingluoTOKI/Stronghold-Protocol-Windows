@@ -54,11 +54,21 @@ function openBrowser(url) {
   return openInBrowser(url) !== null;
 }
 
+/** 启动后的提示：本机开服报「发给朋友」的局域网地址；联机模式只报本机与中心服务器（没有局域网地址可发）。 */
 function printShare(port) {
-  const addrs = classifyAddresses().filter((a) => a.kind === 'lan' || a.kind === 'vpn' || a.kind === 'public');
   const line = c.dim('─'.repeat(56));
+  const localUrl = `http://localhost:${port}`;
+  const upstream = String(process.env.SP_PROXY_TO || '').trim();
   console.log(`\n${line}`);
-  console.log(`${mark.ok} ${c.bold('服务器已启动')}   本机打开：${c.cyan(`http://localhost:${port}`)}`);
+  if (upstream) {
+    console.log(`${mark.ok} ${c.bold('联机模式已启动')}   本机打开：${c.cyan(localUrl)}`);
+    console.log(`  ${c.dim('实时数据来自')} ${c.cyan(upstream)}`);
+    console.log(c.dim('  好友直接访问上面的服务器地址加入。按 Ctrl+C 停止。'));
+    console.log(`${line}\n`);
+    return;
+  }
+  const addrs = classifyAddresses().filter((a) => a.kind === 'lan' || a.kind === 'vpn' || a.kind === 'public');
+  console.log(`${mark.ok} ${c.bold('服务器已启动')}   本机打开：${c.cyan(localUrl)}`);
   if (addrs.length) {
     console.log('  发给朋友（需要能访问这台电脑的网络）：');
     for (const a of addrs.slice(0, 4)) console.log(`    ${c.cyan(hostUrl(a.address, port))}  ${c.dim(KIND_LABEL[a.kind])}`);

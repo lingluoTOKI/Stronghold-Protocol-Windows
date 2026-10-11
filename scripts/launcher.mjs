@@ -274,11 +274,10 @@ export async function runProxy(cfg, { open = true, yes = false } = {}) {
   } else {
     console.log(`\n  ${ok} ${c.bold('联机（本机客户端）')}  ${c.cyan(chosen)} ${c.dim(`(来自 ${info.endpoint})`)}`);
   }
-  if (!parseServer(chosen)?.secure) {
-    console.log(`  ${warn} 未加密的 http 连接：局域网自建没问题，公网服务器建议用 https。`);
-  }
-  console.log(c.dim(`  页面与素材走本机磁盘，只把 /ws 与 /api/* 转发过去；端口 ${cfg.port}，只监听 127.0.0.1。`));
-  console.log(`  ${warn} 本包必须与中心服务器同一版本：不一致时客户端会提示刷新，素材与协议都可能对不上。`);
+  const notes = [];
+  if (!parseServer(chosen)?.secure) notes.push('未加密 http：自建 / 内网可以，公网建议 https');
+  notes.push('本包须与服务器同版本，否则页面会提示刷新');
+  console.log(c.dim(`  ${notes.join(' · ')}`));
 
   if (!yes) {
     const ans = await ask('开始？[Y/n]', 'Y');

@@ -63,10 +63,15 @@ export function isProcessEntry(metaUrl) {
   }
 }
 
-/** Print the boot banner of a started server. @param {{ url: string, host: string, port: number }} srv */
+/** Print the boot banner of a started server. @param {{ url: string, host: string, port: number, proxy?: object|null }} srv */
 export function printBanner(srv) {
   console.log(`\n  卫戍协议：盟约 · Stronghold Protocol: Alliance v${APP_VERSION}`);
   if (DEV_BUILD) console.log('  ! 开发版（dev 分支）：不稳定，请勿用于公开服务器 · development build — unstable, not for public servers');
+  // 联机（本机客户端）模式：本机只服务页面与素材，没有局域网地址可发，也不需要 cloudflared
+  if (srv.proxy) {
+    console.log('  联机模式（素材走本机磁盘）');
+    return;
+  }
   console.log(`  Local:   ${srv.url}`);
   if (srv.host === '0.0.0.0' || srv.host === '::') {
     for (const u of lanUrls(srv.port)) console.log(`  LAN:     ${u}`);
