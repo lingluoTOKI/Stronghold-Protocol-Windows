@@ -329,3 +329,30 @@ npm run package -- --update --from <旧版本的完整包>[,<…>] --out <目录
 - **MANIFEST.json**：三种包的根目录都有（`npm ci` 之后写入）：除素材（`public/assets/`、`public/fonts/`、`data/assets.json`、`data/local-assets.json`，归 setup 管）以外每个文件的大小和 sha256，同一版本的三种包内容相同。`npm run doctor` 和更新包的启动检查（`server/update.js`）用它核对安装。
 - **更新包**（0.2.1 起，每个版本都发）：`--from` 后面列出**之前每个 0.2.x 版本的完整包**（Releases 上的 zip，或它解压出来、没动过的文件夹；逗号分隔或写多个 `--from`），例如发布 0.2.2 时 `--from Stronghold-Protocol-v0.2.0.zip,Stronghold-Protocol-v0.2.1.zip`。工具照常构建完整包的临时目录（`npm ci` 等），逐个文件（大小 + sha256）和每个旧版本比较：和任何一个旧版本不同、或旧版本没有的文件都打进去，所以一个更新包能覆盖在列出的每个版本上；旧版本有、新版本没有的文件记进 `UPDATE.json` 的 `removed`（连同各旧版本里的 sha256，玩家那边只删内容一致的文件；只差大小写的同名文件和 `.env` 之类的本机文件名不删，摘要里会列出）。旧版本必须比当前版本旧、带素材（不能是精简包或更新包）、每个版本只给一次，`--dry-run` 只读取并检查旧版本。更新包里还有新版本的 `MANIFEST.json` 和 `UPDATE.json`（适用的旧版本、文件数、字节数、文件列表和 `removed`），同样经过拒绝名单和个人信息检查；摘要列出和每个旧版本相比改动 / 新增 / 删除的文件数和更新包里各类文件的数量。发布时在 Releases 说明里写明更新包适用的版本（即 `--from` 列出的版本）。`--keep-stage` 保留更新包目录和完整包的临时目录（`<目录>/Stronghold-Protocol-v<版本>-update/` 里的 `Stronghold-Protocol/` 和 `.full/`）。
 - **需要**：已下载素材的仓库（完整包）——打包前先联网运行一次 `node tools/fetch-assets.mjs`，补齐清单计划但本机还没有的素材（清单只列出磁盘上有的文件，打包工具看不出缺了哪些；`data/assets.json` 有变化就先提交）；能访问 npm 的网络（`npm ci`）；`zip`（或 bsdtar 的 `tar`，Windows 10 起自带）；更新包还要之前各版本的完整包（工具自己读 zip，不需要 `unzip`；Releases 上可以重新下载）。`--out` 默认是系统临时目录下的 `stronghold-protocol-release`，不能在仓库里面；`--force` 覆盖已有的 zip，`--keep-stage` 保留打包用的目录供检查。
+
+### 7.1 本改编版：`npm run dist`（Windows 便携包 + 安卓 APK）
+
+本改编版（`stronghold-protocol-alliance`）的发布产物用一条命令出。版本号只有一个来源——仓库根 `package.json` 的 `version`（`0.2.4` → `versionCode` 204），不再手写进 `android/app/build.gradle.kts`：
+
+```bash
+npm run dist                      # Windows 便携包 + 安卓 APK，写进 dist/，并生成 dist/SHA256SUMS.txt
+npm run dist -- --apk             # 只出 APK
+npm run dist -- --win             # 只出 Windows 便携包
+npm run dist -- --upstream <url>  # 换掉打进 APK 的中心服务器地址（默认 android/gradle.properties 的 SP_UPSTREAM）
+npm run dist -- --skip-build      # 复用现成的 android/app/src/main/assets/www.zip
+npm run dist -- --dry-run         # 只打印计划，不执行
+```
+
+**APK 怎么打**：`android/make-www.mjs` 把 `public/`、`data/`、`shared/`、`server/sim/` 打成 `android/app/src/main/assets/www.zip`（约 500 MB，含全部素材）→ `:app:compileReleaseKotlin` 先做一次编译自检（约 10 秒，能在打真包之前挡住 Kotlin 写错）→ `:app:assembleRelease`。
+
+**工具链**（`tools/dist.mjs` 自动找，找不到才报错）：
+
+| 需要 | 找法 |
+|---|---|
+| JDK | `JAVA_HOME`（会验证它确实有 `bin/javac`），否则扫 `C:\Program Files\Java\jdk-*` 等 |
+| Gradle | `SP_GRADLE`，否则 PATH 里的 `gradle`，否则扫各盘符下的 `gradle-*` |
+| Android SDK | `ANDROID_HOME` / `ANDROID_SDK_ROOT`，否则 `android/local.properties` 的 `sdk.dir` |
+
+**签名**：口令**绝不进版本库**（`android/gradle.properties` 一度存过明文，已清掉）。按优先级取：Gradle 属性 `-P` → 环境变量 `SP_KEYSTORE_PASSWORD` / `SP_KEY_ALIAS` / `SP_KEY_PASSWORD` → `android/keystore.properties`（已 gitignore）。密钥库在、口令却没给时 `npm run dist` **直接报错**：debug 签名的包装不上已装的正式版（签名不同，只能先卸载）。
+
+**为什么改代码不用重发 APK**：本机客户端是「**远端代码 + 本机素材**」——`android/app/src/main/java/com/lingluotoki/stronghold/LocalServer.kt` 的 `dispatch` 把 `/assets/`、`/media/`、`/data/local-assets.json`、`/about/`、`/api/app-server` 留在本机 www，其余（页面、`/js`、`/css`、`/data`、`/shared`、`/sim`、`/vendor`、`/healthz`）全部反代给中心服务器，上游不可达时回退本机 www。于是服务器改代码玩家自动跟上，只有改**壳**（Kotlin）或素材才需要重打 APK。壳的构建产物（`www.zip`、`app/build/`、`.gradle/`、`local.properties`、`keystore.properties`）都在 `android/.gitignore` 里，源码之外的都不进版本库。

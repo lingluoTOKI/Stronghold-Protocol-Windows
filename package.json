@@ -38,6 +38,7 @@
     "launcher": "node scripts/launcher.mjs",
     "bundle": "node scripts/make-windows-bundle.mjs",
     "bundle:zip": "node scripts/make-windows-bundle.mjs --zip",
+    "dist": "node tools/dist.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --checkJs -p jsconfig.json",
     "check:imports": "node tools/check-imports.mjs",
