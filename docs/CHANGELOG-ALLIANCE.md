@@ -1,16 +1,51 @@
 # Stronghold Protocol — Alliance Edition · Changelog
 
 > A community multiplayer fork of **Stronghold Protocol (卫戍协议：盟约)**.
-> This edition is rebuilt on the **clean official upstream 0.2.3** baseline and re-applies a
+> This edition is rebuilt on the **clean official upstream 0.2.4** baseline and re-applies a
 > small set of self-hosted multiplayer / UI features. The Rhine Life expansion has been
 > removed from this build and will return later as a separately isolated plugin.
 >
-> - Upstream: <https://github.com/sganggs/Stronghold-Protocol> (baseline commit `1db8e510`, **0.2.3**)
+> - Upstream: <https://github.com/sganggs/Stronghold-Protocol> (baseline commit `bc50cac0`, **0.2.4**)
 > - This fork: <https://github.com/lingluoTOKI/Stronghold-Protocol-Windows>
 > - Primary server: <http://game.lingluotoki.dpdns.org> · Backup vanilla server: <http://116.62.39.28:3000>
 >
 > Fan-made, unofficial, free to play. Art / music / text / data belong to Hypergryph / Yostar
 > and are **not** covered by the GPL code license. No commercial use of any kind.
+
+---
+
+## [0.2.4-alliance] — 2026-10-11
+
+### Re-synced upstream 0.2.4
+- Rebuilt onto official **sganggs/Stronghold-Protocol 0.2.4** (`bc50cac0`), 28 commits on top of
+  the previous `1db8e510` baseline. All ten custom features were re-verified after the merge
+  (grep + `node --check` + `check:imports` + smoke test), and the locked balance values are intact:
+  per-player `deployCap = 8` and the official opening bans (FUNNY 0/1, NORMAL/HARD/ABYSS 3/4,
+  TRAINING 0/0) with the five/six-player reductions applied in `shared/openingBans.js`.
+- Two merge conflicts were resolved by combining upstream logic with the custom hooks:
+  `public/js/screens/lobby.js` (online-pill kept alongside the new lobby tools group) and
+  `public/js/ui/choiceOverlay.js` (`data-idx` kept alongside the new `soldOut` state).
+
+### Upstream 0.2.4 additions (community round 29)
+- **Shared card pool & equipment stock** (§29.8): operators and equipment now use the official
+  shared-stock rules (single/co-op base counts plus per-operator/item exceptions); exhausted
+  equipment shows 库存不足 (`soldOut`) and can no longer be bought.
+- **Reroll one-tap refresh** in the shop.
+- **Boss overtime & Raid revive** (§29.1): the extra grace only applies with an AI teammate;
+  a revived Raid reselects by taunt and no longer stalls.
+- **Operator / item corrections** (§29.2–29.5, 29.10, 29.11): Pinecone S2 per-deployment growth,
+  Harold S2 elemental-only trigger, family-crest first-hit after stealth, Skadi S1 / Stead bounce
+  freeze, Ptilopsis copying Yu/Gladiia bypassing the row prerequisite, Clementia S2 splash &
+  airborne cast, Jessica's shield on the four adjacent tiles, champagne bomb isolated from
+  friendly selection + original art.
+- **UI & recovery** (§29.6): DIY loadout stats, Swire coin balance, lobby tools group, scrollable
+  settlement, transient load retry, Japanese term fixes, multiplayer boss Raid landing on the
+  empty half (§29.13).
+
+### Custom multiplayer / UI features (preserved, unchanged)
+The ten features listed under [0.2.3-alliance] are all preserved: six-player co-op, battle speed
+1×/2×/4×, skip battle, draggable chat/emotes, bulletin board, online count, quick matchmaking,
+admin monitor, and the PC/Android launcher scripts.
 
 ---
 
@@ -97,7 +132,7 @@
 
 ## How to re-sync a future upstream update without losing the custom features
 
-See **[`UPSTREAM-SYNC-PROMPT.md`](./UPSTREAM-SYNC-PROMPT.md)** — it contains the reusable prompt
+See **[`1UPSTREAM-SYNC-PROMPT.md`](./1UPSTREAM-SYNC-PROMPT.md)** — it contains the reusable prompt
 (the block between the two ✂ markers can be copied wholesale), the mirror commands, the exact
 file locations of all ten custom features, the merge/rebuild workflow, the "art is not committed"
 rule, and a self-check list. Never delete a custom feature; keep Rhine out of this build.
