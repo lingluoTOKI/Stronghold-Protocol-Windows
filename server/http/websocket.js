@@ -32,11 +32,14 @@ export function createSessionStack(opts, { data, log }) {
 
 /**
  * Serve the WebSocket endpoint /ws on `server` (its 'upgrade' event).
+ *
+ * 联机（本机客户端）模式：传了 `proxy` 时 `/ws` 整条交给中心服务器（本机只服务页面与素材），本机的 Network /
+ * admission 完全不参与 —— proxy.js 的 forwardUpgrade 已含握手与双向转发。
  * @param {import('node:http').Server} server
- * @param {{ network: Network, log: object }} deps
+ * @param {{ network: Network, log: object, proxy?: ReturnType<import('./proxy.js').createProxy> | null }} deps
  * @returns {WebSocketServer}
  */
-export function attachWebSocket(server, { network, log }) {
+export function attachWebSocket(server, { network, log, proxy = null }) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: WS_MAX_PAYLOAD, perMessageDeflate: false, clientTracking: false });
   wss.on('connection', (ws, req) => network.handleConnection(ws, req));
   wss.on('error', (e) => log.error('[ws] server error', e));
@@ -48,6 +51,10 @@ export function attachWebSocket(server, { network, log }) {
       try { socket.end(`HTTP/1.1 ${status} ${text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`); } catch { socket.destroy(); }
     };
     if (!parts || parts.rawPath !== '/ws') { reject(404, 'Not Found'); return; }
+    if (proxy) {
+      try { proxy.forwardUpgrade(wss, req, socket, head); } catch (e) { log.error('[ws] proxy upgrade failed', e); socket.destroy(); }
+      return;
+    }
     const refused = network.admission(req);
     if (refused === 'per-address') { reject(429, 'Too Many Requests'); return; }
     if (refused) { reject(503, 'Service Unavailable'); return; }

@@ -80,10 +80,11 @@
 - 用法：运维以 `file://` 直接打开 monitor.html（靠 CORS 跨域拉接口），无需服务端托管该页面。
 
 ## 10. 本机开服 / PC+安卓局域网联机 / 打包
-- 新分支位置：新 `scripts/launcher.mjs`（菜单：本机开服/连接服务器/设置/状态，**无公网 proxy**）、`scripts/zipdir.mjs`（通用 UTF-8 zip）；`scripts/launch.mjs` 默认 host 改 `0.0.0.0`（局域网可连）；`scripts/make-windows-bundle.mjs` 在官服版上增补 launcher bat/zipdir/stripWebfonts/`--zip`；根 `启动游戏.bat`/`本机当服务器.bat`/`连接服务器.bat`（`chcp 65001`、切脚本目录、无写死 IP/token）；`package.json` 增 `launcher`/`bundle`/`bundle:zip`。
+- 新分支位置：新 `scripts/launcher.mjs`（菜单：本机开服 / 连接服务器 / **联机（本机客户端）** / 设置 / 状态）、`scripts/zipdir.mjs`（通用 UTF-8 zip）；`scripts/launch.mjs` 默认 host 改 `0.0.0.0`（局域网可连）；`scripts/make-windows-bundle.mjs` 在官服版上增补 launcher bat/zipdir/stripWebfonts/`--zip`/`--upstream`；根 `启动游戏.bat`/`本机当服务器.bat`/`连接服务器.bat`/`连接主服务器.bat`（`chcp 65001`、切脚本目录、无写死 IP/token）；`package.json` 增 `launcher`/`bundle`/`bundle:zip`。
 - 局域网联机：`本机当服务器.bat` 以 `HOST=0.0.0.0` 开服，控制台打印局域网地址，朋友浏览器访问 `http://<本机IP>:3000`；`连接服务器.bat` 输入对方地址。
-- 验证：全部 node --check；vendor 离线构建通过 ✅；**launcher 交互菜单、Windows 便携包实压、安卓 APK 留你实测**。
-- 明确未纳入（见剥离清单）：`server/http/proxy.js` 公网反代/扇出、android 壳与 APK 签名、dist 产物、莱茵打包脚本。
+- **联机（本机客户端）模式**：`server/http/proxy.js` —— 本机用磁盘上的页面与素材，只把 `/ws` 与 `/api/*` 反代给中心服务器（`SP_PROXY_TO` / `opts.proxyTo`）。`/healthz` 不转发（客户端 buildGuard 要比对**本机** build）；`/ws` 的关闭码 4001 / 4002 原样透传（否则客户端的重连策略会走错分支）；上游还没连上时先缓存几帧 hello，连上即补发。入口 `launcher.mjs --mode proxy`，上游地址**只**从包内 `scripts/launcher.config.json` 的 `upstream` 读 —— 打包用 `make-windows-bundle.mjs --upstream <origin>` 写入并生成 `连接主服务器.bat`：地址写死、玩家改不了（会话凭证按 origin 存，用参数指向任意主机等于把凭证外发）。**代价**：本包必须与中心服务器同一版本，不一致时客户端提示刷新，素材与协议都可能对不上。
+- 验证：全部 node --check；vendor 离线构建通过 ✅；`test/proxy.test.js` 覆盖反代本身（`/api/*` 状态码与响应头原样、静态不走上游、`/healthz` 由本机回答、关闭码 4001 透传、非 `/ws` 的 upgrade 仍 404、上游不可达时 502 / 1011）✅；**launcher 交互菜单、Windows 便携包实压、安卓 APK 留你实测**。
+- 明确未纳入（见剥离清单）：android 壳与 APK 签名、dist 产物、莱茵打包脚本。**「页面直连远端」那种玩法仍然不做**：`--mode connect` 是打开对方的网页（页面源决定凭证在哪），`--mode proxy` 只认包内写死的地址、不吃 `--server`。
 
 ---
 

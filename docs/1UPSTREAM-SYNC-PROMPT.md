@@ -33,14 +33,14 @@
 7. **在线人数**：`server/http/routes.js` `GET /api/online`，前端 5s 轮询。
 8. **公共/快速匹配**：`server/lobby.js` 匹配队列（`MATCH_TARGET=6`、`MATCH_TIMEOUT_MS=30000`，凑满即开；超时三选一：继续等待 / 用 AI 补满 / 按当前人数直接开），协议 `match.enqueue` 等。
 9. **监控大屏 monitor.html**：按房间分组玩家、单人踢/一键踢全、三服务器切换、公告编辑器（发布/撤回强制公告）；对应服务端 `routes.js` 的 `/api/admin/*`（players/rooms/kick/kickall/announce/announce-clear，`SP_ADMIN_TOKEN` 鉴权）与 `/healthz` CORS。
-10. **本机/PC/安卓联机脚本**：根目录 `本机当服务器.bat`、`启动游戏.bat`、`连接服务器.bat`（含便携 node 探测、局域网共享）、`scripts/launcher.mjs`、`scripts/make-windows-bundle.mjs`、`scripts/zipdir.mjs`。
+10. **本机/PC/安卓联机脚本**：根目录 `本机当服务器.bat`、`启动游戏.bat`、`连接服务器.bat`（含便携 node 探测、局域网共享）、`scripts/launcher.mjs`、`scripts/make-windows-bundle.mjs`、`scripts/zipdir.mjs`。**联机（本机客户端）模式**：`server/http/proxy.js`（`SP_PROXY_TO` / `opts.proxyTo`：`/ws` 与 `/api/*` 反代中心服务器，页面与素材走本机磁盘，`/healthz` 不转发）+ `server/index.js` 接线 + `routes.js` / `websocket.js` 两条转发 + `launcher.mjs --mode proxy` + 打包 `--upstream` 生成的 `连接主服务器.bat`。**上游地址只从包内 `scripts/launcher.config.json` 的 `upstream` 读，不吃命令行 / URL 参数**（会话凭证按 origin 存）。
 
 **执行流程（一步步来，每步给我看结果）**
 1. `git fetch` 上游 master（走镜像），记录上游最新 commit；用 `git merge-base --is-ancestor <上游最新> HEAD` 和 `git log --oneline HEAD..<上游最新>` 确认**哪些是上游新 commit**（同步前先告诉我数量和标题）。
 2. 从当前分支新建同步分支（如 `sync/upstream-<版本号>`），不要直接在主分支上动。
 3. 合入上游（merge 或按 commit cherry-pick）。逐文件解决冲突：
    - `server/sim/**`、`tools/**`、`public/js/render/**`、官方数据 → 采用上游版本，再把我独有功能的调用钩子重新接上；
-   - 独有文件（chat.js、openingBans.js、monitor.html、announcements*、launcher/打包脚本、三个 bat、两个 `改编版-*.md`）→ 保留我的；
+   - 独有文件（chat.js、openingBans.js、monitor.html、announcements*、`server/http/proxy.js`、launcher/打包脚本、四个 bat、两个 `改编版-*.md`）→ 保留我的；
    - 交叠文件（lobby.js、Match.js、choices.js、gamedata.js、phases.js、intents.js、runner.js、hud.js、game.js、title.js、routes.js、index.js、constants.js、protocol.js）→ 以上游新逻辑为底，把 10 项独有补丁重新合入，保证上游新改动不被覆盖。
 4. 若上游改了数据结构/字段（例如 config 新增字段），运行 `node tools/build-data.mjs` 重建 `data/**`，再确认独有数值（deployCap=8、BAN）仍在。
 5. **美术资源不入库**：`public/assets/**`、`public/fonts/**`、`data/assets.json`、`data/local-assets.json` 在 `.gitignore` 内，属于部署/本地资源，不要提交、不要删；3D 棋盘靠 `data/local-assets.json` + `public/assets/local`（缺失会静默回退 2D、没有橙色栏杆）。
@@ -57,7 +57,7 @@
 ## 附：当前基线快照（AI 核对用，会随版本过期，以实际 fetch 为准）
 
 - 最近一次核对时间：2026-10-10；上游 master 最新 = `1db8e510`（0.2.3，2026-10-10 03:19 +0800），已确认是改编版 HEAD 的祖先，**上游 commit 零遗漏、零删除文件**。
-- 改编版在该基线上的独有改动：新增 12 个文件（announcements.json、monitor.html、public/js/ui/chat.js、scripts/launcher.mjs、scripts/zipdir.mjs、server/http/announcements.js、shared/openingBans.js、三个 bat、两个 `改编版-*.md` 等），修改约 30 个文件，全部属于上述 10 项独有功能。
+- 改编版在该基线上的独有改动：新增 13 个文件（announcements.json、monitor.html、public/js/ui/chat.js、scripts/launcher.mjs、scripts/zipdir.mjs、server/http/announcements.js、server/http/proxy.js、shared/openingBans.js、四个 bat、两个 `改编版-*.md` 等），修改约 30 个文件，全部属于上述 10 项独有功能。
 - 常用命令：
   - 拉上游：`git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git master`
   - 查上游新增：`git log --oneline HEAD..FETCH_HEAD`

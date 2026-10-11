@@ -44,10 +44,11 @@ export function healthReport({ startedAt, network, registry, lobby }) {
  * The request listener for `http.createServer`.
  * @param {{ serveStatic: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse,
  *             rawPath: string, query: string) => Promise<void>,
- *           health: Parameters<typeof healthReport>[0], log: object }} deps
+ *           health: Parameters<typeof healthReport>[0], log: object,
+ *           proxy?: ReturnType<import('./proxy.js').createProxy> | null }} deps
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, announcements = null, announcePublish = null, announceClear = null }) {
+export function createRequestHandler({ serveStatic, health, log, announcements = null, announcePublish = null, announceClear = null, proxy = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
@@ -158,6 +159,14 @@ export function createRequestHandler({ serveStatic, health, log, announcements =
       const r = announceClear();
       if (!r.ok) { sendError(req, res, 500, r.error || 'announce clear failed'); return; }
       sendJson(req, res, 200, { ok: true, updatedAt: r.updatedAt, removed: r.removed });
+      return;
+    }
+
+    // ---- 联机（本机客户端）模式：/ws 与 /api/* 交给中心服务器（server/http/proxy.js）----
+    // 放在本机的运维接口之后：页面与素材始终由本机回答，实时状态与接口则报中心服务器的。
+    // /healthz（不含 /api/ 前缀）故意不走这里 —— 客户端的 buildGuard 要拿它比对**本机**这一份代码。
+    if (proxy && parts.rawPath.startsWith('/api/')) {
+      proxy.proxyHttp(req, res);
       return;
     }
 

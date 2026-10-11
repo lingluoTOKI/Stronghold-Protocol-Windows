@@ -1,5 +1,6 @@
 {
   "port": 3000,
   "host": "0.0.0.0",
-  "lastName": "https://game.lingluotoki.dpdns.org/"
+  "lastName": "https://game.lingluotoki.dpdns.org/",
+  "upstream": ""
 }

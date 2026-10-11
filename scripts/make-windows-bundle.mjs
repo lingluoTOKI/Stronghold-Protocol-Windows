@@ -62,7 +62,7 @@ const SKIP_TRACKED = ['test/'];
  * 仓库根的**原地**启动器：它们假设 `%HERE%` 就是游戏根、node 在 `%HERE%node\`。便携包里游戏在 `app\`，
  * 包根另有一份由 bat() 生成、指向 `app\scripts\launcher.mjs` 的对应脚本，所以这几个不再拷进 `app\`。
  */
-const SKIP_ROOT_FILES = ['启动游戏.bat', '本机当服务器.bat', '连接服务器.bat'];
+const SKIP_ROOT_FILES = ['启动游戏.bat', '本机当服务器.bat', '连接服务器.bat', '连接主服务器.bat'];
 
 /** 包根要带的许可证 / 声明。 */
 const LEGAL_FILES = ['LICENSE', 'NOTICE.md', 'THIRD-PARTY-NOTICES.md'];
@@ -76,7 +76,7 @@ const LEGAL_FILES = ['LICENSE', 'NOTICE.md', 'THIRD-PARTY-NOTICES.md'];
 const LOCAL_ASSET_MANIFEST = path.join('data', 'local-assets.json');
 
 function parseArgs(argv) {
-  const o = { out: '', node: true, force: false, nodeSpec: '', sha256: '', zip: false, webfonts: false };
+  const o = { out: '', node: true, force: false, nodeSpec: '', sha256: '', zip: false, webfonts: false, upstream: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const [k, v] = a.split('=');
@@ -84,6 +84,7 @@ function parseArgs(argv) {
     if (k === '--out') o.out = String(val() || '');
     else if (k === '--node-version') o.nodeSpec = String(val() || '');
     else if (k === '--sha256') o.sha256 = String(val() || '').toLowerCase();
+    else if (k === '--upstream') o.upstream = String(val() || '');
     else if (a === '--no-node') o.node = false;
     else if (a === '--zip') o.zip = true;
     else if (a === '--keep-webfonts') o.webfonts = true;
@@ -102,6 +103,10 @@ const HELP = `node scripts/make-windows-bundle.mjs — 生成 Windows 开箱即�
   --force            目录已存在时先删掉（只肯删空目录，或上一次打的便携包；其余情况拒绝）
   --node-version X   换一个 Node 版本（默认 ${NODE_PIN.version}）；换版本必须同时给 --sha256
   --sha256 <hash>    该版本 win-x64.zip 的 sha256（取自官方 SHASUMS256.txt）
+  --upstream <addr>  配置「联机」的中心服务器（如 http://game.example.com 或 101.132.104.41:3000）：
+                     包根多一个 连接主服务器.bat，包内 launcher.config.json 写入 upstream。
+                     地址**写死在包里**、玩家不可改（会话凭证按 origin 存，见 scripts/launcher.mjs 头部）。
+                     请写全 http:// 或 https://，省掉启动时一次必然失败的协议探测。
 
   app\\ 里只放 git 跟踪的文件 + 生产依赖（npm ci --omit=dev）+ public/{assets,fonts,vendor}；
   因此 .env / .venv / .claude / scripts/service.env.cmd 这些本机文件不会被打进去。
@@ -109,6 +114,7 @@ const HELP = `node scripts/make-windows-bundle.mjs — 生成 Windows 开箱即�
 
   包根带三个 .bat：启动游戏.bat（打开启动器菜单）、本机当服务器.bat（直接开服）、
   连接服务器.bat（输入地址连别人的服）。默认去掉 Google Fonts 外链（包内自带 /fonts）。
+  给了 --upstream 再多一个 连接主服务器.bat：本机素材 + 只把 /ws 与 /api/* 转发给那台服务器。
 `;
 
 /**
@@ -403,6 +409,39 @@ async function extractPortableNode(bundleNodeDir, version, zipPath) {
   }
 }
 
+/**
+ * `--upstream` 的规范形式：只接受 origin（`[http(s)://]主机[:端口]`，不带路径 / 查询 / 片段），
+ * 其余返回 ''。写不写协议都收 —— 不写时由启动器探活决定（本机 / 内网走 http）。
+ * @param {string} raw
+ * @returns {string} 规范化后的地址，或 ''
+ */
+export function normalizeUpstream(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `http://${s}`);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    if (!u.hostname) return '';
+    if (u.pathname !== '/' || u.search || u.hash) return '';
+  } catch { return ''; }
+  // 末尾斜杠去掉，其余原样：裸主机名保持裸的（协议由启动器探活决定，本机 / 内网才有 http）
+  return s.replace(/\/+$/, '');
+}
+
+/**
+ * 把中心服务器地址并进包内 `app/scripts/launcher.config.json` 的内容（保留已有的键，坏 JSON 视为空）。
+ * @param {string} text 现有文件内容
+ * @param {string} upstream
+ * @returns {string} 写回文件的内容
+ */
+export function withUpstream(text, upstream) {
+  let cfg = {};
+  try { cfg = JSON.parse(text); } catch { /* 坏 JSON：按空配置处理 */ }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) cfg = {};
+  cfg.upstream = String(upstream || '');
+  return `${JSON.stringify(cfg, null, 2)}\n`;
+}
+
 /** 启动 .bat（内容保持纯 ASCII，中文只出现在文件名里）。 */
 function bat(body) {
   return `@echo off\r\nchcp 65001 >nul\r\nsetlocal\r\nset "HERE=%~dp0"\r\nset "NODE="\r\nif exist "%HERE%node\\node.exe" set "NODE=%HERE%node\\node.exe"\r\nif not defined NODE set "NODE=node"\r\n${body}\r\nset "CODE=%ERRORLEVEL%"\r\nif not "%CODE%"=="0" pause\r\nexit /b %CODE%\r\n`;
@@ -412,7 +451,11 @@ function bat(body) {
  * 包内说明。带不带便携版 Node 会影响三处措辞（是否需要预装 Node、许可证在哪、目录结构），
  * 所以先算好片段再拼，别在模板里嵌套引号。
  */
-export function bundleReadme({ version, withNode }) {
+export function bundleReadme({ version, withNode, upstream = '' }) {
+  const proxyTree = upstream ? '\n连接主服务器.bat         联机：本机素材 + 只把 /ws 与 /api/* 转发给中心服务器' : '';
+  const proxyHow = upstream
+    ? `\n连接主服务器.bat  联机（推荐）：本机素材照常从磁盘读，只把 /ws 与 /api/* 转发给 ${upstream}，首屏最快\n                  —— 开服方就是这个包对应的中心服务器；本包必须与它**同一版本**，不一致时页面会提示刷新\n`
+    : '';
   const nodeNeed = withNode
     ? `目标机器**不需要安装 Node**：包内的 \`node\\node.exe\` 就是便携版 Node ${version}。`
     : '这个包**没有带便携版 Node**，请先在这台机器上安装 Node 22 或 24（LTS）。';
@@ -421,15 +464,15 @@ export function bundleReadme({ version, withNode }) {
     ? `node\\node.exe            便携版 Node ${version}（官方 x64，已经 sha256 校验）
 node\\LICENSE-node.txt    Node 自己的许可证（MIT）
 app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
-启动游戏.bat             打开启动器菜单（本机当服务器 / 连接服务器 / 设置）
+启动游戏.bat             打开启动器菜单（本机当服务器 / 连接服务器 / 联机 / 设置）
 本机当服务器.bat         直接在这台电脑开服
-连接服务器.bat           输入地址连别人的服务器
+连接服务器.bat           输入地址连别人的服务器${proxyTree}
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md`
     : `app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
-启动游戏.bat             打开启动器菜单（本机当服务器 / 连接服务器 / 设置）
+启动游戏.bat             打开启动器菜单（本机当服务器 / 连接服务器 / 联机 / 设置）
 本机当服务器.bat         直接在这台电脑开服
-连接服务器.bat           输入地址连别人的服务器
+连接服务器.bat           输入地址连别人的服务器${proxyTree}
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 
@@ -461,9 +504,9 @@ Noto Sans SC 这类网页字体（\`index.html\` 里那条外链这次没有改�
 ## 怎么玩
 
 \`\`\`
-启动游戏.bat    打开启动器菜单：[1]本机当服务器  [2]连接服务器  [3]设置  [4]查看状态
+启动游戏.bat    打开启动器菜单：[1]本机当服务器  [2]连接服务器  [3]联机  [4]设置  [5]查看状态
 本机当服务器.bat  直接在这台电脑开服，浏览器自动打开；控制台会打印「发给朋友」的局域网地址
-连接服务器.bat    输入别人的服务器地址，用浏览器直接打开对方的网页
+连接服务器.bat    输入别人的服务器地址，用浏览器直接打开对方的网页${proxyHow}
 \`\`\`
 
 第一次开服时 Windows 防火墙可能弹窗，勾选**允许专用网络**（否则朋友连不上）。
@@ -482,6 +525,15 @@ ${tree}
 async function main() {
   const o = parseArgs(process.argv.slice(2));
   if (o.help) { console.log(HELP); return 0; }
+  if (o.upstream) {
+    const up = normalizeUpstream(o.upstream);
+    if (!up) {
+      console.error(`✖ --upstream 只收 origin（[http(s)://]主机[:端口]，不要路径 / 查询 / 片段），收到的是 ${o.upstream}`);
+      console.error('  例：--upstream http://101.132.104.41:3000  或  --upstream game.example.com');
+      return 1;
+    }
+    o.upstream = up;
+  }
   const out = path.resolve(o.out || path.join(path.dirname(ROOT), 'Stronghold-Protocol-Windows'));
   const appDir = path.join(out, 'app');
   const nodeDir = path.join(out, 'node');
@@ -599,15 +651,28 @@ async function main() {
     await fsp.copyFile(src, path.join(out, f));
   }
 
-  // 6) 包根的三个启动 .bat（指向 app\scripts\launcher.mjs 启动器）
+  // 6) 包根的启动 .bat（指向 app\scripts\launcher.mjs 启动器）
   await fsp.writeFile(path.join(out, '启动游戏.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" %*'), 'latin1');
   await fsp.writeFile(path.join(out, '本机当服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode local %*'), 'latin1');
   await fsp.writeFile(path.join(out, '连接服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode connect %*'), 'latin1');
-  await fsp.writeFile(path.join(out, 'README-开箱即用.md'), bundleReadme({ version: nodeVersion, withNode: !!o.node }), 'utf8');
+
+  // 6b) --upstream：把中心服务器写进包内启动器配置，并加一个「联机」bat。
+  // bat 里**不带地址**（只 --mode proxy）：地址只从 launcher.config.json 读，玩家改不了，
+  // 这样"包是谁打的、连哪台服务器"在打包时定死 —— 会话凭证按 origin 存，见 launcher.mjs 头部说明。
+  if (o.upstream) {
+    const cfgPath = path.join(appDir, 'scripts', 'launcher.config.json');
+    let cfgText = '';
+    try { cfgText = await fsp.readFile(cfgPath, 'utf8'); } catch { /* 新包还没有这份配置：从空对象开始 */ }
+    await fsp.writeFile(cfgPath, withUpstream(cfgText, o.upstream), 'utf8');
+    await fsp.writeFile(path.join(out, '连接主服务器.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launcher.mjs" --mode proxy --yes %*'), 'latin1');
+    console.log(`  · 联机模式已配置中心服务器：${o.upstream}（包根 连接主服务器.bat）`);
+  }
+
+  await fsp.writeFile(path.join(out, 'README-开箱即用.md'), bundleReadme({ version: nodeVersion, withNode: !!o.node, upstream: o.upstream }), 'utf8');
 
   const total = await dirSize(out);
   console.log(`\n✔ 便携包已生成：${out}\n  ${total.files} 个文件 / ${MB(total.bytes)}`);
-  console.log('  双击「启动游戏.bat」打开启动器菜单（本机当服务器 / 连接服务器 / 设置）。');
+  console.log(`  双击「启动游戏.bat」打开启动器菜单（本机当服务器 / 连接服务器${o.upstream ? ' / 联机' : ''} / 设置）。`);
 
   if (o.zip) {
     const zipPath = `${out}.zip`;

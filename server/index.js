@@ -11,6 +11,8 @@
 //   http/files.js      one file → response: MIME, gzip + memory cache, ETag / Last-Modified / 304, Cache-Control, ranges
 //   http/buildTag.js   the build tag of the served browser runtime (/healthz `build`, public/js/ui/buildGuard.js)
 //   http/routes.js     the request listener: security headers, 414 / 400 / 405, GET /healthz → JSON status, else static
+//   http/proxy.js      联机（本机客户端）模式的反向代理：`SP_PROXY_TO` 时 /ws 与 /api/* 转发给中心服务器，
+//                      页面与素材仍由本机磁盘提供（其余一律本机回答；/healthz 不转发）
 //   http/common.js     what every answer shares: security headers, URL split, error page, JSON replies, bare 400
 //   http/boot.js       a pending update package first (update.js: old files deleted, the install verified against
 //                      MANIFEST.json), banner (Local / LAN / tunnel URLs), port-in-use hint, graceful shutdown on SIGINT /
@@ -33,6 +35,7 @@ import { createPackRegistry } from './packs.js';
 import { MIME, COMPRESSIBLE, acceptsGzip, parseRange } from './http/files.js';
 import { BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag } from './http/buildTag.js';
 import { createRequestHandler } from './http/routes.js';
+import { parseProxyOrigin, createProxy } from './http/proxy.js';
 import { createAnnouncements } from './http/announcements.js';
 import { answerClientError } from './http/common.js';
 import { lanUrls, displayHost, isProcessEntry, runMain } from './http/boot.js';
@@ -40,7 +43,7 @@ import { lanUrls, displayHost, isProcessEntry, runMain } from './http/boot.js';
 // The public API of this module (tests and tools import it from here); the code lives in ./http/.
 export {
   ROOT, WS_MAX_PAYLOAD, DATA_SHIM_JS, MIME, COMPRESSIBLE, BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag,
-  acceptsGzip, parseRange, createStaticHandler, lanUrls, parseTrustProxy,
+  acceptsGzip, parseRange, createStaticHandler, lanUrls, parseTrustProxy, parseProxyOrigin, createProxy,
 };
 
 /**
@@ -53,6 +56,7 @@ export {
  *   ratePerSec?: number, rateBurst?: number, maxConnections?: number, maxRooms?: number,
  *   maxConnectionsPerAddr?: number, maxRoomsPerAddr?: number, maxMatchesPerAddr?: number, resyncMinGapMs?: number,
  *   heavyPerSec?: number, heavyBurst?: number, trustProxy?: 'auto' | boolean, soloReconnectWindowMs?: number,
+ *   proxyTo?: string,
  * }} [opts]
  * @returns {Promise<{ port: number, host: string, url: string, server: http.Server, wss: import('ws').WebSocketServer,
  *                     lobby: import('./lobby.js').Lobby, network: import('./net.js').Network,
@@ -71,6 +75,11 @@ export async function startServer(opts = {}) {
   const packs = createPackRegistry({ publicDir, dataDir, packsDir }, { log });
   packs.refresh(true);
   const serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, packsDir, packs, log });
+  // 联机（本机客户端）模式：本进程用本机磁盘上的客户端与素材，只把 /ws 与 /api/* 转发给中心服务器。
+  // 由 startServer 的 opts.proxyTo 或环境变量 SP_PROXY_TO 启用（scripts/launcher.mjs --mode proxy 写的就是它）。
+  const proxyOrigin = parseProxyOrigin(opts.proxyTo ?? process.env.SP_PROXY_TO);
+  const proxy = proxyOrigin ? createProxy({ origin: proxyOrigin, log, maxPayload: WS_MAX_PAYLOAD }) : null;
+  if (proxy) log.info(`[proxy] 联机模式：/ws 与 /api/* → ${proxyOrigin.origin}（页面与素材走本机磁盘）`);
   const startedAt = Date.now();
   // The tag is per process (see buildTag): read the browser runtime once, here, not on every /healthz.
   resetBuildTag();
@@ -114,9 +123,9 @@ export async function startServer(opts = {}) {
     };
   })();
 
-  const server = http.createServer(createRequestHandler({ serveStatic, health: { startedAt, network, registry, lobby }, log, announcements, announcePublish: announceApi.publish, announceClear: announceApi.clear }));
+  const server = http.createServer(createRequestHandler({ serveStatic, health: { startedAt, network, registry, lobby }, log, announcements, announcePublish: announceApi.publish, announceClear: announceApi.clear, proxy }));
   server.on('clientError', answerClientError);
-  const wss = attachWebSocket(server, { network, log });
+  const wss = attachWebSocket(server, { network, log, proxy });
 
   // The address actually bound. The default may fall back to IPv4; the returned host and url follow that.
   let boundHost;
@@ -169,6 +178,7 @@ export async function startServer(opts = {}) {
         setTimeout(() => { server.closeAllConnections?.(); }, 500).unref();
       });
       try { wss.close(); } catch { /* ignore */ }
+      try { proxy?.close(); } catch { /* ignore */ }
     })();
     return closing;
   }

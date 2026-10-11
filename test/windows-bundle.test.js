@@ -152,6 +152,37 @@ describe('make-windows-bundle.mjs: 包内说明的措辞', () => {
   });
 });
 
+describe('make-windows-bundle.mjs: --upstream（联机模式写进包内配置）', () => {
+  test('normalizeUpstream：只收 origin，路径 / 查询 / 片段与非法输入一律拒绝', async () => {
+    const { normalizeUpstream } = await mod('scripts/make-windows-bundle.mjs');
+    assert.equal(normalizeUpstream('http://101.132.104.41:3000'), 'http://101.132.104.41:3000');
+    assert.equal(normalizeUpstream('http://101.132.104.41:3000/'), 'http://101.132.104.41:3000', '末尾斜杠去掉');
+    assert.equal(normalizeUpstream('  https://game.example.com  '), 'https://game.example.com');
+    assert.equal(normalizeUpstream('game.example.com'), 'game.example.com', '不写协议也收（由启动器探活决定 http / https）');
+    for (const bad of ['', '   ', 'http://game.example.com/a', 'http://game.example.com/?q=1', 'ftp://game.example.com', 'http://']) {
+      assert.equal(normalizeUpstream(bad), '', `应当拒绝：${JSON.stringify(bad)}`);
+    }
+  });
+
+  test('withUpstream：保留已有键，坏 JSON / 非对象当空配置', async () => {
+    const { withUpstream } = await mod('scripts/make-windows-bundle.mjs');
+    assert.deepEqual(JSON.parse(withUpstream('{"port":3000,"lastName":"x"}', 'http://a:1')), { port: 3000, lastName: 'x', upstream: 'http://a:1' });
+    assert.deepEqual(JSON.parse(withUpstream('not json', 'http://a:1')), { upstream: 'http://a:1' });
+    assert.deepEqual(JSON.parse(withUpstream('', '')), { upstream: '' });
+    assert.deepEqual(JSON.parse(withUpstream('[1,2]', 'http://a:1')), { upstream: 'http://a:1' }, '数组不是配置对象');
+  });
+
+  test('给了 --upstream 时说明里出现 连接主服务器.bat 与版本对齐要求；没给就不出现', async () => {
+    const { bundleReadme } = await mod('scripts/make-windows-bundle.mjs');
+    const withUp = bundleReadme({ version: 'v22.23.3', withNode: true, upstream: 'http://101.132.104.41:3000' });
+    assert.match(withUp, /连接主服务器\.bat/);
+    assert.match(withUp, /http:\/\/101\.132\.104\.41:3000/);
+    assert.match(withUp, /同一版本/);
+    const without = bundleReadme({ version: 'v22.23.3', withNode: true });
+    assert.ok(!/连接主服务器\.bat/.test(without), '没配上游就不该提这个 bat');
+  });
+});
+
 describe('make-windows-bundle.mjs: PowerShell 单引号转义', () => {
   test("路径里的 ' 要写成 ''（否则 Expand-Archive 那条命令会被截断）", async () => {
     const { psSingleQuote } = await mod('scripts/make-windows-bundle.mjs');
