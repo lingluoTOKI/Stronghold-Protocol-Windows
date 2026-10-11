@@ -121,6 +121,8 @@
   .rooms .list{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:2px}
   .room-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:rgba(22,34,48,.5)}
   .room-card.is-match{border-color:rgba(255,184,77,.55);background:rgba(255,184,77,.07)}
+  /* 无人在线的空房（等人回来 / solo 保留 24h）：标灰，不再冒充"正在进行的房间" */
+  .room-card.is-away{opacity:.62;border-style:dashed;background:rgba(22,34,48,.28)}
   .rc__hd{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px;flex-wrap:wrap}
   .rc__code{font-weight:700;color:var(--txt);letter-spacing:.5px;font-size:15px;font-variant-numeric:tabular-nums}
   .rc__tag{font-size:10px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);color:var(--dim)}
@@ -141,6 +143,8 @@
   .rc__players{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px}
   .kickroom-mini{margin-left:auto;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:6px;padding:2px 10px;font-size:11px;cursor:pointer;transition:all .2s}
   .kickroom-mini:hover{background:var(--danger);color:#fff}
+  .kickroom-mini.b-close{border-color:var(--warn);color:var(--warn)}
+  .kickroom-mini.b-close:hover{background:var(--warn);color:#101820}
 
   /* ============ 在线玩家 ============ */
   .players{margin-top:14px;border-top:1px dashed var(--line);padding-top:10px}
@@ -628,35 +632,43 @@ function renderCombined(el, hint){
     return;
   }
 
-  // rooms 可用：按「对局中优先 → 回合数倒序 → 玩家数倒序」排序，信息更清楚
+  // rooms 可用：按「有人在线优先 → 对局中优先 → 回合数倒序 → 玩家数倒序」排序。
+  // 「无人在线」的房间（全员掉线、宽限内或 solo 保留 24h）排到最后并标灰 —— 它们不是"正在进行的房间"，
+  // 只是等人的空壳；踢整房对它们无效（那个接口只列在线玩家），要清就点「关房」。
+  const hasLive = (r)=> (r.connectedHumans ?? r.humanCount ?? r.seatCount ?? 0) > 0;
   const rooms = [...d.rooms].sort((a,b)=>{
+    if(hasLive(a) !== hasLive(b)) return hasLive(a) ? -1 : 1;
     if((b.inMatch?1:0) !== (a.inMatch?1:0)) return (b.inMatch?1:0)-(a.inMatch?1:0);
     const rb = (b.round||0), ra = (a.round||0);
     if(rb !== ra) return rb - ra;
     const pb = (b.humanCount ?? b.seatCount ?? 0), pa = (a.humanCount ?? a.seatCount ?? 0);
     return pb - pa;
   });
+  const awayOnes = rooms.filter((r)=> !hasLive(r));
   for(const room of rooms){
     const code = room.code;
     const g = d.groups.get(code);
     const players = g? g.list : [];
     totalHumans += players.length;
+    const live = hasLive(room);
     const phaseName = room.phase ? (PHASE_CN[room.phase] || room.phase) : '等待中';
     const phaseCls = room.phase ? ('p-'+room.phase) : 'p-LOBBY';
     const pct = room.inMatch ? Math.min(100, Math.round((room.round||0)/ROUND_REF*100)) : 0;
     const human = room.humanCount ?? room.seatCount ?? players.length;
     const modeName = esc(room.mode||'');
-    html += `<div class="room-card${room.inMatch?' is-match':''}">
+    const awayTxt = room.awaySec ? fmtUptime(room.awaySec)+'前掉线' : '无人在线';
+    html += `<div class="room-card${room.inMatch?' is-match':''}${live?'':' is-away'}">
       <div class="rc__hd">
         <span class="rc__code">${esc(code)}</span>
-        <span class="rc__tag${room.inMatch?' on':''}">${room.inMatch?'对局中':'等待中'}</span>
+        <span class="rc__tag${live && room.inMatch?' on':''}">${live ? (room.inMatch?'对局中':'等待中') : '无人在线'}</span>
         <span class="rc__meta">${room.rhine?'莱茵':'原版'} · ${esc(room.difficulty||'')} · 第${room.matchNo||0}局</span>
-        <button class="kickroom-mini" onclick="doKickRoom('${el}','${esc(code)}')">踢整房</button>
+        ${live ? `<button class="kickroom-mini" onclick="doKickRoom('${el}','${esc(code)}')">踢整房</button>`
+               : `<button class="kickroom-mini b-close" onclick="doCloseRoom('${el}','${esc(code)}')">关房</button>`}
       </div>
       <div class="rc__body">
         <span class="rc__phase ${phaseCls}">${phaseName}</span>
         <span class="rc__round">回合 ${room.round||0}</span>
-        <span class="rc__ppl">${human} 人 · ${modeName}</span>
+        <span class="rc__ppl">${live ? human+' 人' : awayTxt} · ${modeName}</span>
       </div>
       ${room.inMatch?`<div class="rc__bar"><div class="rc__bar-in" style="width:${pct}%"></div></div>`:''}
       ${players.length?`<div class="rc__players">${players.map(p=>playerRow(el,p)).join('')}</div>`:''}
@@ -666,8 +678,24 @@ function renderCombined(el, hint){
     totalHumans += d.lobby.length;
     html += `<div class="room-card"><div class="rc__hd"><span class="rc__code">大厅（未进房）</span><span class="rc__meta">${d.lobby.length} 人</span></div><div class="rc__players">${d.lobby.map(p=>playerRow(el,p)).join('')}</div></div>`;
   }
-  cnt.textContent = d.rooms.length + ' 房 · ' + totalHumans + ' 人';
+  const liveCount = rooms.length - awayOnes.length;
+  cnt.textContent = rooms.length + ' 房 · ' + totalHumans + ' 人' + (awayOnes.length? ` · ${awayOnes.length} 空房` : '');
   box.innerHTML = html || '<div class="empty">当前无房间</div>';
+}
+
+/** 关掉一个无人在线的房间（管理员）：释放座位与对局，客户端收到「该同盟已被管理员关闭」。 */
+async function doCloseRoom(el, roomCode){
+  const svr = SRVS[+el];
+  const token = $('token').value.trim();
+  if(!confirm(`确认关闭房间 ${roomCode}？\n该房当前无人在线；关闭后座位与对局记录一并释放，凭密钥再加入会开一个新房间。`)) return;
+  try{
+    const r = await fetch(`${svr.base}/api/admin/room/close?token=${encodeURIComponent(token)}&code=${encodeURIComponent(roomCode)}`, {cache:'no-store'});
+    const j = await r.json().catch(()=>({}));
+    if(r.ok && j.ok) alert(`房间 ${roomCode} 已关闭`);
+    else if(r.status === 409) alert(`房间 ${roomCode} 里还有 ${j.connected||'?'} 人在线，未关闭（请先踢整房）`);
+    else alert('关房失败: ' + (j.error || j.detail || r.status));
+    tick();
+  }catch(e){ alert('关房请求失败: ' + e.message); }
 }
 
 function playerRow(el, p){
@@ -705,7 +733,10 @@ async function doKickRoom(el, roomCode){
     if(!r.ok) throw new Error(r.status);
     const j = await r.json();
     const ps = (j.players||[]).filter(p=>p.roomCode===roomCode);
-    if(!ps.length){ alert('该房间已无在线玩家'); tick(); return; }
+    if(!ps.length){
+      alert('该房间已无在线玩家。\n它现在只是等人的空房 —— 用「关房」按钮可以把它收掉。');
+      tick(); return;
+    }
     if(!confirm(`确认踢掉房间 ${roomCode} 内全部 ${ps.length} 名玩家？\n将立即断线，且 10 分钟内无法重连。`)) return;
     let ok=0, fail=0;
     for(const p of ps){ const kr = await kickOne(svr, p.playerId); if(kr.ok) ok++; else fail++; }

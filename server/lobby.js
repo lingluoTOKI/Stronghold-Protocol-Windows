@@ -220,6 +220,16 @@ export class Room {
   /** Humans that have not departed, in seat order. @returns {Seat[]} */
   activeHumans() { return this.seats.filter((s) => s && !s.isBot && !s.left); }
 
+  /**
+   * Humans that are **connected right now**（监控大屏用）。
+   *
+   * 与 activeHumans 的区别：掉线但还没过宽限 / solo 保留 24 小时的座位仍然算 activeHumans，却不在
+   * 这里 —— 大屏上「有人」和「这只是等人的空房」必须分得开，否则会出现「踢整房」点了没反应
+   * （那个接口只列在线玩家）的怪现象。
+   * @returns {Seat[]}
+   */
+  connectedHumans() { return this.activeHumans().filter((s) => s.connected); }
+
   /** `room.state` frame (DESIGN §8.1) plus `inMatch`. */
   toState() {
     return {

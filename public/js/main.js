@@ -202,6 +202,8 @@ const CLOSE_REASON = {
   // 'timeout' = this player was removed after staying disconnected past the lobby grace (server/lobby.js)
   host_left: N_('创建者已离开，同盟已解散'), timeout: N_('由于长时间断开连接，你已离开同盟'), empty: N_('同盟已解散'),
   kicked: N_('你已被移出同盟'), ended: N_('模拟已结束'), expired: N_('同盟已过期'), shutdown: N_('服务器维护中，同盟已关闭'),
+  // 'admin' = 监控大屏主动关掉了这个房间（server/http/routes.js /api/admin/room/close）
+  admin: N_('该同盟已被管理员关闭'),
 };
 
 function wireNet() {

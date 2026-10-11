@@ -115,18 +115,47 @@ export function createRequestHandler({ serveStatic, health, log, announcements =
     if (parts.rawPath === '/api/admin/rooms') {
       if (!adminAuthorized()) { sendError(req, res, 403, '拒绝 · Forbidden'); return; }
       const out = [];
+      const now = Date.now();
       for (const [code, r] of health.lobby.rooms) {
         const m = r.match;
+        const active = typeof r.activeHumans === 'function' ? r.activeHumans() : [];
+        const connected = typeof r.connectedHumans === 'function' ? r.connectedHumans() : active.filter((s) => s.connected);
+        // 掉线最久的那位等了多久：大屏拿它把「等人回来的空房」标灰，不再当成有人的房间。
+        const away = active.map((s) => (s.connected || !s.disconnectedAt ? 0 : now - s.disconnectedAt));
         out.push({
           code, mode: r.mode, difficulty: r.difficulty,
           inMatch: !!m, matchNo: r.matchCount || 0,
           phase: m ? m.phase : null, round: m ? m.round : 0,
           seatCount: (r.seats || []).filter(Boolean).length,
-          humanCount: typeof r.activeHumans === 'function' ? r.activeHumans().length : 0,
+          humanCount: active.length,
+          connectedHumans: connected.length,
+          spectatorCount: Array.isArray(r.spectators) ? r.spectators.length : 0,
+          // 'live' 有人在线 / 'away' 只剩掉线座位（等人的空房，宽限或 solo 24h 内仍保留）
+          audience: connected.length ? 'live' : 'away',
+          awaySec: away.length ? Math.round(Math.max(...away) / 1000) : 0,
           hostId: r.hostId || null,
         });
       }
       sendJson(req, res, 200, { ok: true, count: out.length, rooms: out });
+      return;
+    }
+    // 关闭一个房间（监控大屏）：等不到人回来的空房、或卡住的房，管理员直接收掉。
+    // 玩家侧与「最后一人离开」同一条路径（room.closed{admin}），座位与 match 一起释放。
+    if (parts.rawPath === '/api/admin/room/close') {
+      if (!adminAuthorized()) { sendError(req, res, 403, '拒绝 · Forbidden'); return; }
+      const q = new URLSearchParams(parts.query || '');
+      const code = String(q.get('code') || '').toUpperCase();
+      if (!/^[A-Z0-9]{4}$/.test(code)) { sendError(req, res, 400, '同盟密钥无效 · bad room code'); return; }
+      const room = health.lobby.rooms.get(code);
+      if (!room) { sendError(req, res, 404, '房间不存在 · room not found'); return; }
+      const connected = typeof room.connectedHumans === 'function' ? room.connectedHumans().length : 0;
+      // 满员的对局默认不关：管理员真要对正在玩的房间动手，得显式带上 force=1。
+      if (connected > 0 && q.get('force') !== '1') {
+        sendJson(req, res, 409, { ok: false, error: 'room has connected players', connected, hint: 'add force=1 to close anyway' });
+        return;
+      }
+      health.lobby.disposeRoom(room, 'admin');
+      sendJson(req, res, 200, { ok: true, code, closed: true, kicked: connected });
       return;
     }
 

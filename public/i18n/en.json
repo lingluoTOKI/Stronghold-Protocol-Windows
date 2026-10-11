@@ -1256,5 +1256,6 @@
   "等待敌人全部出场后跳过本场": "Skip after every enemy has appeared",
   "确认跳过": "Confirm skip",
   "本阶段无法调整战斗倍速": "The battle speed cannot be changed in this phase",
-  "本阶段不可调倍速": "Speed locked this phase"
+  "本阶段不可调倍速": "Speed locked this phase",
+  "该同盟已被管理员关闭": "An administrator closed this Alliance"
 }
