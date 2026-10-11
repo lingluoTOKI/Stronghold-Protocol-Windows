@@ -544,7 +544,7 @@ describe('websocket lobby', () => {
     assert.equal(st.inMatch, false);
     assert.equal(st.seats.length, MAX_SEATS);
     assert.deepEqual(st.seats[0], { seat: 0, playerId: host.id, name: 'Host', isBot: false, ready: false, connected: true });
-    assert.deepEqual(st.seats.slice(1), [null, null, null]);
+    assert.deepEqual(st.seats.slice(1), Array(MAX_SEATS - 1).fill(null));
 
     const guest = await pool.player('Guest');
     const joined = await joinRoom(guest, st.code.toLowerCase());
@@ -588,7 +588,7 @@ describe('websocket lobby', () => {
     const host = await pool.player('H');
     const st = await createRoom(host);
     const guests = [];
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < MAX_SEATS - 2; i++) {
       const g = await pool.player(`G${i}`);
       await joinRoom(g, st.code);
       guests.push(g);
@@ -627,14 +627,14 @@ describe('websocket lobby', () => {
       await expectError(s1, msg, ERR.NOT_HOST);
     }
     await expectError(s1, { t: 'g.ready', ready: true }, ERR.WRONG_PHASE);
-    // the cap; spectators never count toward the players: two player seats still free
+    // the cap; spectators never count toward the players: the remaining player seats stay free
     const s2 = await pool.player('Watcher2');
     await expectOk(s2, { t: 'room.spectate', code: st.code });
     assert.equal(MAX_SPECTATORS, 2);
     const s3 = await pool.player('Watcher3');
     await expectError(s3, { t: 'room.spectate', code: st.code }, ERR.ROOM_FULL);
     await joinRoom(s3, st.code);
-    await expectOk(host, { t: 'room.addBot' });
+    for (let i = 0; i < MAX_SEATS - 3; i++) await expectOk(host, { t: 'room.addBot' });
     const full = await host.waitFor('room.state', (s) => s.seats.every(Boolean));
     assert.equal(full.spectators.length, 2);
     await expectOk(s3, { t: 'room.ready', ready: true });
