@@ -28,7 +28,7 @@ import { difficultyInfo } from './lobby.js';
 import { t, tc } from '../../../shared/i18n.js';
 
 /**
- * Seats padded to the room's capacity (co-op 4, solo 1), each null or a seat record.
+ * Seats padded to the room's capacity (co-op MAX_SEATS, solo 1), each null or a seat record.
  * @param {any} room room.state payload
  * @returns {(null | {seat:number, playerId:any, name:string, isBot:boolean, ready:boolean, connected:boolean})[]}
  */
@@ -345,7 +345,7 @@ export function RoomScreen() {
         <div class="room-bar__opts">
           <${DifficultyPicker} room=${room} isHost=${facts.isHost} busy=${busy} onPick=${setDifficulty} />
           <${AiLastToggle} option=${aiLastOption(room, me.playerId)} busy=${busy} onToggle=${setAiLast} />
-          ${coop ? html`<span class="room-bar__bans">${info.openingBanNote}<span class="t-dim"> · ${facts.occupied.length} 人（含 AI）</span></span>` : null}
+          ${coop ? html`<span class="room-bar__bans">${info.openingBanNote}<span class="t-dim"> ${t('· {n} 人（含 AI）', { n: facts.occupied.length })}</span></span>` : null}
         </div>
       </div>
       <div class="room-bar__center">

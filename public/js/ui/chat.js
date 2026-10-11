@@ -15,6 +15,7 @@ import { GIcon } from './gameComponents.js';
 import { useStore } from '../store.js';
 import { EMOTE_THEMES, CHAT_MAX_LEN, CHAT_COOLDOWN_MS } from '../../../shared/constants.js';
 import { emoteArtUrl } from './emotes.js';
+import { t } from '../../../shared/i18n.js';
 import { actions } from './gameActions.js';
 
 const STYLE_ID = 'sp-chat-dock-style';
@@ -290,25 +291,25 @@ export function ChatDock({ open, onToggle, disabled = false }) {
     <div class="chat-dock">
       <button type="button" class=${cx('ewheel__btn', 'chat-dock__btn', open && 'is-on')}
         aria-expanded=${open ? 'true' : 'false'} aria-haspopup="dialog" disabled=${disabled}
-        onClick=${() => onToggle(!open)} title="房间聊天 / 交流">
-        <${GIcon} name="emote" /><span class="ewheel__label">交流</span>
+        onClick=${() => onToggle(!open)} title=${t('房间聊天 / 交流')}>
+        <${GIcon} name="emote" /><span class="ewheel__label">${t('交流')}</span>
         ${!open && unread > 0 ? html`<span class="chat-dock__badge">${unread > 99 ? '99+' : unread}</span>` : null}
       </button>
 
       ${open ? html`
-        <div class=${cx('chat-dock__panel', size && 'is-sized', pos && 'is-moved')} role="dialog" aria-label="房间聊天"
+        <div class=${cx('chat-dock__panel', size && 'is-sized', pos && 'is-moved')} role="dialog" aria-label=${t('房间聊天')}
           style=${[size && `width:${size.w}px;height:${size.h}px`, pos && `left:${pos.x}px;top:${pos.y}px`].filter(Boolean).join(';') || undefined}>
-          <div class="chat-dock__head chat-dock__head--drag" title="拖动移动聊天框 · 双击复位位置"
+          <div class="chat-dock__head chat-dock__head--drag" title=${t('拖动移动聊天框 · 双击复位位置')}
             onPointerDown=${beginDrag} onDoubleClick=${resetPos}>
             <span class="chat-dock__tag">COMMS</span>
-            <span class="chat-dock__title">房间聊天</span>
-            <button type="button" class="chat-dock__close" aria-label="收起" title="收起 (Esc)"
+            <span class="chat-dock__title">${t('房间聊天')}</span>
+            <button type="button" class="chat-dock__close" aria-label=${t('收起')} title=${t('收起 (Esc)')}
               onPointerDown=${(e) => e.stopPropagation()}
               onClick=${() => onToggle(false)}>✕</button>
           </div>
 
           <div class="chat-dock__body" ref=${listRef}>
-            ${chat.length === 0 ? html`<div class="chat-dock__empty">// 暂无消息，说点什么吧</div>`
+            ${chat.length === 0 ? html`<div class="chat-dock__empty">${t('// 暂无消息，说点什么吧')}</div>`
               : chat.map((c) => html`
                 <div key=${c.seq} class="chat-item">
                   <span class="chat-item__who">${c.name || c.id}</span>
@@ -327,17 +328,17 @@ export function ChatDock({ open, onToggle, disabled = false }) {
             </div>` : null}
 
           <div class="chat-dock__input">
-            <button type="button" class=${cx('chat-dock__emoji', showPanel && 'is-on')} aria-label="选择表情" title="选择表情"
+            <button type="button" class=${cx('chat-dock__emoji', showPanel && 'is-on')} aria-label=${t('选择表情')} title=${t('选择表情')}
               onClick=${() => setShowPanel((v) => !v)}><${GIcon} name="emote" /></button>
             <input ref=${inputRef} class="chat-dock__field" type="text" maxlength=${CHAT_MAX_LEN}
-              placeholder="输入讯息，可插入表情…" value=${text}
+              placeholder=${t('输入讯息，可插入表情…')} value=${text}
               onInput=${(e) => setText(e.target.value)}
               onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } }} />
-            <button type="button" class="chat-dock__send" disabled=${disabled || cooling} onClick=${send}>${cooling ? '…' : '发送'}</button>
+            <button type="button" class="chat-dock__send" disabled=${disabled || cooling} onClick=${send}>${cooling ? '…' : t('发送')}</button>
           </div>
 
           <div class="chat-dock__resize" role="separator" aria-orientation="both"
-            title="拖拽调整大小 · 双击复位"
+            title=${t('拖拽调整大小 · 双击复位')}
             onPointerDown=${beginResize} onDoubleClick=${resetSize}></div>
         </div>` : null}
     </div>`;

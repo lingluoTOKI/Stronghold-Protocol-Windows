@@ -112,7 +112,7 @@ export function difficultyInfo(roomMode, difficulty, playerCount = null) {
   const openingBans = openingBanCounts(difficulty, knownCount ?? 1, configuredBans);
   const largeRoomNotes = knownCount == null ? [5, 6].map((count) => {
     const bans = openingBanCounts(difficulty, count, configuredBans);
-    return bans.core !== openingBans.core ? `${count} 人（含 AI）时核心 ${bans.core}` : '';
+    return bans.core !== openingBans.core ? t('{count} 人（含 AI）时核心 {core}', { count, core: bans.core }) : '';
   }).filter(Boolean) : [];
   const conditional = largeRoomNotes.length ? `；${largeRoomNotes.join('；')}` : '';
   return {
@@ -123,7 +123,7 @@ export function difficultyInfo(roomMode, difficulty, playerCount = null) {
     hidden: difficulty !== 'FUNNY',
     stageNote: stageNote(Array.isArray(m?.stages) && m.stages.length ? m.stages : STAGE_POOL[difficulty]),
     openingBans,
-    openingBanNote: `开局 BAN：核心 ${openingBans.core} / 附加 ${openingBans.addon}${conditional}`,
+    openingBanNote: t('开局 BAN：核心 {core} / 附加 {addon}{conditional}', { core: openingBans.core, addon: openingBans.addon, conditional }),
   };
 }
 
@@ -392,7 +392,7 @@ export function LobbyScreen() {
         <${Button} variant="ghost" size="sm" icon="chevronLeft" onClick=${backToTitle} title=${t('返回标题')}>${t('返回')}<//>
         <${BulletinButton} />
         <${PingPill} ms=${conn.ping} online=${online} />
-        <div class="online-pill" title=${onlineCount == null ? '在线玩家数加载中…' : `当前 ${onlineCount} 位博士在线`}>
+        <div class="online-pill" title=${onlineCount == null ? t('在线玩家数加载中…') : t('当前 {onlineCount} 位博士在线', { onlineCount })}>
           <${Icon} name="users" />
           <span class="num online-pill__n">${onlineCount == null ? '—' : onlineCount}</span>
           <${MicroLabel}>ONLINE<//>
