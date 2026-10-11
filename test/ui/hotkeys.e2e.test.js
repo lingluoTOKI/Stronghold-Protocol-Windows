@@ -46,8 +46,8 @@ describe('rebindable shortcuts (设置 → 快捷键)', { skip: !ENABLED && 'set
       const problems = await open(page);
       await page.click('.gm__gear');
       await page.waitForSelector('.modal .set-keys');
-      assert.deepEqual(await page.$$eval('.set-key[data-action]', (els) => els.map((el) => el.textContent.trim())), ['R', 'F', 'D', 'Q', 'X', 'Space'],
-        'the defaults are the keys of 0.1.4');
+      assert.deepEqual(await page.$$eval('.set-key[data-action]', (els) => els.map((el) => el.textContent.trim())), ['R', 'F', 'D', 'Q', 'X', 'Space', 'V'],
+        'the defaults are the keys of 0.1.4 plus the 0.2.4 speed key');
 
       // a swap: 撤退 onto X (出售's key) — 出售 takes the old Q, and the line under the list says so
       await page.click('.set-key[data-action="retreat"]');
