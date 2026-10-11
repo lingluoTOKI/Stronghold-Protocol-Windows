@@ -72,8 +72,13 @@ export class MatchIntents {
    * 广播携带发送者 id/昵称/文本/时间戳，客户端按 playerId 归位。
    */
   chat(ps, text) {
-    const s = typeof text === 'string' ? text.trim().slice(0, CHAT_MAX_LEN) : '';
-    if (!s) return fail(ERR.BAD_MSG, 'empty chat');
+    // 与 shared/protocol.js 的 C2S['g.chat'] **同一套校验**，而且必须真的拒绝：以前这里用
+    // 「截断成合法」兜底，于是直接调 API 的调用方（fuzz / 机器人）能把超长或空白文本塞进来 ——
+    // test/match/fuzz.test.js 会看到「服务器接受了非法消息」（bad field text）。
+    if (typeof text !== 'string' || text.length > CHAT_MAX_LEN || !text.trim()) {
+      return fail(ERR.BAD_MSG, 'bad chat text');
+    }
+    const s = text.trim();
     const now = this.sched.now();
     if (now - (ps.lastChatAt || 0) < CHAT_COOLDOWN_MS) return fail(ERR.RATE);
     ps.lastChatAt = now;

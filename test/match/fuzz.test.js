@@ -38,6 +38,9 @@ function randomIntent(rng, m, ps) {
     case 'g.watch': return { t, fieldId: rng.pick(['n:p_0', 'n:p_1', 'n:ai_0', 'u', 'b1', 'b2', 'zz', '']) };
     case 'g.autoplay': return { t, on: rng() < 0.05 };
     case 'g.pause': return { t, on: rng() < 0.5 };
+    // 对局内文字聊天（改编版独有）：协议要求 text 是 1–200 字符的非空白串，
+    // 少了这一支就会落到 default 生成 {"t":"g.chat"}（没有 text），校验直接判非法。
+    case 'g.chat': return { t, text: rng() < 0.8 ? `fuzz ${rng.int(100000)}` : 'x'.repeat(1 + rng.int(200)) };
     default: return { t };
   }
 }
