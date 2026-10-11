@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 只需要联网：一是 WebSocket/HTTP 反代到线上服务器，二是（首启）什么都不用下。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="false"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="false"
+        android:theme="@style/Theme.Stronghold"
+        android:usesCleartextTraffic="true"><!--
+        这里**故意不用** android:networkSecurityConfig。
+
+        原因是一次真实踩坑：只要配置里存在「按域名」的规则（例如只给 127.0.0.1 放行明文），
+        Android 就会把默认信任管理器换成 RootTrustManager，而它的**两参数**
+        checkServerTrusted 会直接抛：
+            CertificateException: Domain specific configurations require that hostname
+            aware checkServerTrusted(X509Certificate[], String, String) is used
+        Ktor 的 CIO 引擎走的正是两参数那条路，于是上游 TLS 在 150 ms 内被拒，
+        表现成「页面正常、但一直正在重连」。
+
+        usesCleartextTraffic 是全局开关、不产生按域名的配置，因此不会替换信任管理器。
+        本 App 只用明文访问 127.0.0.1 的本机服务，对外一律 https/wss，所以放开明文没有实际暴露面。 -->
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode|density|fontScale"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="sensorLandscape">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

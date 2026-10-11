@@ -1,0 +1,13 @@
+# 构建产物与本地素材包：都不进版本库
+/build/
+/app/build/
+/app/src/main/assets/www.zip
+/.gradle/
+/local.properties
+/keystore.jks
+*.jks
+*.keystore
+
+# 签名口令（本地图省事时写这里；tools/dist.mjs 与 app/build.gradle.kts 都会读）
+# ⚠ 绝不能提交：这个仓库是公开的
+/keystore.properties
