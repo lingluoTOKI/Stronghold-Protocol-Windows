@@ -645,6 +645,10 @@ function renderCombined(el, hint){
     return pb - pa;
   });
   const awayOnes = rooms.filter((r)=> !hasLive(r));
+  // 老服务器（<0.2.4）的 /api/admin/rooms 没有 connectedHumans，也没有 /api/admin/room/close。
+  // 那种服上不渲染「关房」——点了只会 404 —— 退化为原来的「踢整房」，等于只读展示。
+  const canClose = rooms.some((r)=> Object.prototype.hasOwnProperty.call(r, 'connectedHumans'));
+  if(!canClose) html += `<div class="empty">该服为旧版（无在线判定与关房接口）：此处只读展示，「关房」不可用</div>`;
   for(const room of rooms){
     const code = room.code;
     const g = d.groups.get(code);
@@ -662,8 +666,8 @@ function renderCombined(el, hint){
         <span class="rc__code">${esc(code)}</span>
         <span class="rc__tag${live && room.inMatch?' on':''}">${live ? (room.inMatch?'对局中':'等待中') : '无人在线'}</span>
         <span class="rc__meta">${room.rhine?'莱茵':'原版'} · ${esc(room.difficulty||'')} · 第${room.matchNo||0}局</span>
-        ${live ? `<button class="kickroom-mini" onclick="doKickRoom('${el}','${esc(code)}')">踢整房</button>`
-               : `<button class="kickroom-mini b-close" onclick="doCloseRoom('${el}','${esc(code)}')">关房</button>`}
+        ${(live || !canClose) ? `<button class="kickroom-mini" onclick="doKickRoom('${el}','${esc(code)}')">踢整房</button>`
+                              : `<button class="kickroom-mini b-close" onclick="doCloseRoom('${el}','${esc(code)}')">关房</button>`}
       </div>
       <div class="rc__body">
         <span class="rc__phase ${phaseCls}">${phaseName}</span>
@@ -679,7 +683,7 @@ function renderCombined(el, hint){
     html += `<div class="room-card"><div class="rc__hd"><span class="rc__code">大厅（未进房）</span><span class="rc__meta">${d.lobby.length} 人</span></div><div class="rc__players">${d.lobby.map(p=>playerRow(el,p)).join('')}</div></div>`;
   }
   const liveCount = rooms.length - awayOnes.length;
-  cnt.textContent = rooms.length + ' 房 · ' + totalHumans + ' 人' + (awayOnes.length? ` · ${awayOnes.length} 空房` : '');
+  cnt.textContent = rooms.length + ' 房 · ' + totalHumans + ' 人' + (awayOnes.length? ` · ${awayOnes.length} 空房` : '') + (canClose? '' : ' · 旧版');
   box.innerHTML = html || '<div class="empty">当前无房间</div>';
 }
 
