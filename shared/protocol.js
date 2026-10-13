@@ -484,6 +484,8 @@ export const S2C = [
   // 改编版独有·公共匹配队列状态 / 排队超时 / 匹配成功；对局内文字聊天 m.chat
   'match.status', 'match.timeout', 'match.found',
   'm.public', 'm.private', 'm.field', 'm.toast', 'm.ticker', 'm.emote', 'm.chat', 'm.result',
+  // m.layer { playerId, bondId, add } — own live prep layer gain; ephemeral, never replayed on resync.
+  'm.layer',
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)
   'm.unitStats',
   // client-side combat (DESIGN §14): b.start { battleId, fieldId, kind, spec, authoritative, startAt, serverNow, elapsed,
