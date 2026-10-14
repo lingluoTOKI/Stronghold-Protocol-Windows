@@ -69,11 +69,12 @@
 
 ## 附：当前基线快照（AI 核对用，会随版本过期，以实际 fetch 为准）
 
-- **最近一次同步：2026-10-13；上游 master 最新 = `cf7a9400`（0.2.5，2026-10-12）**，已合入分支 `sync/upstream-0.2.5`（合并提交 `02a357da`），**已确认是改编版 HEAD 的祖先、上游 commit 零遗漏、零删除文件**。
-- 上一次同步的基点：`bc50cac0`（0.2.4）。上一次的基线快照是 `1db8e510`（0.2.3）。
-- 本次上游带来 **77 个新 commit / 221 个文件改动**（新增 45、修改 176）；合并时**仅 3 个文件真冲突**（`.gitignore`、`shared/protocol.js`、`public/css/screens/title.css`），全部是「双方各自新增」，两边都保留即可。其余 18 个交叠文件 Git 自动合并成功，但已逐一人工确认钩子未被吞。
-- 改编版相对新基线 `cf7a9400` 的独有改动：**新增 54 个文件、修改 49 个文件、删除 0**，全部属于上述 10 项独有功能。新增文件主要落在：`android/**`（安卓壳全套）、`announcements.json`、`monitor.html` + `public/monitor.html`、`public/js/ui/chat.js`、`scripts/launcher.mjs`、`scripts/launcher.config.json`、`scripts/zipdir.mjs`、`tools/dist.mjs`、`server/http/announcements.js`、`server/http/proxy.js`、`shared/openingBans.js`、`test/admin-rooms.test.js`、`test/proxy.test.js`、3 个 bat、以及 `docs/` 下的改编版文档（含本文件、`CHANGELOG-ALLIANCE.md`、`FEATURES-ALLIANCE.md`、`RHINE-REMOVAL.md`）。
-- 本次验证结论（下次可作为参照）：`node --check` 212 个改动 js 全过；`npm run check:imports` 退出 0；`npm run golden` **全绿**（roster 49 / bonds 46 / fields 22 / matches 20 / standins 10 / diy 140）；改编版独有测试全绿；`npm run ci` 曾报 4 个失败——其中 3 个是**满载抖动**（单独重跑即过），第 4 个 `test/scene-assets.test.js` 是**上游自带的 Windows 路径 bug**，**已修复**（详见最高原则第 5 条）。
+- **最近一次同步：2026-10-14；上游 master 最新 = `488db49f`（0.2.6，2026-10-13）**，已合入分支 `sync/upstream-0.2.6`（合并提交 `46365eec`），**已确认是改编版 HEAD 的祖先、上游 commit 零遗漏、零删除文件**。
+- 更早的同步基点：`cf7a9400`（0.2.5）、`bc50cac0`（0.2.4）、`1db8e510`（0.2.3）。
+- 本次上游带来 **58 个新 commit / 93 个文件改动**（新增 17、修改 76）；合并时**13 个交叠文件里仅 3 个真冲突**，全在服务端接线处：`server/index.js`（我方 proxy/announcements vs 上游 traffic/assetIndex/views）、`server/http/websocket.js`（我方 proxy vs 上游流量计 + `perMessageDeflate` 压缩）、`server/http/routes.js`（`/healthz` 路由）。**这三处都是「两边都要」，二选一就会丢功能**。
+- 改编版相对新基线 `488db49f` 的独有改动：全部属于上述 10 项独有功能。新增文件主要落在：`android/**`（安卓壳全套）、`announcements.json`、`monitor.html` + `public/monitor.html`、`public/js/ui/chat.js`、`scripts/launcher.mjs`、`scripts/launcher.config.json`、`scripts/zipdir.mjs`、`tools/dist.mjs`、`server/http/announcements.js`、`server/http/proxy.js`、`shared/openingBans.js`、`test/admin-rooms.test.js`、`test/proxy.test.js`、3 个 bat、以及 `docs/` 下的改编版文档（含本文件、`CHANGELOG-ALLIANCE.md`、`FEATURES-ALLIANCE.md`、`RHINE-REMOVAL.md`）。
+- 本次验证结论（下次可作为参照）：`node --check` 112 个改动 js 全过；`npm run check:imports` 退出 0；`node tools/build-data.mjs` 重建**零差异**；`npm run golden` **全绿**（roster 49 / bonds 46 / fields 22 / matches 20 / standins 10 / diy 140）；改编版独有测试全绿（`proxy` 11、`lobby` 66、`admin-rooms` 5 等）；`npm run ci` 报 4 项失败（`proxy.test.js`、`lobby` 限流 2 例、`sim/perf`、`sim/robustness`），**全部单独重跑通过**，确认为满载抖动。
+- **`scene-assets.test.js` 的 Windows 路径 bug 上游已自行修复**（0.2.6 的 PR #547 / commit `1d55c93e`），改法与改编版此前的一致，无需再手动修。
 - 常用命令：
   - 拉上游：`git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git master`
   - 查上游新增（数量 + 标题）：`git rev-list --count HEAD..FETCH_HEAD`；`git log --oneline --reverse HEAD..FETCH_HEAD`
