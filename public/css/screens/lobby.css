@@ -1,4 +1,4 @@
-/* ==========================================================================================
+﻿/* ==========================================================================================
    screens/lobby.css — mode cards (独立/同盟), difficulty cards, create button, join panel.
    ========================================================================================== */
 
@@ -302,3 +302,113 @@
 
 /* ---- difficulty card: opening-BAN preview line ------------------------------------------------------- */
 .diff-card__bans { color: var(--amber, #ffb454); font-size: calc(.12 * var(--t)); letter-spacing: .04em; opacity: .9; }
+
+/* ===== 自定义大厅背景 ===== */
+.lobby-custom-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  display: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(var(--blur, 0px));
+  transform: scale(1.04); /* 模糊边缘不露底 */
+}
+.lobby-custom-bg.has-bg { display: block; }
+.lobby-custom-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 12, 16, var(--dim, 0.5));
+}
+/* 有自定义背景时隐藏默认深色背景 */
+.app-root.has-custom-bg .app-bg { display: none; }
+
+
+/* 设置弹窗 */
+.bgset { display: flex; flex-direction: column; gap: .22rem; padding: .1rem 0; }
+.bgset__hint { font-size: .13rem; color: #aebfc0; line-height: 1.5; }
+.bgset__empty { font-size: .14rem; color: #aebfc0; padding: .3rem 0; text-align: center; }
+.bgset__slider {
+  display: flex; align-items: center; gap: .18rem;
+  font-size: .14rem; color: #eaf2ee;
+}
+.bgset__slider > span { flex: none; width: .6rem; color: #eaf2ee; font-weight: 500; }
+.bgset__slider input[type="range"] {
+  flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
+  background: rgba(255,255,255,.12); border-radius: 2px; outline: none;
+}
+.bgset__slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--mint-500, #4ed8af); cursor: pointer;
+  border: 2px solid #0b1116;
+}
+.bgset__slider input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--mint-500, #4ed8af); cursor: pointer;
+  border: 2px solid #0b1116;
+}
+.bgset__slider b { flex: none; width: .5rem; text-align: right; font-weight: 600; color: var(--mint-500, #4ed8af); }
+/* ===== 有自定义背景时：面板透明度统一由 --panel-a 控制，适配任何图片 ===== */
+.app-root.has-custom-bg .mode-card,
+.app-root.has-custom-bg .create-box,
+.app-root.has-custom-bg .lobby-create-mode {
+  background: linear-gradient(180deg, rgba(28, 34, 31, var(--panel-a, .88)), rgba(13, 16, 15, calc(var(--panel-a, .88) + .02)));
+}
+.app-root.has-custom-bg .diff-card {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--d-color, #4ed8af) 12%, rgba(21, 26, 24, var(--panel-a, .88))), rgba(15, 19, 17, var(--panel-a, .88)) 70%);
+}
+/* Panel 通用面板：建立方式、加入同盟、作战提示 */
+.app-root.has-custom-bg .panel {
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .012) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, rgba(30, 36, 33, var(--panel-a, .88)), rgba(18, 22, 20, var(--panel-a, .88)));
+}
+.app-root.has-custom-bg .tips {
+  background: rgba(8, 10, 9, calc(var(--panel-a, .88) * .55));
+}
+/* 内部选项块 */
+.app-root.has-custom-bg .create-box__mode-opt {
+  background: rgba(8, 11, 10, calc(var(--panel-a, .88) * .55));
+}
+/* 输入框：比面板略深一点保证可读 */
+.app-root.has-custom-bg .field__box {
+  background: rgba(5, 7, 6, calc(var(--panel-a, .88) * .7));
+}
+/* ===== 有自定义背景时：文字加深色投影保证任何透明度下都清晰 ===== */
+.app-root.has-custom-bg .lobby-body,
+.app-root.has-custom-bg .lobby-body .mode-card,
+.app-root.has-custom-bg .lobby-body .diff-card,
+.app-root.has-custom-bg .lobby-body .lobby-create-mode,
+.app-root.has-custom-bg .lobby-body .join-panel,
+.app-root.has-custom-bg .lobby-body .tips {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .85), 0 0 6px rgba(0, 0, 0, .6);
+}
+/* 大标题投影稍重 */
+.app-root.has-custom-bg .lobby-body .mode-card__text,
+.app-root.has-custom-bg .lobby-body .diff-card__name,
+.app-root.has-custom-bg .lobby-body .create-box__mode-opt-name {
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .9), 0 0 3px rgba(0, 0, 0, .8);
+}
+/* 输入框文字同样保证可读 */
+.app-root.has-custom-bg .lobby-body .field__input {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+
+/* ===== 有自定义背景时：滚动条透明化 ===== */
+.app-root.has-custom-bg .lobby-body::-webkit-scrollbar,
+.app-root.has-custom-bg .screen__scroll::-webkit-scrollbar { width: 5px; }
+.app-root.has-custom-bg .lobby-body::-webkit-scrollbar-track,
+.app-root.has-custom-bg .screen__scroll::-webkit-scrollbar-track { background: transparent; }
+.app-root.has-custom-bg .lobby-body::-webkit-scrollbar-thumb,
+.app-root.has-custom-bg .screen__scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, .18);
+  border-radius: 3px;
+}
+.app-root.has-custom-bg .lobby-body::-webkit-scrollbar-thumb:hover,
+.app-root.has-custom-bg .screen__scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(78, 216, 175, .45);
+}

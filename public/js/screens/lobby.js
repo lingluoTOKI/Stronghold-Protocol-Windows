@@ -254,6 +254,148 @@ function DifficultyCard({ roomMode, difficulty, selected, onSelect }) {
   </button>`;
 }
 
+/* === 自定义大厅背景：IndexedDB 存图 + 全屏层 + 暗化/模糊滑块 === */
+const BGDB = 'sp-lobby-bg';
+const BGSTORE = 'kv';
+const BG_KEY = 'photo';
+const PREF_KEY = 'lobby-bg-pref';
+function bgIdb(mode, fn) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open(BGDB, 1);
+    open.onupgradeneeded = () => open.result.createObjectStore(BGSTORE);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction(BGSTORE, mode);
+      const rq = fn(tx.objectStore(BGSTORE));
+      tx.oncomplete = () => { db.close(); resolve(rq.result); };
+      tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
+    };
+  });
+}
+async function shrinkPhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const k = Math.min(1, 1920 / Math.max(img.naturalWidth, img.naturalHeight, 1));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * k));
+    c.height = Math.max(1, Math.round(img.naturalHeight * k));
+    const g = c.getContext('2d');
+    g.fillStyle = '#0b1116'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise(res => c.toBlob(res, 'image/jpeg', 0.86));
+  } finally { URL.revokeObjectURL(url); }
+}
+function loadBgPref() {
+  try {
+    const o = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
+    return {
+      dim: Math.min(85, Math.max(0, o.dim ?? 50)),
+      blur: Math.min(16, Math.max(0, o.blur ?? 0)),
+      panel: Math.min(100, Math.max(20, o.panel ?? 88)),
+    };
+  } catch { return { dim: 50, blur: 0, panel: 88 }; }
+}
+function BgIcon() {
+  return html`<svg class="btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="currentColor" fill-rule="evenodd" d="M2 4h20v16H2zm2 2v9.6l4.6-4.8 3.6 3.7 2.6-2.6L20 17V6zm13 1.6a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6z"/>
+  </svg>`;
+}
+function BackgroundButton() {
+  const [open, setOpen] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState(null);
+  const [pref, setPref] = useState(loadBgPref);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  // 背景层 mount/unmount
+  useEffect(() => {
+    let layer = document.createElement('div');
+    layer.className = 'lobby-custom-bg';
+    layer.setAttribute('aria-hidden', 'true');
+    const root = document.querySelector('.app-root') || document.body;
+    root.prepend(layer);
+    bgIdb('readonly', s => s.get(BG_KEY)).then(blob => {
+      if (blob instanceof Blob) { setPhotoUrl(URL.createObjectURL(blob)); }
+    }).catch(() => {});
+    return () => { layer.remove(); document.querySelector('.app-root')?.classList.remove('has-custom-bg'); };
+  }, []);
+  // 应用背景样式
+  useEffect(() => {
+    const layer = document.querySelector('.lobby-custom-bg');
+    const root = document.querySelector('.app-root');
+    if (!layer) return;
+    if (photoUrl) {
+      layer.style.backgroundImage = `url("${photoUrl}")`;
+      layer.style.setProperty('--dim', pref.dim / 100);
+      layer.style.setProperty('--blur', pref.blur + 'px');
+      root.style.setProperty('--panel-a', pref.panel / 100);
+      layer.classList.add('has-bg');
+      root.classList.add('has-custom-bg');
+    } else {
+      layer.style.backgroundImage = '';
+      layer.classList.remove('has-bg');
+      root.classList.remove('has-custom-bg');
+      root.style.removeProperty('--panel-a');
+    }
+  }, [photoUrl, pref.dim, pref.blur, pref.panel]);
+  const update = (patch) => setPref(p => { const n = { ...p, ...patch }; localStorage.setItem(PREF_KEY, JSON.stringify(n)); return n; });
+  const onFile = async (e) => {
+    const f = e.target.files?.[0]; e.target.value = '';
+    if (!f) return;
+    if (!/^image\//.test(f.type)) return;
+    setBusy(true);
+    try {
+      const blob = await shrinkPhoto(f);
+      await bgIdb('readwrite', s => s.put(blob, BG_KEY));
+      if (photoUrl) URL.revokeObjectURL(photoUrl);
+      setPhotoUrl(URL.createObjectURL(blob));
+    } finally { setBusy(false); }
+  };
+  const remove = async () => {
+    await bgIdb('readwrite', s => s.delete(BG_KEY)).catch(() => {});
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    setPhotoUrl(null);
+  };
+  return html`
+    <${Button} variant="ghost" size="sm" square=${true} class="lobby-bg-btn" onClick=${() => setOpen(true)}
+      title=${t('大厅背景')} aria-label=${t('大厅背景')}>
+      <${BgIcon} />
+    <//>
+    <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${onFile} />
+    <${Modal} open=${open} title=${t('大厅背景')} micro="LOBBY BACKDROP" tone="mint" onClose=${() => setOpen(false)}
+      actions=${html`
+        <${Button} variant="secondary" size="sm" disabled=${busy} onClick=${() => fileRef.current?.click()}>
+          ${photoUrl ? t('更换图片') : t('选择图片')}
+        <//>
+        ${photoUrl ? html`<${Button} variant="ghost" size="sm" disabled=${busy} onClick=${remove}>${t('移除图片')}<//>` : null}
+      `}>
+      <div class="bgset">
+        <div class="bgset__hint">${t('建议使用横版图片，仅保存在本浏览器，不会上传。')}</div>
+        ${photoUrl ? html`
+          <label class="bgset__slider">
+            <span>${t('暗化')}</span>
+            <input type="range" min="0" max="85" step="1" value=${pref.dim}
+              onInput=${(e) => update({ dim: Number(e.target.value) })} />
+            <b class="num">${pref.dim}%</b>
+          </label>
+          <label class="bgset__slider">
+            <span>${t('模糊')}</span>
+            <input type="range" min="0" max="16" step="1" value=${pref.blur}
+              onInput=${(e) => update({ blur: Number(e.target.value) })} />
+            <b class="num">${pref.blur}px</b>
+          </label>
+          <label class="bgset__slider">
+            <span>${t('面板')}</span>
+            <input type="range" min="20" max="100" step="1" value=${pref.panel}
+              onInput=${(e) => update({ panel: Number(e.target.value) })} />
+            <b class="num">${pref.panel}%</b>
+          </label>
+        ` : html`<div class="bgset__empty">${t('还没有自定义背景，点击下方「选择图片」添加。')}</div>`}
+      </div>
+    <//>`;
+}
+
 /** Lobby screen component. */
 export function LobbyScreen() {
   const me = useStore((s) => s.me, shallowEqual);
@@ -402,6 +544,7 @@ export function LobbyScreen() {
           <${SettingsButton} class="lobby-settings" variant="secondary" square=${true} />
           <${GuideButton} class="lobby-guide" variant="secondary" square=${true} />
           <${PwaInstallButton} class="lobby-pwa" square=${true} />
+          <${BackgroundButton} />
         </div>
       </div>
       <div class="topbar__center">
