@@ -38,6 +38,7 @@
 8. **公共/快速匹配**：`server/lobby.js` 匹配队列（`MATCH_TARGET=6`、`MATCH_TIMEOUT_MS=30000`，凑满即开；超时三选一：继续等待 / 用 AI 补满 / 按当前人数直接开），协议 `match.enqueue` 等。
 9. **监控大屏 monitor.html**：按房间分组玩家、单人踢/一键踢全、三服务器切换、公告编辑器（发布/撤回强制公告）；对应服务端 `routes.js` 的 `/api/admin/*`（players/rooms/kick/kickall/**room/close**/announce/announce-clear，`SP_ADMIN_TOKEN` 鉴权）与 `/healthz` CORS。
     - **鉴权走 query 参数 `?token=`，不是 HTTP header**：用 header 测会得到 403，别误判成鉴权坏了。`/api/admin/room/close` 是 **GET** 且需 `code=<4位房间号>`（无 token 403 / code 非法 400 / 房间不存在 404 / 房内有人且无 `force=1` 则 409）。
+    - **⚠️ 0.3.0 起 CSP 会拦内联脚本**：上游 0.3.0 加了严格 CSP（`script-src 'self' 'sha256-<importmap-hash>'`），monitor.html 的内联 `<script>` 会被浏览器直接拦截（页面打开但数字全 `--`）。**必须把 JS 抽到外部文件**（`public/js/monitor.js`），HTML 只留 `<script src="/js/monitor.js"></script>`。合并时若上游改动了 CSP 策略，注意别把这个外部化改回内联。
 10. **本机/PC/安卓联机脚本**：根目录 `本机当服务器.bat`、`启动游戏.bat`、`连接服务器.bat`（共 3 个 bat；含便携 node 探测、局域网共享）、`scripts/launcher.mjs`、`scripts/launch.mjs`、`scripts/make-windows-bundle.mjs`、`scripts/zipdir.mjs`、`tools/dist.mjs`、`scripts/launcher.config.json`。**联机（本机客户端）模式**：`server/http/proxy.js`（`SP_PROXY_TO` / `opts.proxyTo`：`/ws` 与 `/api/*` 反代中心服务器，页面与素材走本机磁盘，`/healthz` 不转发）+ `server/index.js` 接线 + `routes.js` / `websocket.js` 两条转发 + `launcher.mjs --mode proxy` + 打包 `--upstream` 生成的 `连接主服务器.bat`。**上游地址只从包内 `scripts/launcher.config.json` 的 `upstream` 读，不吃命令行 / URL 参数**（会话凭证按 origin 存）。
     - **⚠️ 监听地址铁律（曾经手滑改坏过）**：`scripts/launch.mjs` 必须保持 `host: process.env.HOST || '::'`，服务端 `server/http/config.js` 的 `DEFAULT_BIND_HOST = '::'`。**`'::'` 是双栈**，改成 `'0.0.0.0'` 会只收 IPv4、**IPv6 玩家连不上本机开的服**。合并后务必用 `Select-String scripts\launch.mjs -Pattern "env\.HOST \|\|"` 确认仍是 `'::'`。
 
@@ -52,7 +53,7 @@
    - **解决完必须全局搜残留标记**：`git grep -n -E "^(<<<<<<<|>>>>>>>)"`（应为空）。注意：**只 `git add` 不等于解干净**，标记还在文件里就会进提交。
    - **自动合并 ≠ 没被吞**：两边改同一文件但不同区域时 Git 会静默合并，可能把钩子挤掉。合完要对每个交叠文件人工确认「上游新逻辑」和「我的钩子」都在（例如 `gamedata.js` 里我的 BAN 与上游新增方法应并存、`phases.js` 里我的信标与上游新 `bossPairs` 应并存）。
 4. 若上游改了数据结构/字段（例如 config 新增字段），运行 `node tools/build-data.mjs` 重建 `data/**`，再确认独有数值（deployCap=8、BAN）仍在。**重建后若 `git status` 无 diff，说明上游数据结构没变，不必提交 data**；另注意 `data/**` 应与上游逐字节一致（`git diff --stat <上游最新> HEAD -- data/` 应为空）。
-5. **美术资源不入库**：`public/assets/**`、`public/fonts/**`、`data/assets.json`、`data/local-assets.json` 在 `.gitignore` 内，属于部署/本地资源，不要提交、不要删；3D 棋盘靠 `data/local-assets.json` + `public/assets/local`（缺失会静默回退 2D、没有橙色栏杆）。
+5. **美术资源不入库**：`public/assets/**`、`public/fonts/**`、`data/assets.json`、`data/local-assets.json`、`data/local-fx.json` 在 `.gitignore` 内，属于部署/本地资源，不要提交、不要删；3D 棋盘靠 `data/local-assets.json` + `public/assets/local/`；0.3.0 起官方战斗特效靠 `data/local-fx.json` + `public/assets/local/fx/`（缺失会静默回退 2D/原版特效、没有橙色栏杆）。
 6. 自检：对改动的 js 跑 `node --check`、`npm run check:imports`；本地 `PORT=31xx SP_ADMIN_TOKEN=test` 起服，curl 冒烟 `/healthz`（版本号应为新版本）、`/api/online`、`/api/announcements`、admin 接口鉴权（无 token 403、`?token=` 正确 200）；浏览器清 Service Worker+caches 硬刷新，巡检标题页/建房页/战场无 404、无 console error。
    - `npm run check:imports` 有 3 条 `server/sim/nodeData.js: node:fs/path/url [sim-node]` 违规是**上游既有的、被上游 `test/check-imports.test.js` 白名单认可的**，退出码 0，不是合并引入的问题。
    - **强烈建议加跑 `npm run golden`**：黄金结果全绿是「上游战斗改动没被我的六人房补丁改坏」的最有力证据。若有场景变动，必须能说清是上游有意改动还是我误伤。
@@ -69,12 +70,21 @@
 
 ## 附：当前基线快照（AI 核对用，会随版本过期，以实际 fetch 为准）
 
-- **最近一次同步：2026-10-14；上游 master 最新 = `488db49f`（0.2.6，2026-10-13）**，已合入分支 `sync/upstream-0.2.6`（合并提交 `46365eec`），**已确认是改编版 HEAD 的祖先、上游 commit 零遗漏、零删除文件**。
-- 更早的同步基点：`cf7a9400`（0.2.5）、`bc50cac0`（0.2.4）、`1db8e510`（0.2.3）。
-- 本次上游带来 **58 个新 commit / 93 个文件改动**（新增 17、修改 76）；合并时**13 个交叠文件里仅 3 个真冲突**，全在服务端接线处：`server/index.js`（我方 proxy/announcements vs 上游 traffic/assetIndex/views）、`server/http/websocket.js`（我方 proxy vs 上游流量计 + `perMessageDeflate` 压缩）、`server/http/routes.js`（`/healthz` 路由）。**这三处都是「两边都要」，二选一就会丢功能**。
-- 改编版相对新基线 `488db49f` 的独有改动：全部属于上述 10 项独有功能。新增文件主要落在：`android/**`（安卓壳全套）、`announcements.json`、`monitor.html` + `public/monitor.html`、`public/js/ui/chat.js`、`scripts/launcher.mjs`、`scripts/launcher.config.json`、`scripts/zipdir.mjs`、`tools/dist.mjs`、`server/http/announcements.js`、`server/http/proxy.js`、`shared/openingBans.js`、`test/admin-rooms.test.js`、`test/proxy.test.js`、3 个 bat、以及 `docs/` 下的改编版文档（含本文件、`CHANGELOG-ALLIANCE.md`、`FEATURES-ALLIANCE.md`、`RHINE-REMOVAL.md`）。
-- 本次验证结论（下次可作为参照）：`node --check` 112 个改动 js 全过；`npm run check:imports` 退出 0；`node tools/build-data.mjs` 重建**零差异**；`npm run golden` **全绿**（roster 49 / bonds 46 / fields 22 / matches 20 / standins 10 / diy 140）；改编版独有测试全绿（`proxy` 11、`lobby` 66、`admin-rooms` 5 等）；`npm run ci` 报 4 项失败（`proxy.test.js`、`lobby` 限流 2 例、`sim/perf`、`sim/robustness`），**全部单独重跑通过**，确认为满载抖动。
-- **`scene-assets.test.js` 的 Windows 路径 bug 上游已自行修复**（0.2.6 的 PR #547 / commit `1d55c93e`），改法与改编版此前的一致，无需再手动修。
+- **最近一次同步：2026-10-16；上游 master 最新 = `c24e17ee`（0.3.0，2026-10-16）**，已合入分支 `sync/upstream-0.3.0`（合并提交 `56888798`，后续公告 `282ff2bf`、README `9101714a`、monitor CSP 修复 `4fc7c170`、兼容文档 `7e951110`），**已确认是改编版 HEAD 的祖先、上游 commit 零遗漏、零删除文件**。
+- 更早的同步基点：`488db49f`（0.2.6）、`cf7a9400`（0.2.5）、`bc50cac0`（0.2.4）、`1db8e510`（0.2.3）。
+- 0.3.0 带来 **390 个新 commit / 807 个文件改动**（从 0.2.6 算起）；合并时 18 个冲突文件分三类解决：文档配置 9、服务端核心 5（index.js / routes.js / lobby.js / gamedata.js / Match.js）、前端核心 4（runner.js / game.js / title.js / hud.js）。
+- **0.3.0 上游新增的重要机制（合并时必须保留、不要覆盖）**：
+  - **插件系统**：`plugins/` 目录、`server/plugins/registry.js`、`shared/plugins/ui.js`、`/studio/` 工作台、Forge 导入器、脚本沙箱（`SP_PLUGIN_SCRIPTS`）。默认不开启，我们线上 plugins/ 只有 `_template`，零实际插件。
+  - **严格 CSP**：`server/http/csp.js` 的 `siteCsp(publicDir)` 只白名单 importmap hash，所有 HTML 页面套 `script-src 'self' ...`。**monitor.html 已外部化 JS**（见 10 项功能第 9 条）。
+  - **官方战斗特效**：`data/local-fx.json` 清单 + `public/assets/local/fx/`（12534 文件）。
+  - **11 战场新场景**：`public/assets/local/scene/`（137 文件）。
+  - **素材导入功能**：标题画面「导入素材包」、「下载完整素材」按哈希校验缓存。
+  - **统计页改版**、**干员多语言语音**、**攻击判定按官方碰撞箱**等大量平衡/渲染改进。
+- **已知待优化（不影响兼容，下次可处理）**：
+  - **倍速切换不丝滑**：4× 切 1× 时渲染插值速率骤降，视觉顿挫。reanchor 数学上游戏时间连续不跳，但渲染层插值器没有平滑过渡。改这个需要动渲染层插值器，风险大，暂未处理。
+- 改编版相对新基线 `c24e17ee` 的独有改动：全部属于上述 10 项独有功能。新增文件主要落在：`android/**`、`announcements.json`、`public/monitor.html` + `public/js/monitor.js`、`public/js/ui/chat.js`、`scripts/launcher.mjs`、`scripts/launcher.config.json`、`scripts/zipdir.mjs`、`tools/dist.mjs`、`server/http/announcements.js`、`server/http/proxy.js`、`shared/openingBans.js`、`test/admin-rooms.test.js`、`test/proxy.test.js`、3 个 bat、`docs/COMPAT-0.3.0.md` 及 docs/ 下改编版文档。
+- 本次验证结论：`node --check` 全过；`npm run check:imports` 退出 0；`node tools/build-data.mjs` 重建零差异；`npm run golden` 全绿；服务器已部署（build `3aa174f7fc6e`，healthz 正常）。
+- **美术资源不入库（0.3.0 更新）**：`public/assets/**`、`data/local-assets.json`、`data/local-fx.json` 在 `.gitignore` 内。3D 棋盘靠 `data/local-assets.json` + `public/assets/local/`；官方战斗特效靠 `data/local-fx.json` + `public/assets/local/fx/`。缺失会静默回退 2D/原版特效。**部署到新服务器时，必须从完整包复制这两个清单文件和 local/ 目录，否则游戏会提示素材不完整。**
 - 常用命令：
   - 拉上游：`git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git master`
   - 查上游新增（数量 + 标题）：`git rev-list --count HEAD..FETCH_HEAD`；`git log --oneline --reverse HEAD..FETCH_HEAD`
