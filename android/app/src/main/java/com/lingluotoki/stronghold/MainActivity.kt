@@ -1,6 +1,13 @@
 package com.lingluotoki.stronghold
 
 import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
+import android.webkit.ValueCallback
+import android.webkit.JavascriptInterface
+import org.json.JSONTokener
+import org.json.JSONObject
+import org.json.JSONArray
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.os.Build
@@ -33,10 +40,8 @@ import kotlinx.coroutines.launch
  * 不给裸 IP 发证书，所以裸 IP 走不了 HTTPS。
  */
 object ServerHosts {
-    const val MAIN = "http://101.132.104.41:3000"
-    const val COVENANT = "http://101.132.104.41:3001"
-    const val BACKUP = "http://116.62.39.28:3000"
-    val ALL = listOf(MAIN, COVENANT, BACKUP)
+    val MAIN: String = BuildConfig.UPSTREAM.trimEnd('/')
+    val ALL = listOf(MAIN)
 }
 
 /**
@@ -46,6 +51,9 @@ object ServerHosts {
 class MainActivity : Activity() {
     companion object {
         private const val TAG = "MainActivity"
+        private const val FILE_CHOOSER_REQUEST = 2101
+        private const val EXPORT_DOCUMENT_REQUEST = 2102
+        private const val MAX_EXPORT_CHARS = 16 * 1024 * 1024
         private const val BG = 0xFF0B0F0E.toInt()
         private const val FG = 0xFFD8E3DE.toInt()
         /** 正常消息（已连上、探测结果之类）停留多久后自动收起。 */
@@ -184,6 +192,8 @@ class MainActivity : Activity() {
     /** 每次新消息都拼一次：能力探测独占一行，其余消息一行，互不覆盖。 */
     private var diagProbe: String? = null
     private var diagConsole: String? = null
+    private var pendingExport: Pair<String, String>? = null
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var web: WebView? = null
     private var server: LocalServer? = null
     /** 本次启动自动探测选中的上游（仅用于日志/诊断，玩家手动选择以 SharedPreferences 为准）。 */
@@ -475,11 +485,11 @@ class MainActivity : Activity() {
      * 为什么要自动：玩家开着游戏遇到主服限流时只会看到「正在重连」，然后以为游戏坏了。
      */
     private suspend fun resolveUpstream(): String {
-        val manual = getSharedPreferences("sp", MODE_PRIVATE).getString("upstream", null)
-        if (manual != null) {
-            Log.i(TAG, "使用玩家手动指定的服务器：$manual")
-            return manual
-        }
+        // This APK belongs to the clean project. Discard server selections inherited from other editions.
+        val selected = getSharedPreferences("sp", MODE_PRIVATE)
+        val manual = selected.getString("upstream", null)
+        if (manual != null && manual.trimEnd('/') == ServerHosts.MAIN) return ServerHosts.MAIN
+        if (manual != null) selected.edit().remove("upstream").apply()
         status.text = "正在选择服务器…"
         val (picked, note) = LocalServer.pickReachable(SERVER_CANDIDATES)
         Log.i(TAG, "自动选服：$note")
@@ -510,43 +520,90 @@ class MainActivity : Activity() {
     /** 长按右下角构建标识弹出的菜单：服务器选择 + 显示（全屏 / 页面缩放）。 */
     private fun showServerPicker() {
         val labels = arrayOf(
-            "自动（推荐）· 主服不通时自动切盟约/备用",
-            "官服改版（主）· game.lingluotoki.dpdns.org",
-            "盟约服（改版mod）· 101.132.104.41:3001",
-            "备用服（旧莱茵）· 116.62.39.28",
+            "连接本项目服务器 · ${ServerHosts.MAIN}",
             if (fullscreen) "显示：退出全屏" else "显示：进入全屏",
             "显示：页面缩放 100%（原始）",
             "显示：页面缩放 110%",
             "显示：页面缩放 125%",
             "显示：页面缩放 150%",
         )
-        val urls = arrayOf(
-            null,                    // null = 自动
-            ServerHosts.MAIN,
-            ServerHosts.COVENANT,
-            ServerHosts.BACKUP,
-        )
         AlertDialog.Builder(this)
-            .setTitle("服务器 / 显示")
+            .setTitle("纯净联机版 / 显示")
             .setItems(labels) { _, which ->
                 when (which) {
-                    in 0..3 -> {
-                        val ed = prefs.edit()
-                        val u = urls[which]
-                        if (u == null) ed.remove("upstream") else ed.putString("upstream", u)
-                        ed.apply()
-                        val what = u ?: "自动选服"
-                        toast("已切换到 $what，正在重启…")
-                        root.postDelayed({ recreate() }, 800)
-                    }
-                    4 -> toggleFullscreen()
-                    5 -> setPageZoom(100)
-                    6 -> setPageZoom(110)
-                    7 -> setPageZoom(125)
-                    8 -> setPageZoom(150)
+                    0 -> applyServerSwitch("")
+                    1 -> toggleFullscreen()
+                    2 -> setPageZoom(100)
+                    3 -> setPageZoom(110)
+                    4 -> setPageZoom(125)
+                    5 -> setPageZoom(150)
                 }
             }
             .show()
+    }
+
+    /** The only native bridge operation: save JSON to a destination explicitly chosen by the user. */
+    private inner class ExportBridge {
+        @JavascriptInterface
+        fun saveJson(filename: String, text: String) {
+            if (text.length > MAX_EXPORT_CHARS) {
+                runOnUiThread { toast("导出文件过大，未保存") }
+                return
+            }
+            val valid = runCatching {
+                val parser = JSONTokener(text)
+                val value = parser.nextValue()
+                (value is JSONObject || value is JSONArray) && parser.nextClean() == 0.toChar()
+            }.getOrDefault(false)
+            if (!valid) {
+                runOnUiThread { toast("导出内容不是有效的 JSON 文件") }
+                return
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (pendingExport != null) {
+                    toast("请先完成或取消上一次保存")
+                    return@runOnUiThread
+                }
+                val name = filename.substringAfterLast('/').substringAfterLast('\\')
+                    .replace(Regex("[^a-zA-Z0-9._-]"), "_").take(120)
+                    .let { if (it.endsWith(".json", true)) it else "stronghold-export.json" }
+                pendingExport = name to text
+                try {
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "application/json"
+                        putExtra(Intent.EXTRA_TITLE, name)
+                    }
+                    startActivityForResult(intent, EXPORT_DOCUMENT_REQUEST)
+                } catch (e: Exception) {
+                    pendingExport = null
+                    Log.w(TAG, "Cannot open export destination", e)
+                    toast("无法打开保存窗口，请确认系统文件管理器可用")
+                }
+            }
+        }
+    }
+
+    private fun installExportHandler(view: WebView) {
+        // Anchor downloads use blob: URLs, which Android's DownloadManager cannot read.
+        // Read in the page's own origin, then ask Android for a user-selected destination.
+        view.evaluateJavascript("""
+            (() => {
+              if (window.__spAndroidExportInstalled) return;
+              window.__spAndroidExportInstalled = true;
+              document.addEventListener('click', event => {
+                const anchor = event.target && event.target.closest && event.target.closest('a[download]');
+                if (!anchor || !anchor.href.startsWith('blob:') || !anchor.download.toLowerCase().endsWith('.json')) return;
+                event.preventDefault();
+                fetch(anchor.href).then(response => {
+                  if (!response.ok) throw new Error('export blob unavailable');
+                  return response.text();
+                }).then(text => SpAndroidExport.saveJson(anchor.download, text))
+                  .catch(() => alert('无法读取导出内容，请重新导出'));
+              }, true);
+            })()
+        """.trimIndent(), null)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -558,7 +615,7 @@ class MainActivity : Activity() {
             databaseEnabled = true
             mediaPlaybackRequiresUserGesture = false       // BGM 与干员语音
             allowFileAccess = false
-            allowContentAccess = false
+            allowContentAccess = true                      // user-selected content:// files from the system picker
             cacheMode = WebSettings.LOAD_NO_CACHE
             // 忽略系统「字体大小 / 显示大小」的无障碍缩放：否则文字被放大后布局会挤爆
             // （结算页的返回按钮被挤出视口之类），这也是玩家反馈「字好大」的来源。
@@ -570,7 +627,31 @@ class MainActivity : Activity() {
             displayZoomControls = false
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         }
+        w.addJavascriptInterface(ExportBridge(), "SpAndroidExport")
         w.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(
+                webView: WebView?, callback: ValueCallback<Array<Uri>>?,
+                params: FileChooserParams?,
+            ): Boolean {
+                fileChooserCallback?.onReceiveValue(null)
+                fileChooserCallback = callback
+                return try {
+                    val intent = params?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                        type = "*/*"
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                    }
+                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, params?.mode == FileChooserParams.MODE_OPEN_MULTIPLE)
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST)
+                    true
+                } catch (e: Exception) {
+                    Log.w(TAG, "Cannot open file picker", e)
+                    fileChooserCallback = null
+                    callback?.onReceiveValue(null)
+                    toast("无法打开文件选择器，请确认系统已安装文件管理器")
+                    true
+                }
+            }
+
             /**
              * 把页面的 console 输出接进诊断行。
              *
@@ -624,6 +705,7 @@ class MainActivity : Activity() {
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                if (view != null && url?.startsWith("http://127.0.0.1:") == true) installExportHandler(view)
                 // 页面正常加载完成后撤掉错误遮罩（如果还在）
                 if (loading.parent != null) {
                     (loading.parent as? ViewGroup)?.removeView(loading)
@@ -675,6 +757,39 @@ class MainActivity : Activity() {
         diag.bringToFront()          // 诊断行压在最上层（平时是 GONE，不挡画面）
     }
 
+    @Deprecated("Activity result API retained for the plain Activity shell")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == EXPORT_DOCUMENT_REQUEST) {
+            val export = pendingExport
+            pendingExport = null
+            val uri = data?.data
+            if (resultCode != RESULT_OK || uri == null || export == null) {
+                toast("已取消保存")
+                return
+            }
+            scope.launch {
+                val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    runCatching {
+                        val output = contentResolver.openOutputStream(uri, "wt")
+                            ?: error("No output stream")
+                        output.bufferedWriter(Charsets.UTF_8).use { it.write(export.second) }
+                    }
+                }
+                if (result.isSuccess) toast("已保存：${export.first}")
+                else {
+                    Log.w(TAG, "Export write failed", result.exceptionOrNull())
+                    toast("保存失败，请重新导出并选择其他位置")
+                }
+            }
+            return
+        }
+        if (requestCode != FILE_CHOOSER_REQUEST) return
+        val callback = fileChooserCallback
+        fileChooserCallback = null
+        callback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             val w = web
@@ -689,6 +804,9 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        pendingExport = null
+        fileChooserCallback?.onReceiveValue(null)
+        fileChooserCallback = null
         scope.launch { }
         server?.stop()
         server = null

@@ -1,9 +1,9 @@
 # 改编版与官方 0.3.0 兼容性报告
 
-> 生成时间：2026-10-16
+> 生成时间：2026-10-16（2026-10-17 更新部署状态）
 > 上游基线：`sganggs/Stronghold-Protocol` master @ `c24e17ee`（v0.3.0）
 > 改编版 HEAD：`4fc7c170`（sync/upstream-0.3.0 分支）
-> 线上版本：build `3aa174f7fc6e`，app `0.3.0`
+> 线上版本：3000 → build `ca3acf158f35`；3001 → build `7eef62337ba2`，均为 app `0.3.0`
 
 ---
 
@@ -126,18 +126,89 @@
 
 ## 六、服务器部署状态
 
+同一台 ECS（101.132.104.41）上并存两套独立服务，共用一份素材与 node_modules。
+
+| 项目 | 3000（本改编版） | 3001（`卫v0.5-0.3` 包） |
+|---|---|---|
+| 路径 | `/root/stronghold` | `/root/stronghold-3001` |
+| systemd | `stronghold`（active，开机自启） | `stronghold-3001`（active，开机自启） |
+| 端口 | 3000 | 3001 |
+| 域名 | https://game.lingluotoki.dpdns.org | **https://alliance.lingluo-toki.top** |
+| IP 直连 | http://101.132.104.41:3000 | http://101.132.104.41:3001 |
+| build hash | `ca3acf158f35` | `aa7046189839` |
+| content vanilla hash | `e044986e81191baeb…` | `e82a94f015efa3c70…` |
+| 证书到期 | 2027-01-03 | 2027-01-15 |
+
+共用项（两套服务相同）：
+
 | 项目 | 值 |
 |---|---|
-| IP | 101.132.104.41 |
-| 路径 | /root/stronghold |
-| systemd | stronghold（active） |
 | Node | v22.23.3 |
-| 端口 | 3000 |
-| 域名 | https://game.lingluotoki.dpdns.org |
-| build hash | 3aa174f7fc6e |
-| content vanilla hash | e044986e81191baeba211af71952150aab84882243a151dd8fe6086a88c06f3b |
-| plugins/ | 空（只有 _template，零实际插件） |
+| 素材 | `public/assets` 均为软链 → `/root/stronghold/public/assets`（16,705 个文件 / 758,184,113 字节） |
+| node_modules | `stronghold-3001/node_modules` 软链 → `/root/stronghold/node_modules` |
+| 素材清单 | `local-assets.json` 1,690 项、`local-fx.json` 9,187 项，两份 md5 完全一致 |
+| plugins/ | 空（只有 `_template`，零实际插件） |
 | SP_PLUGIN_SCRIPTS | 未设置（脚本沙箱关闭） |
+
+### 6.1 nginx 与域名
+
+nginx 1.18.0 监听 80/443，按 `server_name` 分流；`sites-enabled/` 下四项：
+
+| 配置文件 | 域名 | 去向 |
+|---|---|---|
+| `game.conf` | game.lingluotoki.dpdns.org | 根路径 → 3000；`/backup/` → 116.62.39.28:3000 |
+| `alliance.conf` | alliance.lingluo-toki.top | 根路径 → 3001（含 WS 升级） |
+| `zz-eye-diagnosis.conf` | lingluo-toki.top / www | 眼健康诊断系统 → 本地 8000 |
+| `default` | 兜底 | `/var/www/html` |
+
+证书均为 Let's Encrypt + certbot webroot，`--deploy-hook` 自动 `systemctl reload nginx`。
+
+### 6.2 ⚠️ 该游戏必须部署在域名根路径
+
+客户端的 `public/index.html` 用**根路径绝对地址**（`href="/js/webFonts.js"`、`href="/fonts/fonts.css"`），
+WS 也固定拼 `ws(s)://<host>/ws`（`public/js/net.js`）。因此**不能用子路径反代**
+（如 `location /alliance/ { proxy_pass http://127.0.0.1:3001/; }`）：页面在子路径下打开时，
+资源请求会打到该域名根路径（即 3000），WS 也会连进 3000 的大厅——HTTP 表面返回 200，实际是串服。
+2026-10-17 已删除 `game.lingluotoki.dpdns.org/alliance/` 这条错误的子路径反代（现返回 404），
+备份在 `/etc/nginx/sites-available/game.conf.bak-rm-alliance-20261017-135128`。
+
+新增端口时一律新开子域名并在**根路径**反代。
+
+### 6.3 部署 3001 的步骤（2026-10-17 实际执行）
+
+1. 上传包里排除 `public/assets`、`node_modules`、`.cache` 与 `plugins/.studio-key`（工作台密钥不入服务器），其余约 940 个文件 / 13 MB。
+2. 解包到新目录，`public/assets` 与 `node_modules` 软链到 `/root/stronghold` 下的同版本副本（先用 md5 确认清单一致）。
+3. **必须在备用端口试跑**（`PORT=30099 node server/index.js`）再切换：首次打包时 `robocopy /XD assets`
+   误伤了 `tools/assets/`，服务启动即因 `ERR_MODULE_NOT_FOUND: tools/assets/atlas.mjs` 崩溃，靠试跑拦下。
+4. 试跑通过后才 `systemctl stop` → 换目录 → `systemctl start`，避免打断在线对局。
+5. 回滚：`systemctl stop stronghold-3001 && mv stronghold-3001 stronghold-3001-failed && mv stronghold-3001-old stronghold-3001 && systemctl start stronghold-3001`。
+
+代码备份：`/root/backups/stronghold-3001-pre-upstream-20261017-133831.tgz`（旧 0.2.1 代码）；
+旧目录完整保留在 `/root/stronghold-3001-old`。
+
+### 6.4 3001 的移植与定制记录（2026-10-17）
+
+3001 跑的是 `卫v0.5-0.3` 包（含莱茵档案、444 干员）+ `升级包v0.51-0.3-无尽beta`，
+**不是**本仓库 `sp-clean` 的代码。为让它具备本改编版的联机能力，从 `sp-clean` 移植了 6 项功能，
+另对上游代码做了 4 处修改。全部改动都在服务器的 `/root/stronghold-3001/` 下：
+
+| 改动 | 文件 | 说明 |
+|---|---|---|
+| 公告栏 | `server/http/announcements.js`、`server/index.js`、`server/http/routes.js`、`public/js/screens/title.js`、`announcements.json` | 从 sp-clean 移植 |
+| 在线人数 | `server/http/routes.js`（`GET /api/online`） | 从 sp-clean 移植 |
+| 监控大屏 | `public/monitor.html`、`public/js/monitor.js`、`routes.js` 的 `/api/admin/*` | 从 sp-clean 移植 |
+| 战斗倍速 1×/2×/4× | `public/js/battle/runner.js`、`public/js/ui/hud.js`、`public/js/screens/game.js` | 从 sp-clean 移植 |
+| 跳过本场 | 同上 + `game.css` | 从 sp-clean 移植 |
+| proxy 反代 | `server/http/proxy.js`、`server/http/websocket.js` | 从 sp-clean 移植（便携包用） |
+| **放宽无尽模式限制** | `server/lobby.js` | 上游只允许本地端开；改为可用 `SP_ENDLESS_LOCAL_ONLY=1` 恢复 |
+| **补 `room.list` 接口** | `shared/protocol.js`、`server/lobby.js`、`server/net.js` | 上游缺失，导致大厅在线数与房间列表永远为空 |
+| **补梅尔水獭模型** | `data/assets.json`、`tools/assets/local-token-spines.json` | 上游提取工具漏项，素材在但清单没登记 |
+| **修公告弹窗层级** | `public/js/screens/title.js`、`public/css/screens/title.css` | 弹窗被 `.title-main` 层叠上下文困住，z-index 再高也盖不住 |
+
+**没有移植的**（如需再补）：六人房、聊天表情、快速匹配、本机/PC 联机脚本。
+
+> ⚠️ 3001 的这棵代码树**不在任何 git 仓库里**。本地的 `_merge3001` 是线上代码的完整副本，
+> 但没有版本控制。改动前务必先备份（见 6.3 的更新流程）。
 
 ---
 
@@ -148,3 +219,12 @@
 3. **data/local-assets.json 和 local-fx.json**：也不入 git，服务器部署时单独复制
 4. **10 项独有功能的补丁点**已在上文列出，下次合并冲突时按此清单逐一 grep 确认
 5. **不要把 `.cache/` 目录提交**：这是本地客户端提取的缓存，体积巨大且不入版本控制
+6. **3000 与 3001 已共用同一份素材目录**（软链）。更新 3000 的 `public/assets` 会同时影响 3001；
+   若将来两套服务的素材版本需要分叉，必须改成独立副本，否则会出现「素材与代码版本不匹配」。
+   反过来，两套服务代码版本不同也会让 `data/assets.json` 的清单哈希对不上（现为
+   `e044986e…` vs `dfcbcee9…`），排查素材问题时要按各自端口分别看清单。
+7. **打包排除规则要用精确路径**：`robocopy /XD assets` 这类命名匹配会误伤任意层级的同名目录
+   （`tools/assets/` 就被误删过），排除项必须写完整路径。
+8. **改 nginx 前先 `nginx -T | grep server_name` 查重复**：`sites-enabled/` 里残留的软链接
+   （例如指向 `game.conf` 自身的 `game.conf.bak-*`）会让同一份配置被加载两遍，表现为
+   `conflicting server name ... ignored` 警告，容易掩盖真实问题。2026-10-17 已清理一处。

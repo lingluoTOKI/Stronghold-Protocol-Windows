@@ -67,6 +67,7 @@ class LocalServer(
      * 才能继续在纯 JVM 测试里跑。
      */
     private val onSwitchServer: ((String) -> Unit)? = null,
+    private val projectOnly: Boolean = true,
 ) {
     companion object {
         /** /media/ 后缀顺序，与 shared/media.js 的 AUDIO_EXTS 对齐。 */
@@ -281,7 +282,7 @@ class LocalServer(
         when {
             path == APP_SERVER_PATH -> appServerRoute(call, uri)
             path.startsWith("/about/") -> serveStatic(call, path)
-            path == "/data/local-assets.json" || path == "/data/local-fx.json" -> serveStatic(call, path)
+            path == "/data/assets.json" || path == "/data/local-assets.json" || path == "/data/local-fx.json" -> serveStatic(call, path)
             path.startsWith("/assets/") || path.startsWith("/fonts/") || path.startsWith("/media/") -> {
                 val localPath = path.replaceFirst(Regex("^/(assets|fonts|media)/~[0-9a-f]{16}/"), "/$1/")
                 val hash = Regex("^/(?:assets|fonts|media)/~([0-9a-f]{16})/").find(path)?.groupValues?.get(1)
@@ -350,6 +351,11 @@ class LocalServer(
         // 已知 id → 它的地址；其它 → 必须是一个 http(s) 地址，否则视为非法输入。
         // 用空串而不是 null 表示「自动」，这样下面不需要再区分「null 是非法还是自动」。
         val next: String = when {
+            projectOnly && wanted !in listOf(null, "", "auto", "main", upstreamHttp) -> {
+                call.respondText("""{"ok":false,"error":"this APK connects to the clean project only"}""", ContentType.Application.Json, HttpStatusCode.BadRequest)
+                return
+            }
+            projectOnly && wanted == "main" -> upstreamHttp
             wanted.isNullOrEmpty() || wanted == "auto" -> ""
             else -> SERVERS.firstOrNull { it.first == wanted }?.second
                 ?: wanted.takeIf { it.startsWith("http://") || it.startsWith("https://") }
@@ -366,7 +372,8 @@ class LocalServer(
     /** 供 GET /api/app-server 序列化：当前服务器 + 候选项。 */
     private fun appServerJson(): String {
         val cur = if (upstreamHttp == MAIN_SERVER) "main" else if (upstreamHttp == BACKUP_SERVER) "backup" else upstreamHttp
-        val list = SERVERS.joinToString(",") { (id, url, label) -> """{"id":"$id","url":"$url","label":"$label"}""" }
+        val available = if (projectOnly) listOf(Triple("main", upstreamHttp, "纯净联机版 · 本项目服务器")) else SERVERS
+        val list = available.joinToString(",") { (id, url, label) -> """{"id":"$id","url":"$url","label":"$label"}""" }
         return """{"ok":true,"app":true,"current":"$cur","currentUrl":"$upstreamHttp","auto":${upstreamHttp == MAIN_SERVER},"candidates":[$list]}"""
     }
 
