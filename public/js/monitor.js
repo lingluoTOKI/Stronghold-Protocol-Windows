@@ -8,9 +8,11 @@ const SRVS = [
   { base: ALLIANCE_BASE, el:'1', role:'alliance', label:'3001 · 独立部署',   url:'http://101.132.104.41:3001' },
   { base: BACKUP_BASE,  el:'2', role:'backup',   label:'杭州 · 备用服',     url:'http://116.62.39.28:3000' },
 ];
-// 公告目标：主服 + 备用服（两台都是莱茵版 0.2.2，内容一致，公告需要同步）
-// 3001 是独立部署、版本落后，不纳入公告推送。
-const ANNOUNCE_SRVS = [SRVS[0], SRVS[2]];
+// 公告目标：三台都能发（2026-10-17 起）。
+// 早先这里只放主服 + 备用服，注释写「3001 是独立部署、版本落后，不纳入公告推送」——
+// 那会儿 3001 还跑着 0.2.1。现在 3001 已经是并列的联盟服（有独立域名和 /alliance 运维接口），
+// 公告接口和主服一样，所以把三台都纳进来；界面上的勾选框也可以每一台单独选。
+const ANNOUNCE_SRVS = [SRVS[0], SRVS[1], SRVS[2]];
 
 let ipPlain = localStorage.getItem('sp_ip_plain') === '1';
 const MASK_HOST = '***.***.***.***';

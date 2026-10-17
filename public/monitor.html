@@ -75,7 +75,12 @@
   .mgmt__dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok, #34d399);margin-right:5px}
   .mgmt__body{display:none;padding:0 18px 16px}
   .mgmt.is-open .mgmt__body{display:block}
-  .mgmt.is-open .ann-editor__hd{display:none}
+  /* 折叠面板里已经有「⚙️ 服务器管理」当标题了，这里只藏重复的「📢 公告编辑器」文字；
+     ⚠️ 不能整个 .ann-editor__hd 藏掉 —— 公告目标复选框（annT0/annT1/annT2）就在这个容器里，
+     藏了整个头部会让「选择发布到哪台服务器」消失。 */
+  .mgmt .ann-editor__hd .t{display:none}
+  .mgmt .ann-editor__hd{margin-bottom:10px}
+  .mgmt .ann-editor__hd .ann-targets{margin-left:0}
   .mgmt .ann-editor{padding:0;border:none;box-shadow:none;background:none;margin:0}
   .mgmt .adminops{padding:12px 0 0;margin:14px 0 0;border-top:1px solid var(--line)}
 
