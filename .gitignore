@@ -1,0 +1,33 @@
+# 构建产物与本地素材包：都不进版本库
+/build/
+/app/build/
+/app/src/main/assets/www.zip
+/.gradle/
+/local.properties
+/keystore.jks
+*.jks
+*.keystore
+
+# 签名口令（本地图省事时写这里；tools/dist.mjs 与 app/build.gradle.kts 都会读）
+# ⚠ 绝不能提交：这个仓库是公开的
+/keystore.properties
+
+# ---- 3001 联盟服专用构建补充 ----
+# 打包产物（1066 MB，用 GitHub Release 分发，不入库）
+/dist/
+
+# 构建缓存
+/app/.cxx/
+/app/.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# 临时文件
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
