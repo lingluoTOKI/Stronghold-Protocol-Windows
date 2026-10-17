@@ -11,8 +11,8 @@
 | 游戏内容 | 266 干员，无莱茵档案 | **444 干员，含莱茵档案** |
 | 无尽模式 AC-5 | 无 | **有** |
 | 内置素材 | 约 1.06 GB | **约 1.55 GB**（多出皮肤等 3001 独有素材） |
-| 应用名 | 卫戍协议：盟约 | **卫戍协议：盟约 联盟服** |
-| 当前版本 | android.5 / 305 | **android.7 / 307** |
+| 应用名 | 卫戍协议：盟约 | **卫戍协议：契约** |
+| 当前版本 | android.5 / 305 | **android.8 / 308** |
 
 ## 构建
 
@@ -27,7 +27,7 @@ node make-www.mjs
 # 2) 构建
 JAVA_HOME="C:\Program Files\Java\jdk-21" ANDROID_HOME="F:\android-sdk" \
   F:\gradle-8.7\bin\gradle.bat -p . :app:assembleRelease \
-  -PSP_VERSION_CODE=307 -PSP_VERSION_NAME=0.3.0-android.7-alliance
+  -PSP_VERSION_CODE=308 -PSP_VERSION_NAME=0.3.0-android.8-contract
 ```
 
 产物：`app/build/outputs/apk/release/app-release.apk`（复制到 `dist/` 并附 SHA-256）。
