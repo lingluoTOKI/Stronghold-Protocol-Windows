@@ -401,8 +401,8 @@ export function TitleScreen() {
         </div>
       </div>
       <div class="title-assets">
-        <${AssetDownloadButton} />
         <${AssetImportButton} />
+        <${AssetDownloadButton} />
       </div>
     </main>
 

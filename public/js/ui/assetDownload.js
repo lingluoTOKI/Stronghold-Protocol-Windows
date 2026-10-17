@@ -1,63 +1,38 @@
-// The title screen's 下载完整素材 (docs/history/0.3.0.md §32.14.23): the button, its hint line and the dialog, which starts the
-// download queue (assetDownload.js) as it opens; closing it pauses. The import of a local pack has its own button beside
-// this one (ui/assetImport.js, §32.14.39): a file already imported counts as ready here and is not requested again.
-import { useEffect, useState } from '../../vendor/hooks.module.js';
-import { html, Button, Modal, ProgressBar } from './components.js';
-import { assetDownload } from '../assetDownload.js';
+// 标题页的「素材包下载」（原「下载完整素材」，2026-10-17 改）：
+//
+// 之前这个按钮点下去会把整套素材（16,705 个文件 / 723 MB）全部从本服务器拉一遍，
+// 几个玩家同时点就能把小主机的带宽吃满，对局本身都卡。现在改为**不再从服务器全量下载**：
+// 按钮只负责说明 + 指路，玩家去 QQ 群文件取素材包 zip，再用旁边的「导入素材包」导入。
+// 服务器零流量，导入走浏览器本地，比全量下载快得多。
+//
+// 不用素材包也能玩：素材本来就是按需加载的，第一局随用随下（通常几十 MB）。
+// 已经导入过素材的玩家什么都不用做 —— 「导入素材包」直接命中缓存。
+import { useState } from '../../vendor/hooks.module.js';
+import { html, Button, Modal } from './components.js';
 import { t } from '../../../shared/i18n.js';
 
-/** 下载完整素材: the button, its hint line and the download dialog. */
+/** 素材包在哪拿：QQ 群号（改这一处即可）。 */
+export const ASSET_PACK_QQ_GROUP = '1104628970';
+
+/** 素材包下载: 纯说明弹窗，指路到 QQ 群，不从服务器拉取任何素材。 */
 export function AssetDownloadButton() {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState(() => assetDownload.get());
-  useEffect(() => {
-    const off = assetDownload.subscribe(setState);
-    setState(assetDownload.get());
-    return () => {
-      off();
-      assetDownload.pause();
-    };
-  }, []);
-  const busy = ['preparing', 'downloading'].includes(state.phase);
-  const close = () => {
-    assetDownload.pause();
-    setOpen(false);
-  };
-  const status = state.phase === 'complete' ? t('本次素材下载完成')
-    : state.phase === 'preparing' ? t('正在读取素材清单…')
-      : state.phase === 'paused' ? t('素材下载已暂停')
-        : state.phase === 'error' ? t('无法读取素材清单，请检查网络后重试。')
-          : state.phase === 'partial' ? t('有 {n} 个素材下载失败', { n: state.failures.length })
-            : t('正在下载素材…');
-  const label = state.phase === 'complete' ? t('素材已下载')
-    : state.phase === 'paused' ? t('继续下载素材') : t('下载完整素材');
-
-  const ready = state.cached || 0;
-  const missing = Math.max(0, (state.total || 0) - ready);
   return html`<div class="title-assets__item">
-    <${Button} variant="secondary" block=${true} size="sm" data-testid="asset-download" aria-describedby="title-asset-download-hint" onClick=${() => {
-      setOpen(true);
-      if (state.phase !== 'complete') void assetDownload.start();
-    }}>${label}<//>
-    <small id="title-asset-download-hint">${t('含模型、贴图和音频，建议使用 Wi-Fi 下载。')}</small>
-    <${Modal} open=${open} onClose=${close} title=${t('下载完整素材')} class="asset-download" actions=${html`
-      ${busy ? html`<${Button} onClick=${() => assetDownload.pause()}>${t('暂停下载')}<//>`
-        : html`<${Button} variant="primary" data-testid="asset-download-resume" onClick=${() => void assetDownload.start()}>
-          ${state.phase === 'complete' ? t('重新检查') : state.phase === 'paused' ? t('继续下载素材') : t('重试下载')}<//>`}
-      <${Button} onClick=${close}>${t('关闭')}<//>`}>
-      <p role="status" data-testid="asset-download-status">${status}</p>
-      <${ProgressBar} value=${state.done} max=${state.total || 1} label=${t('已完成 {done} / {total} 个文件', { done: state.done, total: state.total })} />
-      <p>${t('已读取 {size} MB（含浏览器缓存）', { size: (state.bytes / 1048576).toFixed(1) })}</p>
-      ${state.total > 0 ? html`<p>${t('已就绪 {ready}，缺少 {missing}', { ready, missing })}</p>` : null}
-      <p class="t-lo">${t('已导入的素材直接使用，不再向服务器请求。')}</p>
-      <p class="t-lo">${t('下载本服务器提供的素材到浏览器缓存。关闭窗口会暂停；缓存被清理后可再次下载。')}</p>
-      ${state.localMissing ? html`<p class="t-lo">${t('服务器未提供额外的本地素材包，将使用基础素材。')}</p>` : null}
-      ${state.failures.length ? html`<div class="asset-download__errors">
-        <p>${t('下载未完成。请重试；若文件持续缺失，请联系服主补齐素材。')}</p>
-        <details><summary>${t('查看失败文件')}</summary><ul>
-          ${state.failures.slice(0, 30).map((item) => html`<li key=${item.url}><code>${item.url}</code> (${item.status})</li>`)}
-        </ul></details>
-      </div>` : null}
+    <${Button} variant="secondary" block=${true} size="sm" data-testid="asset-download"
+      aria-describedby="title-asset-download-hint" onClick=${() => setOpen(true)}>${t('素材包下载')}<//>
+    <small id="title-asset-download-hint">${t('从群文件下载素材包，进游戏更快、也更省服务器带宽。')}</small>
+    <${Modal} open=${open} onClose=${() => setOpen(false)} title=${t('素材包下载')} class="asset-download"
+      actions=${html`<${Button} variant="primary" onClick=${() => setOpen(false)}>${t('知道了')}<//>`}>
+      <p role="status">${t('素材包不在这台服务器上下载——那会把开服机器的带宽占满，影响正在对局的人。')}</p>
+      <p><b>${t('下载方式')}</b></p>
+      <ol class="t-lo" style="margin:.1rem 0 .1rem .2rem;padding:0">
+        <li>${t('加入 QQ 群')}<b class="num">${ASSET_PACK_QQ_GROUP}</b></li>
+        <li>${t('在「群文件」里下载对应版本的素材包 zip（只需一次）')}</li>
+        <li>${t('回到这个页面，点「导入素材包」，选择下载好的 zip')}</li>
+      </ol>
+      <p class="t-lo">${t('导入约 1–2 分钟，之后进对局几乎不下载素材。')}</p>
+      <p class="t-lo">${t('不用素材包也能玩：素材按需加载，第一局会随用随下（通常几十 MB）。')}</p>
+      <p class="t-lo">${t('安卓安装包已经内置素材，不需要这一步。')}</p>
     <//>
   </div>`;
 }

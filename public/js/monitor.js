@@ -246,6 +246,75 @@ async function fetchHealth(svr){
   }
 }
 
+// Stability is a same-origin, token-protected operations service. Backup server is excluded.
+const guardBusy = {0:false, 1:false};
+async function stabilityRequest(el, control){
+  const token = $('token').value.trim();
+  if(!token) throw new Error('请先输入并保存 admin token');
+  const endpoint = control ? '/api/admin/stability/control' : '/api/admin/stability';
+  const controller = new AbortController();
+  const timeout = setTimeout(()=>controller.abort(), 5000);
+  try {
+    const r = await fetch(`${location.origin}${endpoint}?port=${el==='1'?3001:3000}&token=${encodeURIComponent(token)}`, {
+      method:control?'POST':'GET', cache:'no-store', signal:controller.signal,
+      ...(control?{headers:{'Content-Type':'application/json'},body:JSON.stringify(control)}:{})
+    });
+    const result = await r.json();
+    if(!r.ok || !result.ok) {
+      if(r.status===403) throw new Error('管理 token 不正确或权限不足');
+      if(r.status===409) throw new Error('保护尚未启用，需要先批准维护重启');
+      throw new Error('稳定性服务暂不可用');
+    }
+    return result;
+  } finally { clearTimeout(timeout); }
+}
+async function fetchStability(svr){
+  const el=svr.el;
+  if(!['0','1'].includes(el)) return;
+  const state=$('guard'+el+'_state'), metrics=$('guard'+el+'_metrics'), reason=$('guard'+el+'_reason');
+  const pause=$('guard'+el+'_pause'), resume=$('guard'+el+'_resume');
+  if(!state) return;
+  pause.disabled=true; resume.disabled=true;
+  state.dataset.mode='';
+  if(!onDomain || localTest){ state.textContent='未接入'; return; }
+  if(!$('token').value.trim()) { state.textContent='未认证'; reason.textContent='输入管理 token 查看保护状态'; return; }
+  try{
+    const j=await stabilityRequest(el);
+    const host=j.host||{}, service=j.service||{}, a=j.admission, limits=a?.limits||j.pendingLimits||{};
+    const rss=Number(service.MemoryCurrent);
+    const load=Array.isArray(host.load)?host.load.map(v=>Number(v).toFixed(2)).join(' / '):'--';
+    $('guard'+el+'_available').textContent=(host.availableMB??'—')+' MB';
+    $('guard'+el+'_rss').textContent=Number.isFinite(rss)?Math.round(rss/1048576)+' MB':'—';
+    $('guard'+el+'_capacity').textContent=(a?.matches??service.health?.matches??'—')+' / '+(limits.maxMatches??'—');
+    $('guard'+el+'_away').textContent=service.awayRooms??'—';
+    $('guard'+el+'_detail').textContent=`swap ${host.swapUsedMB??'—'} MB · 负载 ${load} · 房间 ${a?.rooms??service.health?.rooms??'—'}/${limits.maxRooms??'—'} · 采样 ${j.observationAgeSec??'—'} 秒前`+(a?` · 事件循环 ${Number(a.lagMs||0).toFixed(0)} ms`:'');
+    if(j.observationStale){state.textContent='数据过期';state.dataset.mode='warn';reason.textContent='监测超过两分钟未更新';return;}
+    if(!j.active){
+      state.textContent='待启用';state.dataset.mode='warn';
+      reason.textContent='监测正常 · 开局保护等待维护启用';
+      return;
+    }
+    const full=a.matches>=limits.maxMatches;
+    const roomsFull=a.rooms>=limits.maxRooms;
+    state.textContent=a.manualPaused?'已暂停':a.pressure?'资源保护':full?'对局已满':roomsFull?'房间已满':'自动保护';
+    state.dataset.mode=a.manualPaused||a.pressure||full||roomsFull?'warn':'ok';
+    reason.textContent=a.manualPaused?'新开局已暂停 · 已有对局继续':a.pressure?'资源紧张 · 暂缓新开局':full?'等待已有对局结束后恢复':roomsFull?'已有房间可继续开局':'运行正常 · 已有对局与重连优先';
+    pause.disabled=guardBusy[el]||a.manualPaused;
+    resume.disabled=guardBusy[el]||!a.manualPaused;
+  }catch(error){state.textContent='暂不可用';state.dataset.mode='warn';reason.textContent=error.name==='AbortError'?'请求超时，请稍后重试':error.message;}
+}
+async function setAdmissionPause(el,paused){
+  if(guardBusy[el]) return;
+  guardBusy[el]=true;
+  $('guard'+el+'_pause').disabled=true; $('guard'+el+'_resume').disabled=true;
+  const message=$('guard'+el+'_message');
+  try {
+    await stabilityRequest(el,{paused});
+    message.textContent=paused?'已暂停新开局，已有对局不受影响。':'已恢复自动保护；资源不足或满额时仍会暂缓新开局。';
+  }catch(error){message.textContent=error.message;}
+  finally {guardBusy[el]=false; await fetchStability(SRVS[Number(el)]);}
+}
+
 // ============ 房间对局 + 在线玩家 合并渲染 ============
 const roomData = {
   0:{ rooms:null, groups:new Map(), lobby:[], playersUnsupported:false },
@@ -459,6 +528,7 @@ async function tick(){
   const health = await Promise.all(act.map(fetchHealth));
   await Promise.all(act.map(fetchRooms));
   await Promise.all(act.map(fetchPlayers));
+  await Promise.all(act.map(fetchStability));
   let tSock=0,tHum=0,tRoom=0,tMatch=0,ok=0;
   health.forEach(j=>{ if(!j) return; ok++; tSock+=j.sockets||0; tHum+=j.humans||0; tRoom+=j.rooms||0; tMatch+=j.matches||0; });
   $('totalOnline').textContent  = ok? tSock : '--';
@@ -484,6 +554,7 @@ document.addEventListener('visibilitychange', ()=>{
 function bindUi(){
   const on = (id, fn, ev) => { const el = $(id); if (el) el.addEventListener(ev || 'click', fn); };
   on('btnSaveToken', saveToken);
+  ['0','1'].forEach(el=>{on('guard'+el+'_pause',()=>setAdmissionPause(el,true));on('guard'+el+'_resume',()=>setAdmissionPause(el,false));});
   on('ipModeBtn', toggleIpMode);
   on('localTestBtn', toggleLocalTest);
   on('btnPublish', publishAnnounce);

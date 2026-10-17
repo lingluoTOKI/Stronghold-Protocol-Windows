@@ -78,5 +78,92 @@
 .result__foot { flex: 0 0 auto; margin-top: auto; padding-top: .2rem; display: flex; }
 .result__foot .btn { min-width: 3.4rem; }
 
-/* a match with gameplay plugins (DESIGN §32.6): the unofficial mark under the headline */
-.result__modmark { align-self: flex-start; margin-top: .06rem; }
+/* ---- 伤害看板（js/screens/dmgBoard.js，移植自工坊包 dmg-board）--------------------------------
+   .result__main 是两列网格（hero | players），看板跨满整行贴在底下。
+   !!! 布局要点 !!! `.screen { overflow: hidden }`（theme.css）且 `.result__main` 是 `flex:1; min-height:0`，
+   加进来的第三行会让总高度超过视口、被外层裁掉 —— 所以：
+     * 网格显式声明两行：第一行（hero|players）占满剩余空间，第二行（看板）按内容高度自适应；
+     * 看板自身 `overflow: auto` 兜底：表很长（列多 / 人多）时在**它内部**滚动，不把整屏顶掉。
+   数字一列列对齐（tabular-nums + 右对齐）；颜色只用主题变量，换主题跟着换。 */
+.result__main { grid-template-rows: minmax(0, 1fr) auto; }
+.dmg-board {
+  grid-column: 1 / -1;
+  max-height: 42vh;
+  overflow: auto;
+  scrollbar-width: thin;
+  margin-top: .16rem;
+  padding: .1rem .14rem .08rem;
+  background: rgba(14, 18, 16, .82);
+  border: 1px solid var(--line-2);
+  border-radius: max(.06rem, 6px);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .35);
+  color: var(--text-md);
+  font-size: max(.14rem, 11px);
+}
+.dmg-board__head { display: flex; align-items: baseline; gap: .1rem; padding-bottom: .06rem; flex-wrap: wrap; }
+.dmg-board__icon { width: max(.2rem, 12px); height: max(.2rem, 12px); color: var(--mint-400); align-self: center; }
+.dmg-board__head b { color: var(--text-hi); font-size: max(.17rem, 12px); letter-spacing: .06em; }
+.dmg-board__head small { color: var(--text-dim); }
+.dmg-board__head .micro { margin-left: auto; }
+/* 列多时横向滚动，不把结算屏撑破 */
+.dmg-board__wrap { overflow-x: auto; scrollbar-width: thin; }
+.dmg-board table { width: 100%; border-collapse: collapse; table-layout: auto; }
+.dmg-board th, .dmg-board td { padding: max(.03rem, 3px) max(.07rem, 6px); text-align: right; white-space: nowrap; }
+.dmg-board th { color: var(--text-dim); font-weight: 500; font-size: max(.12rem, 10px); border-bottom: 1px solid var(--line); }
+.dmg-board td { border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.dmg-board tbody tr:first-child td { border-top: none; }
+
+.dmg-board__rank { width: 1.8em; color: var(--text-dim); text-align: right; }
+.dmg-board__name { text-align: left; color: var(--text-hi); max-width: 14em; overflow: hidden; text-overflow: ellipsis; }
+.dmg-board__who { font-weight: 700; }
+.dmg-board__seat, .dmg-board__tag { margin-left: max(.05rem, 4px); color: var(--text-dim); font-size: max(.11rem, 9px); }
+.dmg-board__tag.is-you { color: var(--mint-400); }
+
+/* 第一名与伤害那一列：看板的第一眼 */
+.dmg-board tr.is-top .dmg-board__rank { color: var(--gold); font-weight: 700; }
+.dmg-board tr.is-top .dmg-board__name { color: var(--mint-400); }
+.dmg-board tr.is-self { background: rgba(78, 216, 175, .06); }
+.dmg-board tr.is-dead .dmg-board__who { color: var(--text-lo); }
+.dmg-board__dmg { position: relative; color: var(--text-hi); }
+.dmg-board__bar {
+  position: absolute; left: 0; bottom: 1px;
+  width: var(--w, 0%); height: 2px; border-radius: 1px;
+  background: rgba(89, 244, 202, .55);   /* 兜底（老 WebView 没有 color-mix） */
+  background: linear-gradient(90deg, var(--mint-400), rgba(89, 244, 202, .35));
+}
+.dmg-board__bad { color: var(--amber); }
+.dmg-board__hint { margin: max(.04rem, 3px) 0 0; color: var(--text-dim); font-size: max(.11rem, 9px); text-align: right; }
+
+@media (max-width: 900px) {
+  .dmg-board { font-size: max(.13rem, 10px); }
+  .dmg-board__name { max-width: 8em; }
+}
+
+/* ---- 返回按钮常驻可见（2026-10-17）-------------------------------------------------------------
+   结算页左栏（.result__hero）的高度会被右栏的战绩卡片撑开：同盟里 3 名成员各一张卡时，
+   整页比视口高，本来贴在左栏底部的「返回同盟」就被推到屏幕外，必须滚动才看得见
+   （手机横屏尤其明显：1920×885 的视口下，左栏底部 190px 内没有任何按钮像素）。
+   这里把 footer 脱离布局流、固定在左下角，任何战绩行数、任何屏幕比例下都点得到。
+   用 position:fixed 而不是 sticky —— 外层 .screen 是 overflow:hidden，sticky 没有可粘的滚动容器。 */
+.result__foot {
+  position: fixed;
+  left: .6rem;                 /* 与 .result__main 的左内边距对齐 */
+  bottom: .3rem;               /* 与 .result__main 的下内边距对齐 */
+  z-index: 5;                  /* 高于看板，低于弹窗层 */
+  margin: 0;
+  padding: .2rem 0 0;
+  display: flex;
+  width: auto;
+}
+/* 给固定按钮垫一层暗色渐变，滚动时下方内容不会和按钮糊在一起 */
+.result__foot::before {
+  content: '';
+  position: absolute;
+  inset: -.16rem -.4rem -.4rem -.6rem;
+  z-index: -1;
+  background: linear-gradient(to top, rgba(10, 14, 13, .96) 55%, rgba(10, 14, 13, 0));
+  pointer-events: none;
+}
+/* 左栏底部为固定按钮留出空间，避免把「本局耗时」压在按钮下面 */
+.result__hero { padding-bottom: 1.05rem; }
+

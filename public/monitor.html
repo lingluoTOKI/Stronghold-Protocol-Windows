@@ -214,6 +214,29 @@
     .adminops .ao-result{margin-left:0;white-space:normal}
     .ann-editor__actions .chk{order:-1;width:100%}
   }
+  .stability{margin:14px 0 4px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px}
+  .stability__head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+  .stability__title{color:var(--dim);font-size:11px;letter-spacing:1px;font-weight:600}
+  .stability__badge{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:20px;padding:3px 9px;color:var(--dim);font-size:10px;white-space:nowrap}
+  .stability__badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+  .stability__badge[data-mode=ok]{color:var(--accent);border-color:rgba(63,216,165,.22);background:rgba(63,216,165,.06)}
+  .stability__badge[data-mode=warn]{color:var(--warn);border-color:rgba(255,184,77,.24);background:rgba(255,184,77,.06)}
+  .stability__metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .stability__metric{min-width:0}
+  .stability__metric span{display:block;color:var(--muted);font-size:10px;margin-bottom:2px}
+  .stability__metric b{font-size:17px;color:var(--txt);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stability__metric small{font-size:10px;font-weight:400;color:var(--dim)}
+  .stability__foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px}
+  .stability__foot p{flex:1;color:var(--muted);font-size:10px;line-height:1.5;min-width:120px}
+  .stability__actions{display:flex;gap:5px}
+  .stability button{font:inherit;font-size:10px;cursor:pointer;border:1px solid var(--line);color:var(--dim);background:transparent;border-radius:6px;padding:5px 8px;white-space:nowrap;transition:background .15s,border-color .15s}
+  .stability button:hover:enabled{border-color:var(--accent);color:var(--accent);background:rgba(63,216,165,.06)}
+  .stability button:disabled{opacity:.35;cursor:not-allowed}
+  .stability details{color:var(--muted);font-size:10px;margin-top:8px}
+  .stability summary{cursor:pointer;user-select:none}
+  .stability details p{margin:5px 0;line-height:1.7}
+  .stability__message:empty{display:none}
+  .stability__message{margin-top:8px;color:var(--accent2);font-size:11px}
 </style>
 </head>
 <body>
@@ -309,6 +332,18 @@
       <div class="stat warn"><div class="v" id="s0_matches">--</div><div class="k">对局</div></div>
       <div class="stat"><div class="v" id="s0_spect">--</div><div class="k">观战</div></div>
     </div>
+    <section class="stability" aria-label="稳定性保护">
+      <div class="stability__head"><span class="stability__title">运行保护</span><span class="stability__badge" id="guard0_state">未认证</span></div>
+      <div class="stability__metrics" id="guard0_metrics">
+        <div class="stability__metric"><span>可用内存 · 全机</span><b id="guard0_available">—</b></div>
+        <div class="stability__metric"><span>本服占用</span><b id="guard0_rss">—</b></div>
+        <div class="stability__metric"><span>对局 / 上限</span><b id="guard0_capacity">—</b></div>
+        <div class="stability__metric"><span>无人房间</span><b id="guard0_away">—</b></div>
+      </div>
+      <div class="stability__foot"><p id="guard0_reason">输入管理 token 查看保护状态</p><div class="stability__actions"><button id="guard0_pause" disabled>暂停开局</button><button id="guard0_resume" disabled>自动保护</button></div></div>
+      <details><summary>更多指标</summary><p id="guard0_detail">—</p><p>暂停仅限制新房间和新开局，已有对局与重连保持可用。</p></details>
+      <p class="stability__message" id="guard0_message"></p>
+    </section>
     <div class="chart" id="ch0"></div>
     <div class="footer"><span id="s0_uptime">运行 --</span><span id="s0_build">--</span></div>
     <div class="rooms">
@@ -329,6 +364,18 @@
       <div class="stat warn"><div class="v" id="s1_matches">--</div><div class="k">对局</div></div>
       <div class="stat"><div class="v" id="s1_spect">--</div><div class="k">观战</div></div>
     </div>
+    <section class="stability" aria-label="稳定性保护">
+      <div class="stability__head"><span class="stability__title">运行保护</span><span class="stability__badge" id="guard1_state">未认证</span></div>
+      <div class="stability__metrics" id="guard1_metrics">
+        <div class="stability__metric"><span>可用内存 · 全机</span><b id="guard1_available">—</b></div>
+        <div class="stability__metric"><span>本服占用</span><b id="guard1_rss">—</b></div>
+        <div class="stability__metric"><span>对局 / 上限</span><b id="guard1_capacity">—</b></div>
+        <div class="stability__metric"><span>无人房间</span><b id="guard1_away">—</b></div>
+      </div>
+      <div class="stability__foot"><p id="guard1_reason">输入管理 token 查看保护状态</p><div class="stability__actions"><button id="guard1_pause" disabled>暂停开局</button><button id="guard1_resume" disabled>自动保护</button></div></div>
+      <details><summary>更多指标</summary><p id="guard1_detail">—</p><p>暂停仅限制新房间和新开局，已有对局与重连保持可用。</p></details>
+      <p class="stability__message" id="guard1_message"></p>
+    </section>
     <div class="chart" id="ch1"></div>
     <div class="footer"><span id="s1_uptime">运行 --</span><span id="s1_build">--</span></div>
     <div class="rooms">

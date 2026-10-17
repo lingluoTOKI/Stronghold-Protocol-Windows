@@ -669,3 +669,4 @@ operator's runtime ability graph. Mixed-letter banks are skipped. Preserve `mixO
 an older PR's full JSON, preserving JP voices and current operators. See DESIGN §28.17.
 
 The 40th local token model is the original champagne bomb (`token_10031_swire2_gdtrap`, §29.5), extracted from the official `btl_pfb_tokens_0.ab` through `TOKEN_SPINES`. Its web fallback is retained. Failed board-pack/image requests can retry after connectivity/visibility recovers; a failed three.js module gets at most two fresh-URL retries per page because browser module failures are cached. Successful resources remain cached.
+

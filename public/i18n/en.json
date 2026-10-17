@@ -1845,5 +1845,19 @@
   "其余 {n} 个已移到 plugins/_removed/。": "The other {n} {n|was|were} moved to plugins/_removed/.",
   "已移到 plugins/_removed/：{n} 个插件": "Moved to plugins/_removed/: {n} {n|plugin|plugins}",
   "选中「{name}」": "Select \"{name}\"",
-  "符号链接的插件文件夹不能在这里删除。": "A plugin folder that is a symbolic link cannot be deleted here."
+  "符号链接的插件文件夹不能在这里删除。": "A plugin folder that is a symbolic link cannot be deleted here.",
+  "推荐先导入本地素材包；安卓客户端已内置素材。": "Import a local asset pack first; the Android app already includes assets.",
+  "服务器繁忙，后台下载排队中…": "Server busy; background download is queued…",
+  "后台下载已降低并发和速度，优先保障正在进行的对局。": "Background downloads use fewer connections and limited speed to prioritize ongoing matches.",
+  "素材包下载": "Get asset pack",
+  "从群文件下载素材包，进游戏更快、也更省服务器带宽。": "Get the pack from the group files for faster loading and lower server traffic.",
+  "知道了": "Got it",
+  "素材包不在这台服务器上下载——那会把开服机器的带宽占满，影响正在对局的人。": "Get the full pack outside this game server to leave bandwidth for ongoing matches.",
+  "下载方式": "How to download",
+  "加入 QQ 群": "Join QQ group ",
+  "在「群文件」里下载对应版本的素材包 zip（只需一次）": "Download the matching asset pack ZIP from the group files once.",
+  "回到这个页面，点「导入素材包」，选择下载好的 zip": "Return here, choose Import assets, and select the downloaded ZIP.",
+  "导入约 1–2 分钟，之后进对局几乎不下载素材。": "Import may take 1–2 minutes; matching assets are then loaded locally.",
+  "不用素材包也能玩：素材按需加载，第一局会随用随下（通常几十 MB）。": "You can play without a pack; assets download as needed, especially in your first match.",
+  "安卓安装包已经内置素材，不需要这一步。": "The Android installer already includes assets; skip this step."
 }
