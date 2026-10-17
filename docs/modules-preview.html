@@ -1,0 +1,330 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>模组补齐核对（Rhine 0.2.1）</title>
+<style>
+:root{--bg:#0c0f0e;--fg:#e8ecea;--dim:#8fa19a;--card:#141a18;--line:#26332e;--acc:#4fd1a5;--vup:#5fb2ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.65 "Noto Sans SC",system-ui,-apple-system,sans-serif}
+header{padding:28px 32px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(12,15,14,.92);backdrop-filter:blur(8px);z-index:2}
+h1{margin:0 0 6px;font-size:20px}
+header p{margin:0;color:var(--dim);font-size:13px}
+.wrap{padding:20px 32px 64px;max-width:1180px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.op{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.op h2{margin:0 0 10px;font-size:15px;display:flex;align-items:baseline;gap:8px}
+.op h2 small{color:var(--dim);font-weight:400;font-size:11px}
+.mod{border-top:1px dashed var(--line);padding-top:10px;margin-top:10px}
+.mod:first-of-type{border-top:0;margin-top:0;padding-top:0}
+.mhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.type{background:#1d2b26;color:var(--acc);border:1px solid #2c443b;border-radius:6px;padding:1px 7px;font-size:11px;letter-spacing:.5px}
+.row{display:grid;grid-template-columns:64px 1fr;gap:8px;margin:3px 0}
+.row i{color:var(--dim);font-style:normal;font-size:12px}
+.attr{color:var(--vup)}
+.add{color:var(--acc)}
+.tal{color:#ffd479;font-size:13px}
+.tal b{color:#ffb84d;margin-right:4px}
+.count{color:var(--acc);font-weight:600}
+</style></head><body>
+<header><h1>模组补齐核对 · Rhine 0.2.1</h1>
+<p>本作新增 <span class="count">36</span> 名精锐干员、共 <span class="count">49</span> 个专属模组（数据源：PRTS wiki）。每张卡含 属性 / 特性 / 特性追加 / 天赋+数值。</p></header>
+<div class="wrap"><div class="grid"><section class="op"><h2>但书 <small>char_4032_provs</small></h2><div class="mod">
+  <div class="mhead"><span class="type">DEC-X</span><b>黛丝特的毕业礼</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+90 攻击力+30</span></div>
+  <div class="row"><i>特性</i><span>攻击造成法术伤害，并对敌人造成较长的停顿</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击范围内存在敌人时技力自然恢复速度+0.2/s</span></div>
+  <div class="tal"><b>卡西米尔法律专精</b> 攻击速度+10，攻击力+5%，置入战场后这个效果会同样赋予给一名随机【卡西米尔】干员</div><div class="tal"><b>卡西米尔法律专精</b> 攻击速度+10，攻击力+8%，置入战场后这个效果会同样赋予给一名随机【卡西米尔】干员</div>
+</div></section><section class="op"><h2>凛冬 <small>char_115_headbr</small></h2><div class="mod">
+  <div class="mhead"><span class="type">SOL-X</span><b>冬将军的毕业礼物</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+180 防御力+32</span></div>
+  <div class="row"><i>特性</i><span>能够阻挡两个敌人</span></div>
+  <div class="row"><i>特性追加</i><span class="add">阻挡敌人时攻击力和防御力各+8％</span></div>
+  <div class="tal"><b>冲锋领袖</b> 编入队伍时所有【先锋】职业干员的部署费用-1，自身部署费用额外-1</div><div class="tal"><b>冲锋领袖</b> 编入队伍时所有【先锋】职业干员的部署费用-1，【尖兵】分支职业干员部署费用额外-1</div>
+</div></section><section class="op"><h2>吽 <small>char_226_hmau</small></h2><div class="mod">
+  <div class="mhead"><span class="type">GUA-Y</span><b>八点档情景剧录像带</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+180 防御力+30</span></div>
+  <div class="row"><i>特性</i><span>技能可以治疗友方单位</span></div>
+  <div class="row"><i>特性追加</i><span class="add">受到的伤害减少15%</span></div>
+  <div class="tal"><b>门神</b> 防御力+10%，自身身后一格内如果是高台单位，自己对其的治疗效果提高75%</div><div class="tal"><b>门神</b> 防御力+13%，自身身后一格内如果是高台单位，自己对其的治疗效果提高75%</div>
+</div></section><section class="op"><h2>坚雷 <small>char_260_durnar</small></h2><div class="mod">
+  <div class="mhead"><span class="type">AST-X</span><b>守护的道路</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+150 攻击力+27</span></div>
+  <div class="row"><i>特性</i><span>技能开启时普通攻击会造成法术伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">技能开启时普通攻击会造成法术伤害，且攻击和受到攻击时对目标额外造成10％攻击力的法术伤害</span></div>
+  <div class="tal"><b>攻守兼备</b> 攻击力+10%，防御力+10%</div><div class="tal"><b>攻守兼备</b> 攻击力+12%，防御力+12%</div>
+</div></section><section class="op"><h2>夜烟 <small>char_141_nights</small></h2><div class="mod">
+  <div class="mhead"><span class="type">CCR-X</span><b>女巫的帽子</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+20 防御力+15</span></div>
+  <div class="row"><i>特性</i><span>攻击造成法术伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">无视目标10点法术抗性</span></div>
+  <div class="tal"><b>黑色迷雾</b> 攻击使目标法术抗性-24%，持续1秒</div><div class="tal"><b>黑色迷雾</b> 攻击使目标法术抗性-27%，持续1秒</div>
+</div></section><section class="op"><h2>寻澜 <small>char_4052_surfer</small></h2><div class="mod">
+  <div class="mhead"><span class="type">AGE-X</span><b>佳肴</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+150 防御力+20</span></div>
+  <div class="row"><i>特性</i><span><休整期结束时>所有契约模式核心盟约的层数合计每叠20层，下一回合额外获得1资金</span></div>
+  <div class="row"><i>特性追加</i><span class="add">不容易受到敌方攻击</span></div>
+  <div class="tal"><b>独自远走</b> 部署时，若周围4格没有其他干员，获得2点部署费用，攻击速度+10（持续10秒）</div><div class="tal"><b>独自远走</b> 部署时，若周围4格没有其他干员，获得2点部署费用，攻击速度+15（持续10秒）</div>
+</div></section><section class="op"><h2>异客 <small>char_472_pasngr</small></h2><div class="mod">
+  <div class="mhead"><span class="type">CHA-X</span><b>电磁调节器</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+65 攻击速度+5</span></div>
+  <div class="row"><i>特性</i><span>攻击造成法术伤害，且会在4个敌人间跳跃，每次跳跃伤害降低10%并造成一定时间停顿</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击造成法术伤害，且会在4个敌人间跳跃，每次跳跃伤害降低10%并造成一定时间（0.8s）停顿</span></div>
+  <div class="tal"><b>孤卒</b> 当周围4格没有敌人时，攻击力+8%，技力自然回复速度+0.15/秒</div><div class="tal"><b>孤卒</b> 当周围4格没有敌人时，攻击力+8%，技力自然回复速度+0.25/秒</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">CHA-Y</span><b>王权金币</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+20 攻击力+70</span></div>
+  <div class="row"><i>特性</i><span>攻击造成法术伤害，且会在4个敌人间跳跃，每次跳跃伤害降低10%并造成一定时间停顿</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击造成法术伤害，且会在4个敌人间跳跃，每次跳跃伤害不再降低并造成短暂的停顿</span></div>
+  <div class="tal"><b>机理分析</b> 攻击命中生命值在80%以上的敌人时，4秒内异客对其造成的伤害提升25%</div><div class="tal"><b>机理分析</b> 攻击命中生命值在70%以上的敌人时，4秒内异客对其造成的伤害提升28%</div>
+</div></section><section class="op"><h2>拜松 <small>char_325_bison</small></h2><div class="mod">
+  <div class="mhead"><span class="type">PRO-X</span><b>“一路以来”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+150 防御力+60</span></div>
+  <div class="row"><i>特性</i><span>能够阻挡三个敌人</span></div>
+  <div class="row"><i>特性追加</i><span class="add">阻挡敌人时防御力+20%</span></div>
+  <div class="tal"><b>交叉掩护</b> 在场时自身防御力+60，自己身后的如果是【先锋】或【近卫】干员也能享受到相同效果</div><div class="tal"><b>交叉掩护</b> 在场时自身防御力+80，自己身后的干员也能享受到相同效果</div>
+</div></section><section class="op"><h2>推进之王 <small>char_112_siege</small></h2><div class="mod">
+  <div class="mhead"><span class="type">SOL-X</span><b>“糖果盒”</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+60 防御力+40</span></div>
+  <div class="row"><i>特性</i><span>能够阻挡两个敌人</span></div>
+  <div class="row"><i>特性追加</i><span class="add">阻挡敌人时攻击力和防御力各+8％</span></div>
+  <div class="tal"><b>万兽之王</b> 所有【先锋】职业干员的攻击力和防御力各+8%，自身攻击力和防御力额外+6%</div><div class="tal"><b>万兽之王</b> 所有【先锋】职业干员的攻击力和防御力各+8%，自身攻击力和防御力额外+8%</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">SOL-Y</span><b>“初诺”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+200 攻击力+65</span></div>
+  <div class="row"><i>特性</i><span>能够阻挡两个敌人</span></div>
+  <div class="row"><i>特性追加</i><span class="add">首次部署时部署费用-4</span></div>
+  <div class="tal"><b>粉碎</b> 周围四格内有敌人倒下时获得2点技力，场上随机另一名【先锋】职业干员获得1点技力</div><div class="tal"><b>粉碎</b> 周围四格内有敌人倒下时获得3点技力，场上随机另一名【先锋】职业干员获得1点技力</div>
+</div></section><section class="op"><h2>提丰 <small>char_2012_typhon</small></h2><div class="mod">
+  <div class="mhead"><span class="type">SIE-X</span><b>自然的包容</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+120 攻击力+60</span></div>
+  <div class="row"><i>特性</i><span>优先攻击重量最重的敌人</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击重量较重（重量等级大于等于3）的敌人时，攻击力提升至115%</span></div>
+  <div class="tal"><b>锐如兽牙</b> 连续攻击时逐渐无视敌人的防御力，最高无视其防御力的55%（每次攻击提升11%的无视防御比例），8秒内未攻击则失去加成</div><div class="tal"><b>锐如兽牙</b> 连续攻击时逐渐无视敌人的防御力，最高无视其防御力的60%（每次攻击提升12%的无视防御比例），10秒内未攻击则失去加成</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">SIE-Y</span><b>冰原的影子</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+70 攻击速度+5</span></div>
+  <div class="row"><i>特性</i><span>优先攻击重量最重的敌人</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击越远的敌人造成的伤害越高（最高提升12%）</span></div>
+  <div class="tal"><b>重如沼泥</b> 技能期间对每个敌人前两次造成伤害时，攻击力提升至200%并使目标停顿3秒</div><div class="tal"><b>重如沼泥</b> 技能期间对每个敌人前两次造成伤害时，攻击力提升至220%并使目标停顿3秒</div>
+</div></section><section class="op"><h2>斩业星熊 <small>char_1044_hsgma2</small></h2><div class="mod">
+  <div class="mhead"><span class="type">AST-X</span><b>无迹</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+190 攻击力+55</span></div>
+  <div class="row"><i>特性</i><span>技能开启时普通攻击会造成法术伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">技能开启时普通攻击会造成法术伤害，且攻击和受到攻击时对目标额外造成10％攻击力的法术伤害</span></div>
+  <div class="tal"><b>鬼之架势</b> 在场时，自身获得最高+50法术抗性和35%攻击力的坚忍（损失60%生命值时达到最大加成）。达到最大加成时，攻击力额外+10％</div><div class="tal"><b>鬼之架势</b> 在场时，自身获得最高+50法术抗性和35%攻击力的坚忍（损失50%生命值时达到最大加成）。达到最大加成时，攻击力额外+15%</div>
+</div></section><section class="op"><h2>晓歌 <small>char_497_ctable</small></h2><div class="mod">
+  <div class="mhead"><span class="type">AGE-Y</span><b>“不发声者”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+130 攻击力+18</span></div>
+  <div class="row"><i>特性</i><span>再部署时间减少，可使用远程攻击</span></div>
+  <div class="row"><i>特性追加</i><span class="add">首次撤退再部署时间额外减少35%</span></div>
+  <div class="tal"><b>万全</b> 未阻挡敌人时攻击速度+15，阻挡敌人时攻击力+15%</div><div class="tal"><b>万全</b> 未阻挡敌人时攻击速度+18，阻挡敌人时攻击力+18%</div>
+</div></section><section class="op"><h2>暗索 <small>char_236_rope</small></h2><div class="mod">
+  <div class="mhead"><span class="type">HOK-X</span><b>铁皮首饰盒</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+100 攻击力+22</span></div>
+  <div class="row"><i>特性</i><span>技能可以使敌人产生位移
+可以放置于远程位</span></div>
+  <div class="row"><i>特性追加</i><span class="add">拖拽期间敌人受到正比于距离的法术伤害</span></div>
+  <div class="tal"><b>听觉训练</b> 获得35%的物理闪避</div><div class="tal"><b>听觉训练</b> 获得40%的物理闪避</div>
+</div></section><section class="op"><h2>暴行 <small>char_230_savage</small></h2><div class="mod">
+  <div class="mhead"><span class="type">CEN-X</span><b>未竟的旅程</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+30 防御力+22</span></div>
+  <div class="row"><i>特性</i><span>同时攻击阻挡的所有敌人</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击被阻挡的敌人攻击力提升至110%※于每次计算伤害时检查目标是否处于阻挡/被阻挡状态（阻挡有敌人的单位亦能触发此效果）；提升效果为攻击力倍率提升。</span></div>
+  <div class="tal"><b>山谷</b> 周围四格中有两格以上的高地地形时攻击力和防御力+13%</div><div class="tal"><b>山谷</b> 周围四格中有两格以上的高地地形时攻击力和防御力+15%</div>
+</div></section><section class="op"><h2>末药 <small>char_117_myrrh</small></h2><div class="mod">
+  <div class="mhead"><span class="type">PHY-X</span><b>“生命的短暂”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+50 攻击速度+3</span></div>
+  <div class="row"><i>特性</i><span>恢复友方单位生命</span></div>
+  <div class="row"><i>特性追加</i><span class="add">治疗生命值低于50%的友方单位时治疗量提升15%|特性追加=yes</span></div>
+  <div class="tal"><b>急救包</b> 部署后立刻恢复全体友方单位的生命值，恢复量为末药攻击力的170%</div><div class="tal"><b>急救包</b> 部署后立刻恢复全体友方单位的生命值，恢复量为末药攻击力的180%</div>
+</div></section><section class="op"><h2>林 <small>char_4080_lin</small></h2><div class="mod">
+  <div class="mhead"><span class="type">PLX-X</span><b>“七窍玲珑”</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+62 防御力+45</span></div>
+  <div class="row"><i>特性</i><span>通常时不攻击且防御力和法术抗性大幅度提升，技能开启时攻击造成群体法术伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">通常时不攻击且防御力和法术抗性更大幅度提升（防御力+215%，法术抗性+25），技能开启时保留部分效果（防御力+100%，法术抗性+10）且攻击造成群体法术伤害</span></div>
+  <div class="tal"><b>韬光</b> 受到攻击时，有50%几率回复2点技力</div><div class="tal"><b>韬光</b> 受到攻击时，有75%几率回复2点技力</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">PLX-Y</span><b>“情与义”</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+50 防御力+20</span></div>
+  <div class="row"><i>特性</i><span>通常时不攻击且防御力和法术抗性大幅度提升，技能开启时攻击造成群体法术伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">范围内敌人越多造成的伤害越高（最高提升15%）</span></div>
+  <div class="tal"><b>计出万全</b> 拥有可以抵挡所有伤害的琉璃璧；琉璃璧在受到单次超过200点伤害时破碎，对周围所有敌人造成相当于林攻击力105%的法术伤害、使其晕眩1秒，并在7秒后再次生成</div><div class="tal"><b>计出万全</b> 拥有可以抵挡所有伤害的琉璃璧；琉璃璧在受到单次超过200点伤害时破碎，对周围所有敌人造成相当于林攻击力110%的法术伤害、使其晕眩1秒，并在6秒后再次生成</div>
+</div></section><section class="op"><h2>格拉尼 <small>char_220_grani</small></h2><div class="mod">
+  <div class="mhead"><span class="type">CHG-X</span><b>骑警套装</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+150 防御力+45</span></div>
+  <div class="row"><i>特性</i><span>击杀敌人后获得2点部署费用，撤退时返还该次部署费用</span></div>
+  <div class="row"><i>特性追加</i><span class="add">击杀敌人后获得2点部署费用，撤退时返还该次部署费用</span></div>
+  <div class="tal"><b>骑警</b> 在场时，所有【先锋】职业干员获得25%的物理闪避</div><div class="tal"><b>骑警</b> 在场时，所有【先锋】职业干员获得30%的物理闪避</div>
+</div></section><section class="op"><h2>棘刺 <small>char_293_thorns</small></h2><div class="mod">
+  <div class="mhead"><span class="type">LOR-X</span><b>“盐与沙”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+160 攻击力+39 攻击速度+5</span></div>
+  <div class="row"><i>特性</i><span>可以进行远程攻击，但此时攻击力降低至80%</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击附带10%攻击力的法术伤害</span></div>
+  <div class="tal"><b>神经腐蚀</b> 攻击使目标中毒，在3秒内每秒受到125点法术伤害，可叠加3次（对会远程攻击的目标伤害加倍）</div><div class="tal"><b>神经腐蚀</b> 攻击使目标中毒，在3秒内每秒受到135点法术伤害，可叠加4次（对会远程攻击的目标伤害加倍）</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">LOR-Δ</span><b>沙蚀</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+80 攻击力+60 攻击速度+5</span></div>
+  <div class="row"><i>特性</i><span>可以进行远程攻击，但此时攻击力降低至80%</span></div>
+  <div class="row"><i>特性追加</i><span class="add">造成伤害时附带相当于10%伤害的神经损伤</span></div>
+  <div class="tal"><b>神经腐蚀</b> 攻击使目标中毒，在3秒内每秒受到200点法术伤害（对会远程攻击的目标伤害加倍）。如果敌方单位处于神经损伤爆发期间，中毒伤害变为2倍且类型改为元素伤害</div><div class="tal"><b>神经腐蚀</b> 攻击使目标中毒，在3秒内每秒受到300点法术伤害（对会远程攻击的目标伤害加倍）。如果敌方单位处于神经损伤爆发期间，中毒伤害变为2.5倍且类型改为元素伤害</div>
+</div></section><section class="op"><h2>森蚺 <small>char_416_zumama</small></h2><div class="mod">
+  <div class="mhead"><span class="type">HES-X</span><b>祖玛玛的工具箱</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+80 防御力+70</span></div>
+  <div class="row"><i>特性</i><span>只有阻挡敌人时才能够回复技力</span></div>
+  <div class="row"><i>特性追加</i><span class="add">缓慢回复技力，只有阻挡敌人时恢复技力回复速度</span></div>
+  <div class="tal"><b>愈战愈勇</b> 阻挡敌人时技力回复速度+0.4/秒</div><div class="tal"><b>愈战愈勇</b> 阻挡敌人时技力回复速度+0.55/秒</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">HES-Y</span><b>“小小的丑东西”</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+70 防御力+80</span></div>
+  <div class="row"><i>特性</i><span>只有阻挡敌人时才能够回复技力</span></div>
+  <div class="row"><i>特性追加</i><span class="add">不阻挡敌人时无法自我回复技力，阻挡敌人时恢复技力回复速度且攻击力+15%，防御力+15%</span></div>
+  <div class="tal"><b>勇冠三军</b> 生命值高于一半时，攻击造成120%伤害；生命值不高于一半时，获得25%的庇护</div><div class="tal"><b>勇冠三军</b> 生命值高于一半时，攻击造成123%伤害；生命值不高于一半时，获得28%的庇护</div>
+</div></section><section class="op"><h2>涤火杰西卡 <small>char_1034_jesca2</small></h2><div class="mod">
+  <div class="mhead"><span class="type">SPT-X</span><b>“私家英雄”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+180 攻击力+50 防御力+25</span></div>
+  <div class="row"><i>特性</i><span>若身后一格干员为“休整期结束时”特质，本干员的特质与其相同</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击范围内敌人的隐匿效果失效</span></div>
+  <div class="tal"><b>灵活应变</b> 可以使用一个持续55秒属性更强的机动盾牌，机动盾牌只能放置于涤火杰西卡四周，机动盾牌部署后，涤火杰西卡立刻转向盾牌且自身与身后的单位防御力+15%
+※机动盾牌：生命上限+300，防御+57</div><div class="tal"><b>灵活应变</b> 可以使用一个持续60秒属性进一步增强的机动盾牌，机动盾牌只能放置于涤火杰西卡四周，机动盾牌部署后，涤火杰西卡立刻转向盾牌且自身与身后的单位防御力+15%
+※机动盾牌：生命上限+380，防御+79</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">SPT-Y</span><b>未曾风化</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+180 攻击力+52</span></div>
+  <div class="row"><i>特性</i><span>若身后一格干员为“休整期结束时”特质，本干员的特质与其相同</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击距离+1（部分技能不受此影响）</span></div>
+  <div class="tal"><b>蓄能释放</b> 机动盾牌受到伤害时，有55%的概率使涤火杰西卡获得1点技力并使机动盾牌自身再部署时间-1s（最多至-11s）</div><div class="tal"><b>蓄能释放</b> 机动盾牌受到伤害时，有60%的概率使涤火杰西卡获得1点技力并使机动盾牌自身再部署时间-1s（最多至-14s）</div>
+</div></section><section class="op"><h2>灰喉 <small>char_367_swllow</small></h2><div class="mod">
+  <div class="mhead"><span class="type">MAR-Y</span><b>母爱的倒影</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+100 攻击力+24</span></div>
+  <div class="row"><i>特性</i><span>优先攻击空中单位</span></div>
+  <div class="row"><i>特性追加</i><span class="add">范围内存在地面敌人时攻击速度+8</span></div>
+  <div class="tal"><b>顺风</b> 攻击速度+6，攻击时有18%的概率攻击力提升至150%</div><div class="tal"><b>顺风</b> 攻击速度+6，攻击时有21%的概率攻击力提升至150%</div>
+</div></section><section class="op"><h2>烈夏 <small>char_194_leto</small></h2><div class="mod">
+  <div class="mhead"><span class="type">LOR-Y</span><b>旧衣服</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+40 防御力+25</span></div>
+  <div class="row"><i>特性</i><span>可以进行远程攻击，但此时攻击力降低至80%</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击范围内存在2名及以上敌人时攻击速度+12</span></div>
+  <div class="tal"><b>快点快点！</b> 开启技能时，【乌萨斯学生自治团】干员攻击速度+27，持续至技能结束</div><div class="tal"><b>快点快点！</b> 开启技能时，【乌萨斯学生自治团】干员攻击速度+32，持续至技能结束</div>
+</div></section><section class="op"><h2>爱丽丝 <small>char_338_iris</small></h2><div class="mod">
+  <div class="mhead"><span class="type">MSC-X</span><b>梦之城堡立体书</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+50 法术抗性+3</span></div>
+  <div class="row"><i>特性</i><span>攻击造成法术伤害，在找不到攻击目标时可以将攻击能量储存起来之后一齐发射（最多4个）</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击造成法术伤害，在找不到攻击目标时可以将攻击能量储存起来之后一齐发射（最多4个）</span></div>
+  <div class="tal"><b>封印的宝盒</b> 储存的攻击能量造成的伤害提升至135%</div><div class="tal"><b>封印的宝盒</b> 储存的攻击能量造成的伤害提升至138%</div>
+</div></section><section class="op"><h2>琴柳 <small>char_479_sleach</small></h2><div class="mod">
+  <div class="mhead"><span class="type">BEA-X</span><b>牧人的歌</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+150 攻击力+48</span></div>
+  <div class="row"><i>特性</i><span>技能发动期间阻挡数变为0</span></div>
+  <div class="row"><i>特性追加</i><span class="add">技能发动期间阻挡数变为0，但使身前一名干员阻挡数+1</span></div>
+  <div class="tal"><b>不退之旗</b> 部署时自身持有军旗；军旗周围8格的干员攻击速度+12，敌人的攻击速度-12</div><div class="tal"><b>不退之旗</b> 部署时自身持有军旗；军旗周围8格的干员攻击速度+13，敌人的攻击速度-13</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">BEA-Y</span><b>“友谊万岁”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+150 防御力+45</span></div>
+  <div class="row"><i>特性</i><span>技能发动期间阻挡数变为0</span></div>
+  <div class="row"><i>特性追加</i><span class="add">技能发动期间阻挡数变为0，但获得迷彩</span></div>
+  <div class="tal"><b>精神感召</b> 部署后，下一名部署的干员费用-2，若该干员为地面干员，则部署后获得1点部署费用</div><div class="tal"><b>精神感召</b> 部署后，下一名部署的干员费用-2，若该干员为地面干员，则部署后获得2点部署费用</div>
+</div></section><section class="op"><h2>真理 <small>char_195_glassb</small></h2><div class="mod">
+  <div class="mhead"><span class="type">DEC-Y</span><b>读书笔记</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+80 攻击速度+3</span></div>
+  <div class="row"><i>特性</i><span>攻击造成法术伤害，并对敌人造成短暂的停顿</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击造成法术伤害，并对敌人造成较长（1.2s）的停顿</span></div>
+  <div class="tal"><b>探知者</b> 防御力-35%，但攻击速度+21，技能期间攻速加成额外提升5</div><div class="tal"><b>探知者</b> 防御力-35%，但攻击速度+21，技能期间攻速加成额外提升10</div>
+</div></section><section class="op"><h2>空 <small>char_101_sora</small></h2><div class="mod">
+  <div class="mhead"><span class="type">BAR-X</span><b>“齐唱”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+142 攻击力+13</span></div>
+  <div class="row"><i>特性</i><span>不攻击，持续恢复范围内所有友军生命（每秒相当于自身攻击力10%的生命），自身不受鼓舞影响</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击范围内存在2名及以上其他干员时，攻击力+8%（不受技能影响）</span></div>
+  <div class="tal"><b>安可</b> 技能结束后，60%几率立即回复50%的最大技力</div><div class="tal"><b>安可</b> 技能结束后，60%几率立即回复60%的最大技力</div>
+</div></section><section class="op"><h2>红云 <small>char_190_clour</small></h2><div class="mod">
+  <div class="mhead"><span class="type">MAR-X</span><b>“不落”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+90 攻击力+23</span></div>
+  <div class="row"><i>特性</i><span>优先攻击空中单位</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击空中单位时攻击力提升至110%</span></div>
+  <div class="tal"><b>猎人的经验</b> 自身的技力自然回复速度+0.35/秒</div><div class="tal"><b>猎人的经验</b> 自身的技力自然回复速度+0.4/秒</div>
+</div></section><section class="op"><h2>老鲤 <small>char_322_lmlee</small></h2><div class="mod">
+  <div class="mhead"><span class="type">MER-X</span><b>“无问吉凶”</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+200 攻击力+55</span></div>
+  <div class="row"><i>特性</i><span>再部署时间减少，撤退时不返还部署费用，在场时每3秒消耗3点部署费用（不足时自动撤退）</span></div>
+  <div class="row"><i>特性追加</i><span class="add">再部署时间减少，撤退时不返还部署费用，在场时每3秒消耗2点部署费用（不足时自动撤退）</span></div>
+  <div class="tal"><b>有备无患</b> 特性消耗费用时，若费用足够则改为消耗5费用，抵消自身受到的下一次晕眩/冻结，并使攻击来源晕眩4秒</div><div class="tal"><b>有备无患</b> 特性消耗费用时，若费用足够则改为消耗4费用，抵消自身受到的下一次晕眩/冻结，并使攻击来源晕眩4秒</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">MER-Y</span><b>“但思善恶”</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+57 防御力+35</span></div>
+  <div class="row"><i>特性</i><span>再部署时间减少，撤退时不返还部署费用，在场时每3秒消耗3点部署费用（不足时自动撤退）</span></div>
+  <div class="row"><i>特性追加</i><span class="add">每次特性消耗费用时攻击力+4%，最多可以叠加5次</span></div>
+  <div class="tal"><b>和气生财</b> 老鲤阻挡目标时，使其攻击速度-17，且自身攻击速度+17；当周围八格内仅存在一个敌人时效果翻倍</div><div class="tal"><b>和气生财</b> 老鲤阻挡目标时，使其攻击速度-20，且自身攻击速度+20；当周围八格内仅存在一个敌人时效果翻倍</div>
+</div></section><section class="op"><h2>苦艾 <small>char_405_absin</small></h2><div class="mod">
+  <div class="mhead"><span class="type">CCR-X</span><b>“监护者”单兵通讯单元</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+100 攻击力+30</span></div>
+  <div class="row"><i>特性</i><span>攻击造成法术伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">无视目标10点法术抗性</span></div>
+  <div class="tal"><b>执法者</b> 攻击生命值低于50%的敌人伤害提高29%</div><div class="tal"><b>执法者</b> 攻击生命值低于50%的敌人伤害提高32%</div>
+</div></section><section class="op"><h2>逻各斯 <small>char_4133_logos</small></h2><div class="mod">
+  <div class="mhead"><span class="type">CCR-Y</span><b>《语义范式百科》</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+35 法术抗性+5</span></div>
+  <div class="row"><i>特性</i><span>攻击造成法术伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">普通攻击命中精英或领袖敌人时获得1点技力</span></div>
+  <div class="tal"><b>语汇演化</b> 对一个目标发起攻击时，有40%几率额外对攻击范围内两个随机目标造成相当于攻击力63%的法术伤害并使其停顿0.8秒</div><div class="tal"><b>语汇演化</b> 对一个目标发起攻击时，有40%几率额外对攻击范围内两个随机目标造成相当于攻击力65%的法术伤害并使其停顿0.8秒</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">CCR-Δ</span><b>来自河谷的笔盒</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+100 攻击力+36</span></div>
+  <div class="row"><i>特性</i><span>攻击造成法术伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">造成法术伤害时附带相当于8%伤害的凋亡损伤</span></div>
+  <div class="tal"><b>语汇演化</b> 对一个目标发起攻击时，有50%几率额外对攻击范围内一个随机目标造成相当于攻击力60%的法术伤害并使其停顿0.8秒，若该随机目标处于凋亡损伤爆发期间则同时造成相当于攻击力40%的元素伤害</div><div class="tal"><b>语汇演化</b> 对一个目标发起攻击时，有60%几率额外对攻击范围内一个随机目标造成相当于攻击力60%的法术伤害并使其停顿0.8秒，若该随机目标处于凋亡损伤爆发期间则同时造成相当于攻击力60%的元素伤害</div>
+</div></section><section class="op"><h2>锡兰 <small>char_348_ceylon</small></h2><div class="mod">
+  <div class="mhead"><span class="type">WAH-X</span><b>野外考察套装</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+25 法术抗性+5</span></div>
+  <div class="row"><i>特性</i><span>拥有较大治疗范围，但在治疗较远目标时治疗量变为80%</span></div>
+  <div class="row"><i>特性追加</i><span class="add">自身获得抵抗且更不容易受到敌人的攻击</span></div>
+  <div class="tal"><b>湖畔漫步者</b> 攻击力+8%，当场地中存在水地形时改为攻击力+30%</div><div class="tal"><b>湖畔漫步者</b> 攻击力+11%，当场地中存在水地形时改为攻击力+42%</div>
+</div></section><section class="op"><h2>阿 <small>char_225_haak</small></h2><div class="mod">
+  <div class="mhead"><span class="type">GEE-X</span><b>什锦果味医用箱</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+135 攻击力+37</span></div>
+  <div class="row"><i>特性</i><span>自身生命会不断流失</span></div>
+  <div class="row"><i>特性追加</i><span class="add">生命值高于80%时，技力自然回复速度+0.25/秒</span></div>
+  <div class="tal"><b>混合药物射击</b> 每次攻击时会随机触发下列效果之一：回复自身生命18%；当次攻击力提升至160%；目标停顿1.5秒；目标晕眩1.1秒；有20%概率同时触发以上所有效果</div><div class="tal"><b>混合药物射击</b> 每次攻击时会随机触发下列效果之一：回复自身生命20%；当次攻击力提升至165%；目标停顿1.6秒；目标晕眩1.2秒；有30%概率同时触发以上所有效果</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">GEE-Y</span><b>毒医残章</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+43 攻击速度+3</span></div>
+  <div class="row"><i>特性</i><span>自身生命会不断流失</span></div>
+  <div class="row"><i>特性追加</i><span class="add">再部署时间减少</span></div>
+  <div class="tal"><b>药剂扩散</b> 自身受到的治疗量+20%，且部署后立即恢复攻击范围内一名友方干员（优先选取正前方）的生命值，恢复量为阿攻击力的100％</div><div class="tal"><b>药剂扩散</b> 自身受到的治疗量+25%，且部署后立即恢复攻击范围内一名友方干员（优先选取正前方）的生命值，恢复量为阿攻击力的150％</div>
+</div></section><section class="op"><h2>阿消 <small>char_277_sqrrel</small></h2><div class="mod">
+  <div class="mhead"><span class="type">PUS-Y</span><b>客制化防火服</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+130 攻击力+21 防御力+12</span></div>
+  <div class="row"><i>特性</i><span>同时攻击阻挡的所有敌人
+可以放置于远程位</span></div>
+  <div class="row"><i>特性追加</i><span class="add">同时攻击阻挡的所有敌人，阻挡2个及以上敌人时自身推力增加一级
+可以放置于远程位</span></div>
+  <div class="tal"><b>防火护服</b> 法术抗性+20</div><div class="tal"><b>防火护服</b> 法术抗性+23</div>
+</div></section><section class="op"><h2>陈 <small>char_010_chen</small></h2><div class="mod">
+  <div class="mhead"><span class="type">SWO-X</span><b>罗德岛制式剑</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+50 攻击速度+5</span></div>
+  <div class="row"><i>特性</i><span>普通攻击连续造成两次伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">技能期间造成的伤害提升10%</span></div>
+  <div class="tal"><b>呵斥</b> 在场时每3秒回复全场友方角色1点攻击/受击技力</div><div class="tal"><b>呵斥</b> 在场时每3秒回复全场友方角色1点攻击/受击技力，自身额外回复1点技力</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">SWO-Y</span><b>往昔时光</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+52 防御力+28</span></div>
+  <div class="row"><i>特性</i><span>普通攻击连续造成两次伤害</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击时无视敌人70点的防御力</span></div>
+  <div class="tal"><b>持刀格斗术</b> 攻击力+11%，防御力+11%，物理闪避+15%</div><div class="tal"><b>持刀格斗术</b> 攻击力+15%，防御力+15%，物理闪避+18%</div>
+</div></section><section class="op"><h2>食铁兽 <small>char_241_panda</small></h2><div class="mod">
+  <div class="mhead"><span class="type">PUS-Y</span><b>尚蜀风味自制辣酱</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+120 攻击力+25 防御力+25</span></div>
+  <div class="row"><i>特性</i><span>同时攻击阻挡的所有敌人
+可以放置于远程位</span></div>
+  <div class="row"><i>特性追加</i><span class="add">同时攻击阻挡的所有敌人，阻挡2个及以上敌人时自身推力增加一级
+可以放置于远程位</span></div>
+  <div class="tal"><b>功夫</b> 获得47%的物理闪避</div><div class="tal"><b>功夫</b> 获得52%的物理闪避</div>
+</div></section><section class="op"><h2>黑 <small>char_340_shwaz</small></h2><div class="mod">
+  <div class="mhead"><span class="type">ARC-X</span><b>定制弩配件套装</b></div>
+  <div class="row"><i>属性</i><span class="attr">生命上限+130 攻击力+55</span></div>
+  <div class="row"><i>特性</i><span>高精度的近距离射击</span></div>
+  <div class="row"><i>特性追加</i><span class="add">再部署时间减少</span></div>
+  <div class="tal"><b>交叉火力</b> 携带黑和另外至少一名【狙击】干员时，所有【狙击】干员的攻击力+11%</div><div class="tal"><b>交叉火力</b> 携带黑和另外至少一名【狙击】干员时，所有【狙击】干员的攻击力+13%</div>
+</div><div class="mod">
+  <div class="mhead"><span class="type">ARC-Y</span><b>老剃刀</b></div>
+  <div class="row"><i>属性</i><span class="attr">攻击力+80 防御力+10</span></div>
+  <div class="row"><i>特性</i><span>高精度的近距离射击</span></div>
+  <div class="row"><i>特性追加</i><span class="add">攻击正前方的敌人时攻击力提升至105%且无视其物理闪避|特性追加=yes</span></div>
+  <div class="tal"><b>破甲箭头</b> 攻击时，20%几率当次攻击的攻击力提升至165%，并使命中目标的防御力下降25%，持续5秒</div><div class="tal"><b>破甲箭头</b> 攻击时，20%几率当次攻击的攻击力提升至170%，并使命中目标的防御力下降25%，持续5秒</div>
+</div></section></div></div></body></html>

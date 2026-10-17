@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>六件六阶装备 · 描述改版预览</title>
+<style>
+:root{
+  --text-hi:#f2f2f2; --text-md:#c3cbc7; --text-lo:#8a948f; --text-dim:#5d6863;
+  --line-2:#2a3230; --mint-500:#4ed8af; --mint-400:#7fe3c6; --gold:#ffc600; --gold-2:#f2bd3e; --amber:#f6a329;
+  --vup:#3fb6ff;
+  --font-cjk:'Noto Sans SC','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:28px 22px 60px;background:#0b0f0e;color:var(--text-md);font:14px/1.6 var(--font-cjk)}
+.wrap{max-width:1080px;margin:0 auto}
+h1{font-size:20px;color:var(--text-hi);margin:0 0 6px;letter-spacing:.06em}
+.lead{color:var(--text-lo);font-size:13px;margin:0 0 18px}
+.legend{display:flex;gap:18px;flex-wrap:wrap;border:1px solid var(--line-2);background:#111615;padding:12px 14px;margin-bottom:26px;font-size:12.5px}
+.legend b{color:var(--text-hi);font-weight:800}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.rt-vup{color:var(--vup)}
+.rt-note{color:var(--text-lo)}
+.good{border:1px solid var(--line-2);background:#101513;padding:16px 16px 14px;margin-bottom:18px}
+.good.is-ref{border-color:#2f4239;background:#0f1614}
+.good__head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
+.good__head h2{font-size:16px;margin:0;color:var(--text-hi);letter-spacing:.05em}
+.good__head h2 small{font-size:12px;color:var(--text-dim);font-weight:400}
+.good__meta{display:flex;gap:8px;flex-wrap:wrap}
+.good__id{font-size:11px;color:var(--text-dim);margin-left:auto;font-family:ui-monospace,Consolas,monospace}
+.tag{font-size:11px;letter-spacing:.08em;border:1px solid var(--line-2);color:var(--text-lo);padding:1px 7px}
+.tag-ref{border-color:#3a5a4c;color:var(--mint-400)}
+.tag-bond{border-color:#3b4a44;color:var(--mint-400)}
+.tag-chg{border-color:#4a3f22;color:var(--amber)}
+.tag-ok{border-color:#2f4a3c;color:var(--mint-400)}
+.tag-bad{border-color:#5a2a22;color:#e88}
+.was{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;margin:12px 0 0;padding:8px 10px;border-left:3px solid #3a3a3a;background:#0d1211;font-size:12.5px;color:var(--text-dim)}
+.was b{color:var(--text-lo);font-weight:700}
+.was span{color:var(--text-dim)}
+.was i{color:var(--text-dim);opacity:.8}
+.effs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media (max-width:760px){.effs{grid-template-columns:1fr}}
+.eff{display:flex;flex-direction:column;gap:6px;padding:10px 12px 12px;border:1px solid var(--line-2);border-left:3px solid var(--mint-500);background:linear-gradient(180deg,rgba(78,216,175,.06),rgba(0,0,0,.22))}
+.eff.is-elite{border-left-color:var(--gold);background:linear-gradient(180deg,rgba(246,163,41,.07),rgba(0,0,0,.22))}
+.eff__k{font-size:11px;font-weight:900;letter-spacing:.2em;color:var(--mint-400)}
+.eff.is-elite .eff__k{color:var(--gold-2)}
+.eff__micro{font-size:9px;letter-spacing:.14em;color:var(--text-dim);font-weight:400}
+.eff__text{margin:0;font-size:13px;line-height:1.65;color:var(--text-md)}
+.nums{margin-top:auto;padding-top:8px;border-top:1px dashed var(--line-2);display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11.5px}
+.nums .kv{font-family:ui-monospace,Consolas,monospace;color:var(--text-hi);background:#1a211f;padding:1px 6px}
+.nums .kv i{color:var(--text-dim);font-style:normal;margin-right:5px}
+.nums .src{color:var(--text-dim);font-size:10.5px;margin-left:auto}
+.nums.is-empty{color:var(--text-dim);font-size:11.5px}
+.nums code{color:var(--text-lo)}
+footer{margin-top:26px;color:var(--text-dim);font-size:12px;border-top:1px solid var(--line-2);padding-top:12px}
+footer code{color:var(--text-lo)}
+</style></head>
+<body><div class="wrap">
+<h1>六件六阶装备 · 描述改版预览</h1>
+<p class="lead">用装备总览（装备图鉴）的同一套富文本与色值渲染 <code>descRaw</code>，所以这就是重启服务端后在图鉴里会看到的样子。</p>
+<div class="legend">
+  <span><span class="sw" style="background:#3fb6ff"></span><b>数值</b> · <code>&lt;@ba.vup&gt;</code> 蓝色高亮</span>
+  <span><span class="sw" style="background:#8a948f"></span><b>条件行</b> · <code>&lt;@ba.acrem&gt;</code> 整行暗色</span>
+  <span><b>版式</b> · 两行：第 1 行 = 基础 + 盟约内效果（<code>；</code> 分隔）／第 2 行 = 「同时携带…」的配对效果</span>
+  <span style="color:var(--text-dim)">注：条件行里嵌套的数值也一并转入暗色 —— 官方件（天师古鼎那行）就是这个行为，不是我们改出来的。</span>
+</div>
+<section class="good is-ref">
+  <header class="good__head">
+    <h2>天师古鼎 <small>（官方六阶盟约件，作为目标版式）</small></h2>
+    <div class="good__meta"><span class="tag tag-bond">炎</span><span class="tag tag-ref">官方 · 本次未改 · 版式参照</span></div>
+    <code class="good__id">chess_item_6_03_e_a / _b</code>
+  </header>
+  
+  <div class="effs">
+    <div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <p class="eff__text">生命值<span class="rt-vup">+45%</span>；若携带者为【炎】盟约干员，本回合每获得过1名干员战斗开始后攻击速度<span class="rt-vup">+25</span>（最多3层）<br><span class="rt-note">若该【炎】盟约干员同时装备“炎国短刀”，每次获得干员时获得</span><span class="rt-note rt-vup">2</span><span class="rt-note">资金（每回合最多3次）</span></p>
+      <div class="nums"><span class="kv"><i>attack_speed</i>25</span><span class="kv"><i>max_cnt</i>3</span><span class="src">items.json</span></div>
+    </div>
+    <div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <p class="eff__text">生命值<span class="rt-vup">+70%</span>；若携带者为【炎】盟约干员，本回合每获得过1名干员战斗开始后攻击速度<span class="rt-vup">+25</span>（最多3层）<br><span class="rt-note">若该【炎】盟约干员同时装备“炎国短刀”，每次获得干员时获得</span><span class="rt-note rt-vup">2</span><span class="rt-note">资金（每回合最多3次）</span></p>
+      <div class="nums"><span class="kv"><i>attack_speed</i>25</span><span class="kv"><i>max_cnt</i>3</span><span class="src">items.json</span></div>
+    </div>
+  </div>
+</section>
+<section class="good">
+  <header class="good__head">
+    <h2>联合研究主机</h2>
+    <div class="good__meta"><span class="tag tag-bond">莱茵生命</span><span class="tag tag-chg">描述已改版</span><span class="tag tag-ok">精锐 = 普通 × 2</span></div>
+    <code class="good__id">chess_item_rhine_mainframe_a / _b</code>
+  </header>
+  <div class="was"><b>改前描述</b><span>若携带者不是伊芙利特，生命值+45%；若为伊芙利特，其基础攻击力+100；</span><span>若她同时装备“莱茵实验终端”，基础攻击力额外+50，且攻击额外附带10%攻击力的灼热损伤。</span><i>（无高亮标记）</i></div>
+  <div class="effs">
+    <div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <p class="eff__text">若携带者不是伊芙利特，生命值<span class="rt-vup">+45%</span>；若为伊芙利特，其基础攻击力<span class="rt-vup">+100</span><br><span class="rt-note">若她同时装备“莱茵实验终端”，基础攻击力额外</span><span class="rt-note rt-vup">+50</span><span class="rt-note">，且攻击额外附带</span><span class="rt-note rt-vup">10%</span><span class="rt-note">攻击力的灼热损伤</span></p>
+      <div class="nums"><span class="kv"><i>max_hp</i>0.45</span><span class="kv"><i>ifrit_atk</i>100</span><span class="kv"><i>pair_atk</i>50</span><span class="kv"><i>burn</i>0.1</span><span class="src">items.json</span></div>
+    </div>
+    <div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <p class="eff__text">若携带者不是伊芙利特，生命值<span class="rt-vup">+90%</span>；若为伊芙利特，其基础攻击力<span class="rt-vup">+200</span><br><span class="rt-note">若她同时装备“莱茵实验终端”，基础攻击力额外</span><span class="rt-note rt-vup">+100</span><span class="rt-note">，且攻击额外附带</span><span class="rt-note rt-vup">20%</span><span class="rt-note">攻击力的灼热损伤</span></p>
+      <div class="nums"><span class="kv"><i>max_hp</i>0.9</span><span class="kv"><i>ifrit_atk</i>200</span><span class="kv"><i>pair_atk</i>100</span><span class="kv"><i>burn</i>0.2</span><span class="src">items.json</span></div>
+    </div>
+  </div>
+</section>
+<section class="good">
+  <header class="good__head">
+    <h2>罗德岛勋章</h2>
+    <div class="good__meta"><span class="tag tag-bond">罗德岛</span><span class="tag tag-chg">描述已改版</span><span class="tag tag-ok">精锐 = 普通 × 2</span></div>
+    <code class="good__id">chess_item_rodos_medal_a / _b</code>
+  </header>
+  <div class="was"><b>改前描述</b><span>穿戴该装备的干员，其特质使层数提升时额外+1。</span><span>与“罗德岛权限卡”同时携带且该干员为【罗德岛】盟约干员时，每回合使【罗德岛】层数额外+5。</span><i>（无高亮标记）</i></div>
+  <div class="effs">
+    <div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <p class="eff__text">穿戴该装备的干员，其特质使层数提升时额外<span class="rt-vup">+1</span><br><span class="rt-note">与“罗德岛权限卡”同时携带且该干员为【罗德岛】盟约干员时，每回合使【罗德岛】层数额外</span><span class="rt-note rt-vup">+5</span></p>
+      <div class="nums"><span class="kv"><i>layer</i>1</span><span class="kv"><i>round_layer</i>5</span><span class="src">items.json</span></div>
+    </div>
+    <div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <p class="eff__text">穿戴该装备的干员，其特质使层数提升时额外<span class="rt-vup">+2</span><br><span class="rt-note">与“罗德岛权限卡”同时携带且该干员为【罗德岛】盟约干员时，每回合使【罗德岛】层数额外</span><span class="rt-note rt-vup">+10</span></p>
+      <div class="nums"><span class="kv"><i>layer</i>2</span><span class="kv"><i>round_layer</i>10</span><span class="src">items.json</span></div>
+    </div>
+  </div>
+</section>
+<section class="good">
+  <header class="good__head">
+    <h2>文明的存续</h2>
+    <div class="good__meta"><span class="tag tag-bond">巴别塔</span><span class="tag tag-chg">描述已改版</span><span class="tag tag-ok">精锐 = 普通 × 2</span></div>
+    <code class="good__id">chess_item_6_12_e_a / _b</code>
+  </header>
+  <div class="was"><b>改前描述</b><span>携带装备的干员造成的伤害提高50%</span><span>若装备者为【巴别塔】盟约干员且同时携带“魔王的祭器”，则伤害额外提高50%（总计+100%）</span><span>若装备者为阿米娅（术士、近卫、医疗），则造成的伤害提高150%（总计+200%）。</span><i>（有高亮标记）</i></div>
+  <div class="effs">
+    <div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <p class="eff__text">携带装备的干员造成的伤害<span class="rt-vup">提高50%</span>；若装备者为【巴别塔】盟约干员且同时携带“魔王的祭器”，则伤害额外<span class="rt-vup">提高50%</span>（总计<span class="rt-vup">+100%</span>）<br><span class="rt-note">若装备者为阿米娅（术士、近卫、医疗），则造成的伤害</span><span class="rt-note rt-vup">提高150%</span><span class="rt-note">（总计</span><span class="rt-note rt-vup">+200%</span><span class="rt-note">）</span></p>
+      <div class="nums"><span class="kv"><i>base</i>0.5</span><span class="kv"><i>pair</i>0.5</span><span class="kv"><i>amiya</i>2</span><span class="src">effects.json · eff_theresa_legacy</span></div>
+    </div>
+    <div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <p class="eff__text">携带装备的干员造成的伤害<span class="rt-vup">提高100%</span>；若装备者为【巴别塔】盟约干员且同时携带“魔王的祭器”，则伤害额外<span class="rt-vup">提高100%</span>（总计<span class="rt-vup">+200%</span>）<br><span class="rt-note">若装备者为阿米娅（术士、近卫、医疗），则造成的伤害</span><span class="rt-note rt-vup">提高300%</span><span class="rt-note">（总计</span><span class="rt-note rt-vup">+400%</span><span class="rt-note">）</span></p>
+      <div class="nums"><span class="kv"><i>base</i>1</span><span class="kv"><i>pair</i>1</span><span class="kv"><i>amiya</i>4</span><span class="src">effects.json · eff_theresa_legacy_b</span></div>
+    </div>
+  </div>
+</section>
+<section class="good">
+  <header class="good__head">
+    <h2>未炸的哑弹</h2>
+    <div class="good__meta"><span class="tag tag-bond">乌萨斯学生自治团</span><span class="tag tag-chg">描述已改版</span><span class="tag tag-ok">精锐 = 普通 × 2</span></div>
+    <code class="good__id">chess_item_6_usstudent_dud_a / _b</code>
+  </header>
+  <div class="was"><b>改前描述</b><span>防御力提高35%。若携带者为乌萨斯学生团干员，攻击速度+30；若携带者为乌萨斯学生团优胜者，攻击额外造成攻击力10%的真实伤害。精锐翻倍加成。</span><i>（无高亮标记）</i></div>
+  <div class="effs">
+    <div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <p class="eff__text">防御力<span class="rt-vup">提高35%</span>；若携带者为乌萨斯学生团干员，攻击速度<span class="rt-vup">+30</span><br><span class="rt-note">若携带者为乌萨斯学生团优胜者，攻击额外造成攻击力</span><span class="rt-note rt-vup">10%</span><span class="rt-note">的真实伤害</span></p>
+      <div class="nums"><span class="kv"><i>def</i>0.35</span><span class="kv"><i>attack_speed</i>30</span><span class="kv"><i>true_scale</i>0.1</span><span class="src">items.json</span></div>
+    </div>
+    <div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <p class="eff__text">防御力<span class="rt-vup">提高70%</span>；若携带者为乌萨斯学生团干员，攻击速度<span class="rt-vup">+60</span><br><span class="rt-note">若携带者为乌萨斯学生团优胜者，攻击额外造成攻击力</span><span class="rt-note rt-vup">20%</span><span class="rt-note">的真实伤害</span></p>
+      <div class="nums"><span class="kv"><i>def</i>0.7</span><span class="kv"><i>attack_speed</i>60</span><span class="kv"><i>true_scale</i>0.2</span><span class="src">items.json</span></div>
+    </div>
+  </div>
+</section>
+<section class="good">
+  <header class="good__head">
+    <h2>量子二踢脚</h2>
+    <div class="good__meta"><span class="tag tag-bond">岁</span><span class="tag tag-chg">描述已改版</span><span class="tag tag-ok">精锐 = 普通 × 2</span></div>
+    <code class="good__id">chess_item_6_quantum_kick_a / _b</code>
+  </header>
+  <div class="was"><b>改前描述</b><span>携带者攻击力+30%。若携带者是【岁】干员且同时携带岁过华灯，攻击力加成提升至+50%，并获得两个如意红包。</span><i>（有高亮标记）</i></div>
+  <div class="effs">
+    <div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <p class="eff__text">携带者攻击力<span class="rt-vup">+30%</span><br><span class="rt-note">若携带者是</span><span class="rt-note rt-vup">【岁】</span><span class="rt-note">干员且同时携带</span><span class="rt-note rt-vup">岁过华灯</span><span class="rt-note">，攻击力加成提升至</span><span class="rt-note rt-vup">+50%</span><span class="rt-note">，并获得</span><span class="rt-note rt-vup">两个如意红包</span></p>
+      <div class="nums"><span class="kv"><i>atk</i>0.3</span><span class="kv"><i>atk_strong</i>0.5</span><span class="kv"><i>packets</i>2</span><span class="src">items.json</span></div>
+    </div>
+    <div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <p class="eff__text">携带者攻击力<span class="rt-vup">+60%</span><br><span class="rt-note">若携带者是</span><span class="rt-note rt-vup">【岁】</span><span class="rt-note">干员且同时携带</span><span class="rt-note rt-vup">岁过华灯</span><span class="rt-note">，攻击力加成提升至</span><span class="rt-note rt-vup">+100%</span><span class="rt-note">，并获得</span><span class="rt-note rt-vup">四个如意红包</span></p>
+      <div class="nums"><span class="kv"><i>atk</i>0.6</span><span class="kv"><i>atk_strong</i>1</span><span class="kv"><i>packets</i>4</span><span class="src">items.json</span></div>
+    </div>
+  </div>
+</section>
+<section class="good">
+  <header class="good__head">
+    <h2>新酿烈刀子</h2>
+    <div class="good__meta"><span class="tag tag-bond">龙门</span><span class="tag tag-chg">描述已改版</span><span class="tag tag-ok">精锐 = 普通 × 2</span></div>
+    <code class="good__id">chess_item_6_xinniang_a / _b</code>
+  </header>
+  <div class="was"><b>改前描述</b><span>携带者造成的伤害提高25%。若携带者为【龙门】干员且同时携带元宵通宝，其造成的灼燃损伤额外+15%。</span><i>（有高亮标记）</i></div>
+  <div class="effs">
+    <div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <p class="eff__text">携带者造成的伤害<span class="rt-vup">提高25%</span><br><span class="rt-note">若携带者为</span><span class="rt-note rt-vup">【龙门】</span><span class="rt-note">干员且同时携带</span><span class="rt-note rt-vup">元宵通宝</span><span class="rt-note">，其造成的</span><span class="rt-note rt-vup">灼燃损伤</span><span class="rt-note">额外</span><span class="rt-note rt-vup">+15%</span></p>
+      <div class="nums"><span class="kv"><i>damage</i>0.25</span><span class="kv"><i>burn_bonus</i>0.15</span><span class="src">items.json</span></div>
+    </div>
+    <div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <p class="eff__text">携带者造成的伤害<span class="rt-vup">提高50%</span><br><span class="rt-note">若携带者为</span><span class="rt-note rt-vup">【龙门】</span><span class="rt-note">干员且同时携带</span><span class="rt-note rt-vup">元宵通宝</span><span class="rt-note">，其造成的</span><span class="rt-note rt-vup">灼燃损伤</span><span class="rt-note">额外</span><span class="rt-note rt-vup">+30%</span></p>
+      <div class="nums"><span class="kv"><i>damage</i>0.5</span><span class="kv"><i>burn_bonus</i>0.3</span><span class="src">items.json</span></div>
+    </div>
+  </div>
+</section>
+<footer>
+  数据：<code>data/items.json</code> + <code>data/effects.json</code> ｜ 备份 <code>data/items.json.bak-t6desc</code>、<code>data/effects.json.bak-t6desc</code><br>
+  生成：<code>node _gen-t6-preview.mjs</code> ｜ 改动：<code>node _fix-t6-desc.cjs --write</code> ｜ 校验：<code>node _verify-t6-desc.mjs</code>
+</footer>
+</div></body></html>

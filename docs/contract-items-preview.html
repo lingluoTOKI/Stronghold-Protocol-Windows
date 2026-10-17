@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>契约档道具 · 改版预览</title>
+<style>
+:root{
+  --text-hi:#f2f2f2; --text-md:#c3cbc7; --text-lo:#8a948f; --text-dim:#5d6863;
+  --line-2:#2a3230; --mint-500:#4ed8af; --mint-400:#7fe3c6; --gold:#ffc600; --gold-2:#f2bd3e; --amber:#f6a329; --vup:#3fb6ff;
+  --font-cjk:'Noto Sans SC','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:28px 22px 60px;background:#0b0f0e;color:var(--text-md);font:14px/1.6 var(--font-cjk)}
+.wrap{max-width:1080px;margin:0 auto}
+h1{font-size:20px;color:var(--text-hi);margin:0 0 6px;letter-spacing:.06em}
+h2.grp{font-size:13px;letter-spacing:.18em;color:var(--mint-400);margin:30px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line-2)}
+.lead{color:var(--text-lo);font-size:13px;margin:0 0 18px}
+.legend{display:flex;gap:10px 18px;flex-wrap:wrap;border:1px solid var(--line-2);background:#111615;padding:12px 14px;margin-bottom:24px;font-size:12.5px}
+.legend b{color:var(--text-hi);font-weight:800}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.rt-vup{color:var(--vup)}
+.rt-note{color:var(--text-lo)}
+.good{border:1px solid var(--line-2);background:#101513;padding:14px 16px;margin-bottom:14px}
+.good.is-ref{border-color:#2f4239;background:#0f1614}
+.good__head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
+.good__head h2{font-size:15.5px;margin:0;color:var(--text-hi);letter-spacing:.05em}
+.good__head h2 small{font-size:11.5px;color:var(--text-dim);font-weight:400}
+.good__meta{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.tag{font-size:11px;letter-spacing:.06em;border:1px solid var(--line-2);color:var(--text-lo);padding:1px 7px}
+.tag-ref,.tag-ok{border-color:#3a5a4c;color:var(--mint-400)}
+.tag-bond{border-color:#3b4a44;color:var(--mint-400)}
+.tag-chg{border-color:#4a3f22;color:var(--amber)}
+.was{margin:4px 0 0;padding:5px 8px;border-left:2px solid #3a3a3a;background:#0d1211;font-size:11.5px;color:var(--text-dim);line-height:1.5}
+.was span{display:block}
+.effs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media (max-width:760px){.effs{grid-template-columns:1fr}}
+.eff{display:flex;flex-direction:column;gap:6px;padding:9px 12px 11px;border:1px solid var(--line-2);border-left:3px solid var(--mint-500);background:linear-gradient(180deg,rgba(78,216,175,.06),rgba(0,0,0,.22))}
+.eff.is-elite{border-left-color:var(--gold);background:linear-gradient(180deg,rgba(246,163,41,.07),rgba(0,0,0,.22))}
+.eff__k{font-size:11px;font-weight:900;letter-spacing:.2em;color:var(--mint-400)}
+.eff.is-elite .eff__k{color:var(--gold-2)}
+.eff__micro{font-size:9px;letter-spacing:.14em;color:var(--text-dim);font-weight:400}
+.eff__text{margin:0;font-size:13px;line-height:1.65;color:var(--text-md)}
+.hints{list-style:none;margin:0;padding:0}
+.dhint{display:flex;align-items:flex-start;gap:6px;font-size:12.5px;color:var(--text-md);padding:5px 10px;border-bottom:1px dashed var(--line-2)}
+.dhint .ic{width:13px;height:13px;flex:none;margin-top:3px;border-radius:50%;border:1px solid var(--text-dim);color:var(--text-dim);font-size:9px;font-style:normal;line-height:11px;text-align:center}
+.dhint em{font-style:normal;color:var(--text-dim);font-size:11px;margin-left:auto;padding-left:12px;white-space:nowrap}
+footer{margin-top:26px;color:var(--text-dim);font-size:12px;border-top:1px solid var(--line-2);padding-top:12px}
+footer code{color:var(--text-lo)}
+</style></head>
+<body><div class="wrap">
+<h1>契约档（本作新增）道具 · 改版预览</h1>
+<p class="lead">用装备总览的同一套富文本与色值渲染 <code>descRaw</code> —— 重启服务端后在图鉴里看到的就是这个样子。</p>
+<div class="legend">
+  <span><span class="sw" style="background:#3fb6ff"></span><b>数值</b> · <code>&lt;@ba.vup&gt;</code> 蓝色高亮</span>
+  <span><span class="sw" style="background:#8a948f"></span><b>条件 / 配对行</b> · <code>&lt;@ba.acrem&gt;</code> 整行暗色</span>
+  <span><b>版式</b> · 两行：第 1 行 = 基础 + 盟约内效果（<code>；</code> 分隔）／第 2 行 = 「同时携带…」的配对效果</span>
+  <span><b>「与变形同构体…」</b> 那句已从道具文本里删除，改在<b>装备干员界面</b>用小字提示（见文末）</span>
+</div>
+<section class="good is-ref">
+  <header class="good__head"><h2>天师古鼎 <small>（官方六阶盟约件 · 本次未改 · 版式参照）</small></h2>
+  <div class="good__meta"><span class="tag tag-ref">官方</span><span class="tag">6 本 · ¥4</span></div></header>
+  <div class="effs"><div class="eff"><div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div><p class="eff__text">生命值<span class="rt-vup">+45%</span>；若携带者为【炎】盟约干员，本回合每获得过1名干员战斗开始后攻击速度<span class="rt-vup">+25</span>（最多3层）<br><span class="rt-note">若该【炎】盟约干员同时装备“炎国短刀”，每次获得干员时获得</span><span class="rt-note rt-vup">2</span><span class="rt-note">资金（每回合最多3次）</span></p></div></div>
+</section>
+<h2 class="grp">阶位改动（价格不变）</h2>
+<section class="good">
+  <header class="good__head"><h2>岁过华灯</h2><div class="good__meta"><span class="tag tag-chg">3 本 → 5 本 · 价格不变 ¥3</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">岁</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>装备时，携带者攻击力+10%，并获得一个如意红包。若同时携带变形同构体，携带者视为【岁】干员。</span></div>
+      <p class="eff__text">装备时，携带者攻击力<span class="rt-vup">+10%</span>，并获得一个<span class="rt-vup">如意红包</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>装备时，携带者攻击力+20%，并获得两个如意红包。若同时携带变形同构体，携带者视为【岁】干员。</span></div>
+      <p class="eff__text">装备时，携带者攻击力<span class="rt-vup">+20%</span>，并获得两个<span class="rt-vup">如意红包</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>元宵通宝</h2><div class="good__meta"><span class="tag tag-chg">3 本 → 4 本 · 价格不变 ¥3</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">龙门</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>装备时，携带者攻击力+20%，攻击附带造成伤害10%的灼燃损伤。若同时携带变形同构体，携带者视为【龙门】干员。</span></div>
+      <p class="eff__text">装备时，携带者攻击力<span class="rt-vup">+20%</span>，攻击附带造成伤害<span class="rt-vup">10%</span>的<span class="rt-vup">灼燃损伤</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>装备时，携带者攻击力+40%，攻击附带造成伤害20%的灼燃损伤。若同时携带变形同构体，携带者视为【龙门】干员。</span></div>
+      <p class="eff__text">装备时，携带者攻击力<span class="rt-vup">+40%</span>，攻击附带造成伤害<span class="rt-vup">20%</span>的<span class="rt-vup">灼燃损伤</span></p>
+    </div></div>
+</section>
+<h2 class="grp">效果改动</h2>
+<section class="good">
+  <header class="good__head"><h2>罗德岛权限卡</h2><div class="good__meta"><span class="tag">3 本 · ¥3/精锐 ¥3</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">罗德岛</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>装备后，若本场战斗中该干员首次死亡，其所有已激活盟约层数+4。</span></div>
+      <p class="eff__text">携带时，若本场作战达成完美作战，则携带干员所有已激活盟约层数<span class="rt-vup">+4</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>装备后，若本场战斗中该干员首次死亡，其所有已激活盟约层数+8。</span></div>
+      <p class="eff__text">携带时，若本场作战达成完美作战，则携带干员所有已激活盟约层数<span class="rt-vup">+8</span></p>
+    </div></div>
+</section>
+<h2 class="grp">版式 / 文本改动（含删除「变形同构体」那句）</h2>
+<section class="good">
+  <header class="good__head"><h2>联合研究主机</h2><div class="good__meta"><span class="tag">6 本 · ¥4/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-ok">scopeOnly: mod</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>若携带者不是伊芙利特，生命值+45%；若为伊芙利特，其基础攻击力+100</span><span>若她同时装备“莱茵实验终端”，基础攻击力额外+50，且攻击额外附带10%攻击力的灼热损伤</span></div>
+      <p class="eff__text">若携带者不是伊芙利特，生命值<span class="rt-vup">+45%</span>；若为伊芙利特，其基础攻击力<span class="rt-vup">+100</span><br><span class="rt-note">若伊芙利特同时装备“莱茵实验终端”，基础攻击力额外</span><span class="rt-note rt-vup">+50</span><span class="rt-note">，且攻击额外附带</span><span class="rt-note rt-vup">10%</span><span class="rt-note">攻击力的灼热损伤</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>若携带者不是伊芙利特，生命值+90%；若为伊芙利特，其基础攻击力+200</span><span>若她同时装备“莱茵实验终端”，基础攻击力额外+100，且攻击额外附带20%攻击力的灼热损伤</span></div>
+      <p class="eff__text">若携带者不是伊芙利特，生命值<span class="rt-vup">+90%</span>；若为伊芙利特，其基础攻击力<span class="rt-vup">+200</span><br><span class="rt-note">若伊芙利特同时装备“莱茵实验终端”，基础攻击力额外</span><span class="rt-note rt-vup">+100</span><span class="rt-note">，且攻击额外附带</span><span class="rt-note rt-vup">20%</span><span class="rt-note">攻击力的灼热损伤</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>莱茵实验终端</h2><div class="good__meta"><span class="tag">3 本 · ¥2/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">莱茵生命</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>攻击力+15%；若携带者为伊芙利特，其基础攻击力+50。</span></div>
+      <p class="eff__text">攻击力<span class="rt-vup">+15%</span>；若携带者为伊芙利特，其基础攻击力<span class="rt-vup">+50</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>攻击力+25%；若携带者为伊芙利特，其基础攻击力+100。</span></div>
+      <p class="eff__text">攻击力<span class="rt-vup">+25%</span>；若携带者为伊芙利特，其基础攻击力<span class="rt-vup">+100</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>魔王的祭器</h2><div class="good__meta"><span class="tag">2 本 · ¥3/精锐 ¥6</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">巴别塔</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>全场每有一个干员开启技能时，本场战斗中攻击力与生命值+2%（最多+30%）</span><span>与“变形同构体”同时携带时，额外视为【巴别塔】盟约装备。</span></div>
+      <p class="eff__text">全场每有一个干员开启技能时，本场战斗中攻击力与生命值<span class="rt-vup">+2%</span>（最多<span class="rt-vup">+30%</span>）</p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>全场每有一个干员开启技能时，本场战斗中攻击力与生命值+2%（最多+30%）</span><span>与“变形同构体”同时携带时，额外视为【巴别塔】盟约装备。</span></div>
+      <p class="eff__text">全场每有一个干员开启技能时，本场战斗中攻击力与生命值<span class="rt-vup">+2%</span>（最多<span class="rt-vup">+30%</span>）</p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>终极企鹅勋章</h2><div class="good__meta"><span class="tag">5 本 · ¥4/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">企鹅物流</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>装备时，立刻获得两件随机一阶或二阶装备；若携带者是【企鹅物流】干员，改为获得精锐装备。若同时携带变形同构体，携带者视为【企鹅物流】干员。</span></div>
+      <p class="eff__text">装备时，立刻获得<span class="rt-vup">两件随机一阶或二阶</span>装备；若携带者是<span class="rt-vup">【企鹅物流】</span>干员，改为获得<span class="rt-vup">精锐装备</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>装备时，立刻获得三件随机一阶或二阶装备；若携带者是【企鹅物流】干员，改为获得精锐装备。若同时携带变形同构体，携带者视为【企鹅物流】干员。</span></div>
+      <p class="eff__text">装备时，立刻获得<span class="rt-vup">三件随机一阶或二阶</span>装备；若携带者是<span class="rt-vup">【企鹅物流】</span>干员，改为获得<span class="rt-vup">精锐装备</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>涂改的旗帜</h2><div class="good__meta"><span class="tag">4 本 · ¥3/精锐 ¥3</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">乌萨斯学生自治团</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>携带者攻击力、防御力、生命值提升10%。若同时携带变形同构体，视为乌萨斯学生团干员。精锐翻倍加成。</span></div>
+      <p class="eff__text">携带者攻击力、防御力、生命值<span class="rt-vup">提升10%</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>携带者攻击力、防御力、生命值提升10%。若同时携带变形同构体，视为乌萨斯学生团干员。精锐翻倍加成。</span></div>
+      <p class="eff__text">携带者攻击力、防御力、生命值<span class="rt-vup">提升20%</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>先锋芯片</h2><div class="good__meta"><span class="tag">3 本 · ¥2/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">先锋</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>技力回复速度+0.2。与变形同构体一同装备时，携带者视为【先锋】干员。</span></div>
+      <p class="eff__text">技力回复速度<span class="rt-vup">+0.2</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>技力回复速度+0.4。与变形同构体一同装备时，携带者视为【先锋】干员。</span></div>
+      <p class="eff__text">技力回复速度<span class="rt-vup">+0.4</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>重装芯片</h2><div class="good__meta"><span class="tag">3 本 · ¥2/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">重装</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>防御力+20%。与变形同构体一同装备时，携带者视为【重装】干员。</span></div>
+      <p class="eff__text">防御力<span class="rt-vup">+20%</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>防御力+40%。与变形同构体一同装备时，携带者视为【重装】干员。</span></div>
+      <p class="eff__text">防御力<span class="rt-vup">+40%</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>辅助芯片</h2><div class="good__meta"><span class="tag">3 本 · ¥2/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">辅助</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>攻击范围内敌方防御力、法术抗性-10%。与变形同构体一同装备时，携带者视为【辅助】干员。</span></div>
+      <p class="eff__text">攻击范围内敌方<span class="rt-vup">防御力、法术抗性-10%</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>攻击范围内敌方防御力、法术抗性-20%。与变形同构体一同装备时，携带者视为【辅助】干员。</span></div>
+      <p class="eff__text">攻击范围内敌方<span class="rt-vup">防御力、法术抗性-20%</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>近卫芯片</h2><div class="good__meta"><span class="tag">3 本 · ¥2/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">近卫</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>攻击力+15%，攻击速度+20。与变形同构体一同装备时，携带者视为【近卫】干员。</span></div>
+      <p class="eff__text">攻击力<span class="rt-vup">+15%</span>，攻击速度<span class="rt-vup">+20</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>攻击力+30%，攻击速度+40。与变形同构体一同装备时，携带者视为【近卫】干员。</span></div>
+      <p class="eff__text">攻击力<span class="rt-vup">+30%</span>，攻击速度<span class="rt-vup">+40</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>医疗芯片</h2><div class="good__meta"><span class="tag">3 本 · ¥2/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">医疗</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>治疗量提升10%；部署时获得相当于生命值30%的护盾。与变形同构体一同装备时，携带者视为【医疗】干员。</span></div>
+      <p class="eff__text">治疗量<span class="rt-vup">提升10%</span>；部署时获得相当于生命值<span class="rt-vup">30%</span>的<span class="rt-vup">护盾</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>治疗量提升20%；部署时获得相当于生命值60%的护盾。与变形同构体一同装备时，携带者视为【医疗】干员。</span></div>
+      <p class="eff__text">治疗量<span class="rt-vup">提升20%</span>；部署时获得相当于生命值<span class="rt-vup">60%</span>的<span class="rt-vup">护盾</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>狙击芯片</h2><div class="good__meta"><span class="tag">3 本 · ¥2/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">狙击</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>攻击无视目标50点防御力。与变形同构体一同装备时，携带者视为【狙击】干员。</span></div>
+      <p class="eff__text">攻击<span class="rt-vup">无视目标50点防御力</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>攻击无视目标100点防御力。与变形同构体一同装备时，携带者视为【狙击】干员。</span></div>
+      <p class="eff__text">攻击<span class="rt-vup">无视目标100点防御力</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>术师芯片</h2><div class="good__meta"><span class="tag">3 本 · ¥2/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">术师</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>攻击无视目标10%法术抗性。与变形同构体一同装备时，携带者视为【术师】干员。</span></div>
+      <p class="eff__text">攻击<span class="rt-vup">无视目标10%法术抗性</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>攻击无视目标20%法术抗性。与变形同构体一同装备时，携带者视为【术师】干员。</span></div>
+      <p class="eff__text">攻击<span class="rt-vup">无视目标20%法术抗性</span></p>
+    </div></div>
+</section>
+<section class="good">
+  <header class="good__head"><h2>特种芯片</h2><div class="good__meta"><span class="tag">3 本 · ¥2/精锐 ¥5</span><span class="tag tag-chg">文本已改</span><span class="tag tag-bond">特种</span></div></header>
+  <div class="effs"><div class="eff">
+      <div class="eff__k">普通 <span class="eff__micro">NORMAL</span></div>
+      <div class="was">改前：<span>再部署时间-30%。与变形同构体一同装备时，携带者视为【特种】干员。</span></div>
+      <p class="eff__text">再部署时间<span class="rt-vup">-30%</span></p>
+    </div><div class="eff is-elite">
+      <div class="eff__k">精锐 <span class="eff__micro">ELITE</span></div>
+      <div class="was">改前：<span>再部署时间-60%。与变形同构体一同装备时，携带者视为【特种】干员。</span></div>
+      <p class="eff__text">再部署时间<span class="rt-vup">-60%</span></p>
+    </div></div>
+</section>
+<h2 class="grp">装备干员界面里的小字提示（30 条）</h2>
+<p class="lead">来自 <code>public/js/ui/detailPanel.js</code> 的 <code>MorphGrantLine</code>（<code>dhint--morph</code>）：按道具的 <code>giveBondId</code> 自动渲染，所以数据里不再重复写这句。<b>已带上变形同构体时</b>该行会变绿。<br>
+下面每条 = 打开一名<b>携带该装备</b>的干员时，装备栏里那一行小字。</p>
+<ul class="hints"><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【巴别塔】成员</span><em>魔王的祭器 · 2 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【巴别塔】成员</span><em>魔王的祭器 · 2 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【术师】成员</span><em>术师芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【术师】成员</span><em>术师芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【医疗】成员</span><em>医疗芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【医疗】成员</span><em>医疗芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【莱茵生命】成员</span><em>莱茵实验终端 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【莱茵生命】成员</span><em>莱茵实验终端 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【罗德岛】成员</span><em>罗德岛权限卡 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【罗德岛】成员</span><em>罗德岛权限卡 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【狙击】成员</span><em>狙击芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【狙击】成员</span><em>狙击芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【特种】成员</span><em>特种芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【特种】成员</span><em>特种芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【辅助】成员</span><em>辅助芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【辅助】成员</span><em>辅助芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【重装】成员</span><em>重装芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【重装】成员</span><em>重装芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【先锋】成员</span><em>先锋芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【先锋】成员</span><em>先锋芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【近卫】成员</span><em>近卫芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【近卫】成员</span><em>近卫芯片 · 3 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【龙门】成员</span><em>元宵通宝 · 4 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【龙门】成员</span><em>元宵通宝 · 4 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【乌萨斯学生自治团】成员</span><em>涂改的旗帜 · 4 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【乌萨斯学生自治团】成员</span><em>涂改的旗帜 · 4 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【企鹅物流】成员</span><em>终极企鹅勋章 · 5 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【企鹅物流】成员</span><em>终极企鹅勋章 · 5 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【岁】成员</span><em>岁过华灯 · 5 本</em></li><li class="dhint dhint--morph"><i class="ic">i</i><span>与变形同构体一同装备时，携带者视为【岁】成员</span><em>岁过华灯 · 5 本</em></li></ul>
+<footer>
+  数据：<code>data/items.json</code> + <code>data/effects.json</code> ｜ 备份 <code>data/items.json.bak-contract</code>、<code>data/effects.json.bak-contract</code><br>
+  生成：<code>node _gen-contract-preview.mjs</code> ｜ 改动：<code>node _fix-contract-items.cjs --write</code> ｜ 校验：<code>node _verify-contract-items.mjs</code>
+</footer>
+</div></body></html>

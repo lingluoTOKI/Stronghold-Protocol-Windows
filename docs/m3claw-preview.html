@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>新增道具 M3利爪 · 预览</title>
+<style>
+:root{--text-hi:#e8efe c;--text-hi:#e8efec;--text-md:#c2cdc7;--text-lo:#8a948f;--text-dim:#5f6b66;
+  --line-2:#2a3230;--mint-500:#4ed8af;--mint-400:#7fe3c6;--gold:#ffc600;--gold-2:#f2bd3e;--amber:#f6a329;
+  --vup:#3fb6ff;
+  --font-cjk:'Noto Sans SC','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;}
+*{box-sizing:border-box}
+body{margin:0;padding:28px 22px 60px;background:#0b0f0e;color:var(--text-md);font:14px/1.6 var(--font-cjk)}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:20px;color:var(--text-hi);margin:0 0 6px;letter-spacing:.06em}
+.lead{color:var(--text-lo);font-size:13px;margin:0 0 18px}
+.legend{display:flex;gap:18px;flex-wrap:wrap;border:1px solid var(--line-2);background:#111615;padding:12px 14px;margin-bottom:26px;font-size:12.5px}
+.legend b{color:var(--text-hi);font-weight:800}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.rt-vup{color:var(--vup)}
+.rt-note{color:var(--text-lo)}
+h3.sec{font-size:13px;letter-spacing:.18em;color:var(--mint-400);margin:30px 0 12px;font-weight:800}
+.good{border:1px solid var(--line-2);background:#101513;padding:14px 16px 12px;margin-bottom:12px}
+.good.is-elite{border-left:3px solid var(--gold)}
+.good__head{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.ico{width:46px;height:46px;object-fit:contain;filter:drop-shadow(0 0 5px rgba(0,0,0,.6))}
+.good__head h2{font-size:16px;margin:0;color:var(--text-hi);letter-spacing:.05em}
+.good__head h2 small{font-size:12px;color:var(--text-dim);font-weight:400}
+.good__id{font-size:11px;color:var(--text-dim);margin-left:auto;font-family:ui-monospace,Consolas,monospace}
+.tag{font-size:11px;letter-spacing:.06em;border:1px solid var(--line-2);color:var(--text-lo);padding:1px 7px}
+.tag-new{border-color:#2f4a3c;color:var(--mint-400)}
+.tag-ref{border-color:#3b4a44;color:var(--text-dim)}
+.tag-scope{border-color:#4a3f22;color:var(--amber)}
+.tag-note{border-color:#3a4a5a;color:#8fc0e8}
+.eff__text{margin:10px 0 8px;font-size:13.5px;line-height:1.75;color:var(--text-md)}
+.nums{padding-top:8px;border-top:1px dashed var(--line-2);display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11.5px}
+.nums .kv{font-family:ui-monospace,Consolas,monospace;color:var(--text-hi);background:#1a211f;padding:1px 6px}
+.nums .kv i{color:var(--text-dim);font-style:normal;margin-right:5px}
+.nums .src{color:var(--text-dim);font-size:10.5px;margin-left:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+th,td{border:1px solid var(--line-2);padding:6px 9px;text-align:left}
+th{background:#141a18;color:var(--text-hi);font-weight:700}
+td.n{font-family:ui-monospace,Consolas,monospace;color:var(--vup)}
+.ok{color:var(--mint-400)}
+footer{margin-top:26px;color:var(--text-dim);font-size:12px;border-top:1px solid var(--line-2);padding-top:12px}
+footer code{color:var(--text-lo)}
+</style></head>
+<body><div class="wrap">
+<h1>新增道具「M3利爪」· 预览</h1>
+<p class="lead">用装备图鉴的同一套富文本解析器与色值渲染 <code>descRaw</code> —— 这就是重启服务端后在图鉴里会看到的样子（图标也取自 <code>data/assets.json</code>）。</p>
+<div class="legend">
+  <span><span class="sw" style="background:#3fb6ff"></span><b>数值</b> · <code>&lt;@ba.vup&gt;</code></span>
+  <span><span class="sw" style="background:#8a948f"></span><b>条件行</b> · <code>&lt;@ba.acrem&gt;</code> 整行</span>
+  <span><b>版式</b> · 两行：第 1 行基础效果／第 2 行「同时装备…」的配对效果</span>
+  <span style="color:var(--text-dim)">条件行里嵌套的数值也会转暗 —— 官方件同款行为。</span>
+</div>
+
+<h3 class="sec">M3 套装</h3>
+<section class="good ">
+  <div class="good__head">
+    <img class="ico" src="../public/assets/item/m3_claw.png" alt="">
+    <h2>M3利爪 <small>普通</small></h2>
+    <span class="tag tag-t5">5 本</span>
+    <span class="tag">售价 ¥4</span>
+    <span class="tag tag-new">本作新增</span>
+    <span class="tag tag-scope">仅契约档</span>
+    <span class="tag tag-note">本次新增</span>
+    <span class="good__id">chess_item_5_m3_claw_a</span>
+  </div>
+  <p class="eff__text">攻击力<span class="rt-vup">+30%</span><br><span class="rt-note">若装备者同时装备</span><span class="rt-note rt-vup">M3茧甲</span><span class="rt-note">，复活次数</span><span class="rt-note rt-vup">+1</span><span class="rt-note">且被击倒后对自身周围造成攻击力</span><span class="rt-note rt-vup">30%</span><span class="rt-note">的真实伤害</span></p>
+  <div class="nums"><span class="kv"><i>atk_scale</i>0.3</span><span class="kv"><i>respawn_add</i>1</span><span class="src">buffs · 2 条</span></div>
+</section>
+<section class="good is-elite">
+  <div class="good__head">
+    <img class="ico" src="../public/assets/item/m3_claw.png" alt="">
+    <h2>M3利爪 <small>精锐</small></h2>
+    <span class="tag tag-t5">5 本</span>
+    <span class="tag">售价 ¥5</span>
+    <span class="tag tag-new">本作新增</span>
+    <span class="tag tag-scope">仅契约档</span>
+    <span class="tag tag-note">本次新增 · 精锐</span>
+    <span class="good__id">chess_item_5_m3_claw_b</span>
+  </div>
+  <p class="eff__text">攻击力<span class="rt-vup">+60%</span><br><span class="rt-note">若装备者同时装备</span><span class="rt-note rt-vup">M3茧甲</span><span class="rt-note">，复活次数</span><span class="rt-note rt-vup">+2</span><span class="rt-note">且被击倒后对自身周围造成攻击力</span><span class="rt-note rt-vup">60%</span><span class="rt-note">的真实伤害</span></p>
+  <div class="nums"><span class="kv"><i>atk_scale</i>0.6</span><span class="kv"><i>respawn_add</i>2</span><span class="src">buffs · 2 条</span></div>
+</section>
+<section class="good ">
+  <div class="good__head">
+    <img class="ico" src="../public/assets/item/trap_1068_acarm068.png" alt="">
+    <h2>M3茧甲 <small>普通</small></h2>
+    <span class="tag tag-t4">4 本</span>
+    <span class="tag">售价 ¥3</span>
+    <span class="tag tag-ref">官方 0.2.1</span>
+    
+    <span class="tag tag-note">官方，未改动</span>
+    <span class="good__id">chess_item_4_12_e_a</span>
+  </div>
+  <p class="eff__text">战斗阶段被击倒时立刻复活（一场战斗仅<span class="rt-vup">1</span>次）</p>
+  <div class="nums"><span class="kv"><i>max_respawn_cnt</i>1</span><span class="src">buffs · 1 条</span></div>
+</section>
+<section class="good is-elite">
+  <div class="good__head">
+    <img class="ico" src="../public/assets/item/trap_1068_acarm068.png" alt="">
+    <h2>M3茧甲 <small>精锐</small></h2>
+    <span class="tag tag-t4">4 本</span>
+    <span class="tag">售价 ¥5</span>
+    <span class="tag tag-ref">官方 0.2.1</span>
+    
+    <span class="tag tag-note">官方，未改动 · 精锐</span>
+    <span class="good__id">chess_item_4_12_e_b</span>
+  </div>
+  <p class="eff__text">战斗阶段被击倒时立刻复活（一场战斗仅<span class="rt-vup">2</span>次）</p>
+  <div class="nums"><span class="kv"><i>max_respawn_cnt</i>2</span><span class="src">buffs · 1 条</span></div>
+</section>
+
+<h3 class="sec">实测（_verify-m3-claw.mjs · 99 passed / 0 failed）</h3>
+<table>
+  <tr><th>搭配</th><th>攻击力</th><th>复活名额</th><th>被击倒时（周围 8 格）</th></tr>
+  <tr><td>裸装</td><td class="n">422</td><td class="n">0</td><td>—</td></tr>
+  <tr><td>M3茧甲(普通)</td><td class="n">—</td><td class="n">1</td><td>—</td></tr>
+  <tr><td>M3茧甲(精锐)</td><td class="n">—</td><td class="n">2</td><td>—</td></tr>
+  <tr><td>利爪(普通) 单穿</td><td class="n">548.6 <span class="ok">×1.30</span></td><td class="n">0</td><td>— （没有茧甲，第二段不生效）</td></tr>
+  <tr><td>利爪(普通) + 茧甲(普通)</td><td class="n">548.6 <span class="ok">×1.30</span></td><td class="n">2</td><td class="n">164.6 <span class="ok">= 548.6 × 30%</span> 真实伤害</td></tr>
+  <tr><td>利爪(精锐) + 茧甲(精锐)</td><td class="n">675.2 <span class="ok">×1.60</span></td><td class="n">4</td><td class="n">405.1 <span class="ok">= 675.2 × 60%</span> 真实伤害</td></tr>
+  <tr><td>茧甲(普通) + 利爪(精锐)</td><td class="n">675.2</td><td class="n">3</td><td class="n">405.1</td></tr>
+</table>
+<p class="lead" style="margin-top:10px">「周围 8 格」= 切比雪夫距离 ≤ 1（不含自身），与巴别塔 Mon3tr「不毁重构」同款口径；2 格外的敌人实测毫发无伤。撤退（不是被击倒）不触发复活也不炸。</p>
+
+<footer>
+  数据：<code>data/items.json</code>（+2 条）· <code>data/assets.json</code>（+1 图标）· <code>public/assets/item/m3_claw.png</code><br>
+  备份 <code>data/items.json.bak-m3claw</code>、<code>data/assets.json.bak-m3claw</code> ｜ 可重复：<code>node _fix-m3-claw.cjs --write</code><br>
+  战斗实现：<code>server/sim/content/items/battle.js</code>（新增 <code>chess_item_5_m3_claw</code>；<code>chess_item_4_12_e</code> 读 <code>respawn_add</code>）｜ <b>需重启服务端</b>
+</footer>
+</div></body></html>

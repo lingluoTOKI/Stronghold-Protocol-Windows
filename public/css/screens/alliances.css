@@ -1,0 +1,187 @@
+/* ==========================================================================================
+   screens/alliances.css — 盟约与策略总览 (js/screens/alliances.js): a read-only overlay that reuses the 装备总览 /
+   干员调配 skeleton (.lo / .lo-top / .lo-note / .lo-body / .lo-grid / .lo-card / .lo-chip / .eq-*), so the three
+   screens look and behave alike; this file adds only its own pieces — the 盟约 / 策略 tabs, the group headers of the
+   grid, the 层数 rows of a bond's effect, the member list and the 相关装备 chips.
+   Sizes are design px ÷ 100 (theme.css root scale); text that must stay readable on phones uses max(.xxrem, N px).
+   ========================================================================================== */
+
+/* the overlay covers the screen behind it (the same rule .sp-loadout-open / .sp-equip-open use) */
+.sp-alliance-open .app-root > .screen { visibility: hidden; }
+
+/* ---- 总览页签：一屏列出当前档位全部盟约的层数与效果 -------------------------------------- */
+.al-ov { grid-column: 1 / -1; display: flex; flex-direction: column; gap: .14rem; padding: .02rem .02rem .2rem; }
+.al-ov__bond { border-left: 2px solid var(--line-3); padding: .04rem 0 .04rem .12rem; }
+.al-ov__bond.is-core { border-left-color: var(--mint-400); }
+.al-ov__bond.is-sel { background: rgba(78, 216, 175, .07); }
+.al-ov__head { display: flex; align-items: center; gap: .08rem; }
+.al-ov__icon { width: max(.3rem, 18px); height: max(.3rem, 18px); object-fit: contain; }
+.al-ov__name { background: none; border: 0; padding: 0; color: var(--text-hi); font-size: max(.17rem, 11px); font-weight: 800; letter-spacing: .04em; cursor: pointer; }
+.al-ov__name:hover { color: var(--mint-400); }
+.al-ov__th { font-size: max(.12rem, 9px); color: var(--text-dim); }
+.al-ov__layers { display: flex; flex-direction: column; gap: .02rem; margin-top: .04rem; }
+
+/* ---- 契约页签：全目录三栏并排 —— 左我方增益、中中立契约、右敌方增益（卡片样式复用 .al-ov__bond）----
+   契约目录与盟约卡同在 .al-grid 这一个滚动区里：三栏占满整行、每栏内部各自滚动，免得契约把盟约卡顶到很下面。 */
+.al-contracts {
+  grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .2rem; align-items: start;
+  padding: .02rem .02rem .16rem; margin-bottom: .1rem; border-bottom: 1px solid var(--line-1);
+}
+@media (max-width: 740px) { .al-contracts { grid-template-columns: 1fr; } }
+.al-ccol { display: flex; flex-direction: column; gap: .1rem; min-width: 0; max-height: 58vh; overflow-y: auto; padding-right: .04rem; }
+@media (max-width: 740px), (max-height: 620px) { .al-ccol { max-height: none; overflow-y: visible; } }
+.al-ccard.is-self { border-left-color: var(--mint-400); }
+.al-ccard.is-enemy { border-left-color: #f0a06a; }
+.al-ccard.is-neutral { border-left-color: #b9a7f5; }
+.al-ccard .al-ov__eff { margin: .04rem 0 0; font-size: max(.14rem, 10px); line-height: 1.4; color: var(--text-md); }
+/* 契约专属图标（ui/contractGlyphs.js）：敌方橙红；加强档「+」角标 */
+.al-ccard__iconwrap { position: relative; display: inline-grid; }
+.al-ccard.is-self .al-ov__icon { color: var(--mint-500); }
+.al-ccard.is-enemy .al-ov__icon { color: #f0a06a; }
+.al-ccard.is-neutral .al-ov__icon { color: #b9a7f5; }
+.al-ccard__plus {
+  position: absolute; right: -.1rem; bottom: -.1rem; width: max(.24rem, 14px); height: max(.24rem, 14px);
+  display: grid; place-items: center; font-size: max(.16rem, 9px); font-weight: 900; color: #1d1400;
+  background: var(--gold); border-radius: 50%; box-shadow: 0 0 0 2px rgba(8, 11, 10, .85);
+}
+
+/* ---- 显示范围开关（盟约 = 官方 / 契约 = 本作新增）---------------------------------------- */
+/* two segments in the tab row, the same chip shape the 盟约 / 策略 tabs use; 协防干员 / 调和 / 绝技 stay in both */
+.al-tabrow { display: flex; align-items: center; justify-content: space-between; gap: .12rem; width: 100%; flex-wrap: wrap; }
+.al-tabrow .al-tabs { width: auto; }
+.al-scope { flex: 0 0 auto; gap: .04rem; padding: .02rem .06rem; border: 1px solid var(--line-2); border-radius: .04rem; }
+.al-scope__k { font-size: max(.12rem, 9px); letter-spacing: .1em; color: var(--text-dim); padding-right: .04rem; }
+.al-scope__seg { height: max(.32rem, 22px); padding: 0 .14rem; font-size: max(.14rem, 10px); }
+.al-scope__seg.is-on { color: var(--mint-400); border-color: var(--mint-700); background: rgba(78, 216, 175, .12); }
+
+/* ---- tabs (盟约 / 策略) ------------------------------------------------------------------ */
+.al-tabs { width: 100%; gap: .06rem; }
+.al-tab { display: inline-flex; align-items: center; gap: .06rem; height: max(.42rem, 26px); padding: 0 .18rem; font-weight: 700; letter-spacing: .04em; }
+.al-tab .icon { width: max(.2rem, 12px); height: max(.2rem, 12px); }
+.al-tab .num { font-family: var(--font-num); font-size: max(.13rem, 9px); opacity: .8; }
+
+/* ---- group headers inside the card grid ------------------------------------------------- */
+.al-group { grid-column: 1 / -1; display: flex; align-items: center; gap: .12rem; margin: .08rem 0 .01rem; }
+.al-group__k { font-size: max(.17rem, 11px); font-weight: 900; letter-spacing: .14em; color: var(--text-md); }
+.al-group__n { font-size: max(.13rem, 9px); color: var(--text-dim); }
+.al-group::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); }
+
+/* ---- cards ------------------------------------------------------------------------------ */
+/* the strategy portraits need room: a wider min column than the shared .lo-grid default (64px), so the 180×180
+   bust reads at ~1.6× the size it had (the official 策略 draft uses 1.36rem per card, draft.css) */
+.al-grid--bands { grid-template-columns: repeat(auto-fill, minmax(max(1.8rem, 112px), 1fr)); }
+.al-card { text-align: left; --tc: var(--line-3); }
+.al-card--core { --tc: var(--mint-400); }
+.al-card--bond .lo-card__art img { object-fit: contain; padding: 16%; background: radial-gradient(circle at 50% 45%, rgba(78, 216, 175, .1), transparent 70%); }
+.al-card--band .lo-card__art { display: block; background: #111513; }
+/* the official strategy art is a 180×180 bust (all 40 are) — fill the card frame instead of the .6rem default
+   BandIcon size, so the 大头照 reads at full size and nothing is cut */
+.al-card--band .lo-card__art .bandicon { --bi: 100%; width: 100%; height: 100%; display: block; }
+.al-card--band .lo-card__art .bandicon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.al-card__meta { font-size: max(.12rem, 9px); }
+/* 阈值串只能在数字之间换行（彩虹小队 1–8 档以前会从「4/」中间断开、罗德岛孤一个「9」掉行——实测 2026-10-10） */
+.al-card__th { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .03rem; min-width: 0; font-family: var(--font-num); letter-spacing: .04em; color: var(--text-lo); }
+.al-card__thn { font-weight: inherit; white-space: nowrap; }
+.al-card__thn:not(:last-child)::after { content: '/'; margin-left: .05rem; color: var(--text-dim); }
+.al-card__eff { min-width: 0; overflow: hidden; color: var(--text-lo); white-space: nowrap; text-overflow: ellipsis; }
+.al-card__hp { display: inline-flex; align-items: center; gap: .03rem; font-family: var(--font-num); color: var(--gold-2); }
+.al-kind { padding: 0 .07rem; font-size: max(.11rem, 8px); letter-spacing: .1em; border: 1px solid var(--line-3); color: var(--text-lo); }
+.al-kind.is-core { border-color: var(--mint-600); color: var(--mint-400); background: rgba(78, 216, 175, .08); }
+
+/* ---- detail column ---------------------------------------------------------------------- */
+/* NB: padding on the disc must be *fixed*, never a percentage — a % resolves against the *detail column*
+   (≈350px), which blows the content box up and squeezes the icon to 0×0 (the grey square bug, 2026-10-06). */
+.al-detail__disc { display: grid; place-items: center; background: #1b201e; }
+.al-detail__disc img { object-fit: contain; padding: max(.12rem, 7px); }
+.al-detail__disc.is-core { border-color: var(--mint-600); box-shadow: inset 0 0 0 1px rgba(78, 216, 175, .25); }
+/* the strategy art is a 180×180 bust: `BandIcon size="xl"` is 2.2rem (132 px), and the `.eq-detail__art` frame
+   clips it to 66 px ⇒ only a corner of the face survived. Fill the frame instead — a square source + cover means
+   the whole bust, as large as the frame allows. */
+.al-detail__disc--band .bandicon { --bi: 100%; width: 100%; height: 100%; display: block; }
+.al-detail__disc--band .bandicon img { width: 100%; height: 100%; object-fit: cover; padding: 0; border-radius: 0; }
+.al-detail__hp { margin-left: auto; }
+
+/* 层数行：官方八角图标（TierChip）+ 需要的人数 */
+.al-layerrow { display: grid; grid-template-columns: max(1.1rem, 64px) 1fr; gap: .1rem; align-items: start; padding: .05rem 0; border-top: 1px dashed var(--line-1); }
+.al-layerrow:first-of-type { border-top: 0; }
+.al-layerrow.is-base { opacity: .92; }
+.al-layer { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: .02rem; padding: .03rem .06rem; border: 1px solid var(--line-3); background: rgba(0, 0, 0, .3); }
+.al-layer__icon { width: max(.34rem, 20px); height: max(.34rem, 20px); }
+.al-layer__k { font-family: var(--font-num); font-size: max(.15rem, 10px); font-weight: 900; letter-spacing: .06em; color: var(--mint-400); }
+.al-layer__n { font-size: max(.11rem, 8px); color: var(--text-dim); }
+.al-layer--0 .al-layer__k { color: var(--text-lo); font-weight: 700; }
+
+/* 相关装备 / 相关盟约 chips */
+.al-items { display: flex; flex-wrap: wrap; gap: .08rem; }
+.al-item { display: inline-flex; align-items: center; gap: .06rem; padding: .05rem .1rem .05rem .05rem; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .3); color: inherit; cursor: pointer; }
+.al-item:hover { border-color: var(--mint-500); }
+.al-item__icon { width: max(.3rem, 18px); height: max(.3rem, 18px); object-fit: contain; }
+.al-item__name { font-size: max(.15rem, 10px); color: var(--text-md); }
+.al-bondchip { display: inline-flex; align-items: center; gap: .06rem; padding: .04rem .1rem; font-size: max(.15rem, 10px); color: var(--text-lo); border: 1px solid var(--line-2); }
+.al-bondchip.is-core { color: var(--mint-400); border-color: var(--mint-800); background: rgba(78, 216, 175, .07); }
+.al-bondchip__icon { width: max(.2rem, 12px); height: max(.2rem, 12px); object-fit: contain; }
+
+/* 成员 list: a compact grid of thumb + name + tier */
+.al-members { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(1.7rem, 104px), 1fr)); gap: .06rem; }
+.al-member { position: relative; display: flex; align-items: center; gap: .06rem; padding: .03rem .05rem; border: 1px solid transparent; background: rgba(0, 0, 0, .22); }
+.al-member:hover { border-color: var(--line-2); }
+.al-member__name { flex: 1; min-width: 0; overflow: hidden; font-size: max(.15rem, 10px); color: var(--text-md); white-space: nowrap; text-overflow: ellipsis; }
+/* the row carries the standalone 阶级 chip, so the thumb's own mini badge would double it */
+.al-member .uthumb__tier { display: none; }
+.al-member .tier { width: max(.28rem, 17px); height: max(.28rem, 17px); }
+/* 本局禁用（开局 BAN）：成员照常列出，右上角打叉 + 头像压暗（用户 2026-10-12） */
+.al-member[data-banned="1"] { background: var(--red-a20); border-color: rgba(231, 49, 24, .45); }
+.al-member[data-banned="1"] .uthumb { filter: grayscale(1) brightness(.62); }
+.al-member[data-banned="1"] .al-member__name { color: var(--text-dim); text-decoration: line-through; }
+.al-member__ban { position: absolute; top: -.04rem; right: -.04rem; display: grid; place-items: center;
+  width: max(.24rem, 15px); height: max(.24rem, 15px); border-radius: 50%;
+  background: var(--red); color: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); }
+.al-member__ban .icon { width: 72%; height: 72%; }
+/* 龙门：本局被随机强化的干员 —— 左上角绿勾 */
+.al-member.is-enhanced { border-color: rgba(60, 200, 120, .55); background: rgba(40, 170, 100, .18); }
+.al-member__enh { position: absolute; top: -.05rem; left: -.05rem; display: grid; place-items: center;
+  width: max(.26rem, 16px); height: max(.26rem, 16px); border-radius: 50%;
+  background: var(--green, #2fbf71); color: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .55); z-index: 2; }
+.al-member__enh .icon { width: 74%; height: 74%; }
+/* 完整强化：徽章带百分比标签（用户 2026-10-16「怎么知道是谁加成了什么」）——勾在左，数字跟在右边 */
+.al-member.is-enhanced .al-member__enh { width: auto; min-width: max(.26rem, 16px); height: max(.24rem, 15px);
+  border-radius: max(.12rem, 8px); padding: 0 max(.05rem, 3px); gap: 2px; grid-auto-flow: column; }
+.al-member__pct { font-size: max(.13rem, 9px); font-weight: 700; letter-spacing: 0; white-space: nowrap; }
+/* 部分强化：拿 (25+层数×0.1)% / (50+层数×0.2)% 的那批非强化干员 —— 只在行内右侧挂一枚金色百分比，不占角标 */
+.al-member.is-partial { border-color: rgba(255, 198, 0, .32); background: rgba(255, 198, 0, .09); }
+.al-member__enh--part { position: static; width: auto; height: auto; border-radius: max(.1rem, 6px);
+  padding: 0 max(.04rem, 2px); background: rgba(255, 198, 0, .2); color: var(--gold);
+  font-size: max(.12rem, 9px); font-weight: 700; white-space: nowrap; box-shadow: none; }
+
+/* 「本局强化」明细面板（龙门强化：谁 / 强化哪一项 / 多少 / 自选还是随机） */
+.al-enh { display: grid; gap: .06rem; }
+/* 诗怀雅【天选明星】是玩家自选，与随机区分（用户 2026-10-16「策略诗怀雅是自选的」） */
+.al-enh .eq-eff__micro { margin-left: auto; }
+.al-enh__origin { flex: none; padding: 0 max(.05rem, 3px); border-radius: max(.1rem, 6px);
+  background: rgba(255, 255, 255, .08); color: var(--text-dim);
+  font-size: max(.11rem, 9px); font-weight: 700; letter-spacing: .02em; cursor: help; }
+.al-enh__origin.is-chosen { background: var(--mint-a20); color: var(--mint-400); }
+.al-enh__row { display: flex; align-items: baseline; gap: .07rem; padding: .05rem .06rem;
+  background: rgba(0, 0, 0, .22); border-left: 2px solid transparent; }
+.al-enh__row:has(.is-full) { border-left-color: var(--green, #2fbf71); }
+.al-enh__row:has(.is-part) { border-left-color: var(--gold); }
+.al-enh__tag { display: inline-flex; align-items: center; gap: 2px; flex: none;
+  padding: 0 max(.05rem, 3px); border-radius: max(.1rem, 6px);
+  font-size: max(.12rem, 9px); font-weight: 700; white-space: nowrap; }
+.al-enh__tag.is-full { background: rgba(47, 191, 113, .22); color: var(--green, #2fbf71); }
+.al-enh__tag.is-full .icon { width: max(.12rem, 10px); height: max(.12rem, 10px); }
+.al-enh__tag.is-part { background: rgba(255, 198, 0, .16); color: var(--gold); }
+.al-enh__body { min-width: 0; font-size: max(.14rem, 11px); color: var(--text-md); line-height: 1.5; }
+.al-enh__body b { color: var(--text-hi); font-weight: 700; }
+.al-enh__body b.num { color: var(--gold-2); }
+.al-member-note { display: flex; align-items: center; gap: .05rem; margin: .08rem 0 0;
+  font-size: max(.14rem, 10px); color: var(--text-dim); }
+.al-member-note .icon { color: var(--red-premium); flex: none; }
+
+/* ---- phones ----------------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  .al-layerrow { grid-template-columns: max(.92rem, 54px) 1fr; }
+  .al-members { grid-template-columns: repeat(auto-fill, minmax(max(1.5rem, 92px), 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) { .al-item, .al-member { transition: none; } }

@@ -1,0 +1,39 @@
+# 3001（联盟服 / 无尽模式）线上代码
+# 这是 ECS 101.132.104.41:3001 上运行代码的本地完整副本。
+
+# ---- 依赖与构建产物 ----
+node_modules/
+.pnpm-store/
+
+# ---- 游戏素材：版权归原权利人，不入库（部署时由共享目录提供）----
+public/assets/
+public/fonts/
+public/vendor/
+data/assets.json
+data/local-assets.json
+data/local-fx.json
+
+# ---- 运行时缓存 ----
+.cache/
+*.log
+logs/
+
+# ---- 测试 / 调试残留 ----
+.playwright-cli/
+_layertest/
+_verify/
+_merge/
+_akdata/
+_amiya_kv_backup/
+test/
+
+# ---- 临时脚本 ----
+_fix-desc-placeholders.mjs
+_t40.cjs
+_t41.cjs
+
+# ---- 本机密钥与配置 ----
+plugins/.studio-key
+plugins/config.json
+.env
+scripts/service.env.cmd
