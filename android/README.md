@@ -1,24 +1,19 @@
-# 安卓包（内置素材 · 一键启动）
+# 安卓包：本地美术、服务器更新
 
-点开即玩的安卓版：**素材全部在 APK 里，只有 `/ws` 与 `/api/*` 出网**。
-它是 Windows 便携包 `SP_PROXY_TO`（`scripts/launcher.mjs --mode proxy`）在安卓上的等价物，
-客户端代码一行都没改——页面以为自己在跟一台普通服务器说话。
+2026-10-17 修复版保持同一应用 ID 和正式签名，构建版本码提升为 302，可覆盖安装上一包。
 
-## 它怎么工作
+- 页面、JS、CSS、游戏数据、战斗模拟、插件与健康检查从选中的服务器加载；公告和联机同样走服务器。服务器更新后重新打开页面即可获取更新，不必为游戏代码重新安装 APK。
+- APK 内置美术、字体、语音、音乐、3D 场景及官方特效；`/data/local-assets.json`、`/data/local-fx.json` 使用包内清单。
+- 正确解析 `/assets/~哈希/…`、`/fonts/~哈希/…`、`/media/~哈希/…`。本地文件与请求哈希一致才使用；缺失或哈希不同则从服务器加载，避免返回错误版本的素材。
+- 不再在联网失败时使用旧的包内游戏代码，避免新旧战斗协议混用。此包需要联网，不能离线进行对局。
+- 主服为 http://101.132.104.41:3000，保留设置中的切服功能。
+- WebView 关闭旧响应缓存，游戏代码更新跟随服务器；本地存储中的玩家设置和身份保留。
 
-```
-WebView  http://127.0.0.1:<随机端口>/
-   │
-   ├─ /  /js  /css  /data  /shared  /sim  /assets  /vendor  /fonts   ← 手机本地（解包后的 www/）
-   ├─ /data.js   /media/…   /healthz                                 ← 本机应答
-   ├─ /api/*     → 反代 https://<upstream>                           ← 只有这两条出网
-   └─ /ws        → WebSocket 反代 wss://<upstream>
-```
+构建前运行 `node android/make-www.mjs`，随后用 JDK 21、Gradle 8.7 和 Android SDK 34 构建 `:app:assembleRelease`。签名从已忽略的 `android/keystore.properties` 读取，勿公开口令。版本码必须高于上一包。
 
-- `WwwInstaller.kt` 首次启动把 `assets/www.zip` 解到 `filesDir/www/`，用 `BuildConfig.VERSION_CODE`
-  做标记，升级后自动重解。
-- `LocalServer.kt` 就是那台"本机服务器"（Ktor CIO）。**它不依赖 `android.*`**，所以能原样跑在
-  JVM 单元测试里，见 `app/src/test/.../LocalServerTest.kt`（11 例，含真实连线上服务器拿 `welcome`）。
+首次启动会解压内置资源，需要额外存储空间。服务器以后新增或修改的素材可能需要联网下载；只有 APK 内已有且匹配的素材才能从本地直接加载。
+
+包内保留 LICENSE、NOTICE.md 与 THIRD-PARTY-NOTICES.md。素材版权归原权利人，严禁盈利。
 
 ### 为什么素材打成一个 zip 而不是直接当 AGP assets
 
@@ -34,8 +29,8 @@ AGP 的 `assets.srcDirs` 是把多个目录的**内容**并到同一层，而这
 # 1) 生成内置素材包（读仓库根的 public/ data/ shared/ server/sim/ + 三份声明 → about/）
 node android/make-www.mjs
 
-# 2) 构建（会一并跑 JVM 单元测试）
-JAVA_HOME=<jdk21> ANDROID_HOME=<sdk> gradle -p android :app:testDebugUnitTest :app:assembleRelease
+# 2) 构建（单元测试按需另跑）
+JAVA_HOME=<jdk21> ANDROID_HOME=<sdk> gradle -p android :app:assembleRelease -PSP_VERSION_CODE=302 -PSP_VERSION_NAME=0.3.0-android.2
 ```
 
 产物：`android/app/build/outputs/apk/release/app-release.apk`。
@@ -49,7 +44,7 @@ JAVA_HOME=<jdk21> ANDROID_HOME=<sdk> gradle -p android :app:testDebugUnitTest :a
 
 ### 签名
 
-密钥库在仓库外：`F:/android-keystore/stronghold.jks`（口令见 `gradle.properties`）。
+密钥库在仓库外：`F:/android-keystore/stronghold.jks`（口令只从环境变量或已忽略的 `keystore.properties` 读取）。
 没这个文件时会退回 debug 签名，仍可侧载但不适合分发。
 
 > ⚠️ **务必备份这个 jks**。丢了就再也无法给已安装的用户发更新，只能让他们卸载重装。
@@ -66,9 +61,9 @@ JAVA_HOME=<jdk21> ANDROID_HOME=<sdk> gradle -p android :app:testDebugUnitTest :a
 
 ## 已知限制
 
-- APK 约 310 MB，只能侧载（Google Play 单包上限 200 MB）。首次解包后占用约 400 MB，
-  加上安装包共约 700 MB。
-- 首次启动需要解包 8500+ 个文件，约 10–60 秒。
+- 本次 APK 约 804 MB，只能侧载（Google Play 单包上限 200 MB）。首次解包后占用约 1.1 GB，
+  加上安装包需要约 2 GB 可用空间。
+- 首次启动需要解包约 32000 个文件，约 10–60 秒。
 - 启动界面左下角有一行**诊断信息**（正常 10 秒后自动收起，出错留 30 秒，点一下可立即收起，
   点右下角构建标识可叫回来）。联机出问题时它会把异常链直接写在屏幕上——这一条是爬了四轮坑换来的：
   先有可观测性，再谈修 bug。

@@ -43,28 +43,13 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLDecoder
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * App 内的本地服务器：**静态部分全部来自本机磁盘，只有 /ws 与 /api/… 出网**。
- *
- * 这就是 Windows 便携包 `SP_PROXY_TO` 那条反代（scripts/launcher.mjs 模式 2 / server/index.js proxyTo）
- * 在安卓上的等价物 —— 页面与素材一个字节都不走网络，客户端代码一行都不用改，因为它以为自己在跟一台
- * 普通服务器说话（同源，没有 CORS，没有跨域 Cookie 问题）。
- *
- * 与线上 Node 服务器的对应关系（server/index.js createStaticHandler）：
- *   /            → www/index.html、js/、css/、assets/…     本机
- *   /data/       → www/data/                                本机
- *   /shared/     → www/shared/                              本机
- *   /sim/        → www/sim/                                 本机
- *   /data.js     → www/data.js（浏览器替身，构建时写进 zip）  本机
- *   /media/…     → www/assets/audio/…（省扩展名的音频路由）   本机
- *   /healthz     → 本机应答（build 标记必须稳定，见下）       本机
- *   /api/…       → 反代到线上                               出网
- *   /ws          → WebSocket 反代到线上                      出网
- *
- * `/healthz` 故意**不**转发：它报的 build 标记是 buildGuard 拿来和页面比对的东西
- * （public/js/ui/buildGuard.js）。只要这个标记在同一个 APK 内恒定，页面就不会误判自己过期而反复刷新；
- * 转发线上的标记反而会在两边版本不一致时把玩家页面刷掉。
+ * Local art gateway: application code, game data, health and multiplayer follow the selected server.
+ * Bundled art uses the server's content hash when supplied; missing or changed files use the server.
+ * Never fall back to bundled application code: it may disagree with the live battle protocol.
  */
 class LocalServer(
     private val wwwDir: File,
@@ -289,35 +274,53 @@ class LocalServer(
         }
     }
 
-    /**
-     * 分发（本扩展的「联机（本机客户端）」模式）。
-     *
-     *   · `/api/app-server`              → 本机自己答（App 专有能力，线上服务器没有也不该有）
-     *   · 其余 `/api/…`                   → 转发中心服务器（公告、在线人数…）
-     *   · `/assets/`、`/media/`（含子路径） → **本机 www**（美术 / 音频，体积大，走本地最快）
-     *   · `/data/local-assets.json`       → 本机 www（它描述的正是 www 里那份素材，不能换成线上那份）
-     *   · 其余全部                        → **转发中心服务器**（页面 / js / css / data / shared / sim / vendor / healthz …）
-     *
-     * 最后一条是「让玩家只下载一次」的关键：客户端代码永远和服务器同版本，APK 只在改壳时才需要重发。
-     * 上游不可达时回退本机 www —— 离线至少能进到「正在重连」界面而不是一片空白；页面与 /healthz 会一起
-     * 回退（同一份 build），客户端的 buildGuard 不会误判成需要刷新。`/api/…` 是实时数据，不回落。
-     */
+    /** Only bundled art and notices are local; all application routes follow the live server. */
     private suspend fun dispatch(call: ApplicationCall) {
-        val uri = call.request.uri                 // 路径 + 查询串
+        val uri = call.request.uri
         val path = uri.substringBefore('?')
         when {
-            // App 专有接口：游戏设置面板里的「服务器」用它读当前选中的服务器、并在玩家切换时
-            // 把选择写回 App（写成功即由 App 重启，页面会被重载到新服务器）。
-            // 线上服务器没有这条路由，所以网页版请求它一定 404 —— 前端正是靠这个判断
-            // 「我在 App 里吗」，不给纯浏览器玩家显示一个切了也没用的选项。
             path == APP_SERVER_PATH -> appServerRoute(call, uri)
-            path.startsWith("/api/") -> proxyApi(call, uri)
-            path.startsWith("/assets/") -> serveStatic(call, path)
-            // 包内自带的 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md（上游没有这个路径）
             path.startsWith("/about/") -> serveStatic(call, path)
-            path.startsWith("/media/") -> serveMedia(call, path)
-            path == "/data/local-assets.json" -> serveStatic(call, path)
-            else -> if (!proxyUpstream(call, uri)) serveStatic(call, path)
+            path == "/data/local-assets.json" || path == "/data/local-fx.json" -> serveStatic(call, path)
+            path.startsWith("/assets/") || path.startsWith("/fonts/") || path.startsWith("/media/") -> {
+                val localPath = path.replaceFirst(Regex("^/(assets|fonts|media)/~[0-9a-f]{16}/"), "/$1/")
+                val hash = Regex("^/(?:assets|fonts|media)/~([0-9a-f]{16})/").find(path)?.groupValues?.get(1)
+                val file = bundledArt(localPath, hash)
+                if (file != null) {
+                    call.response.headers.append(HttpHeaders.CacheControl, "no-cache")
+                    call.respondFile(file)
+                } else proxyApi(call, uri)
+            }
+            else -> proxyApi(call, uri)
+        }
+    }
+
+    private val artHashes = ConcurrentHashMap<String, String>()
+
+    /** Resolve only inside www, and check hashed URLs against actual local bytes. */
+    private fun bundledArt(path: String, expectedHash: String?): File? {
+        val decoded = try { URLDecoder.decode(path, "UTF-8") } catch (_: Exception) { return null }
+        if (decoded.contains('\u0000')) return null
+        val root = wwwDir.canonicalPath + File.separator
+        val candidates = if (decoded.startsWith("/media/")) {
+            val relative = decoded.removePrefix("/media/")
+            val base = File(wwwDir, "assets/audio/$relative")
+            listOf(base) + AUDIO_EXTS.map { File(wwwDir, "assets/audio/$relative$it") }
+        } else listOf(File(wwwDir, decoded.trimStart('/')))
+        return candidates.firstOrNull { file ->
+            file.canonicalPath.startsWith(root) && file.isFile &&
+                (expectedHash == null || artHashes.getOrPut(file.canonicalPath) {
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    file.inputStream().buffered().use { input ->
+                        val buffer = ByteArray(65536)
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            digest.update(buffer, 0, n)
+                        }
+                    }
+                    digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }.take(16)
+                } == expectedHash)
         }
     }
 

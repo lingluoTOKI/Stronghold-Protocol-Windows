@@ -1,10 +1,35 @@
 # 卫戍协议：盟约 · Stronghold Protocol: Alliance
 
-《明日方舟》季节性自走棋塔防玩法「卫戍协议：盟约」的**非官方同人复刻**：浏览器即开即玩，单人或 1–4 人联机合作。
+《明日方舟》季节性自走棋塔防玩法「卫戍协议：盟约」的**非官方同人复刻**：浏览器即开即玩，单人或最多 6 人联机合作。
 
 ![version](https://img.shields.io/badge/version-0.3.0-2ea44f)
 ![license](https://img.shields.io/badge/code%20license-GPL--3.0--or--later-blue)
 ![node](https://img.shields.io/badge/node-22%20%7C%2024-339933)
+
+## 2026-10-17 更新：上游修复与安卓本地素材
+
+本轮已由维护者确认测试通过。上游基线从 `c24e17ee` 后续同步至 `6ab2468279e926d107788f63d7fe219b85f67b4a`；相对同步前分支新增 **16 个提交、24 个文件改动**，无合并冲突。上游提交标题中的 0.3.1 属于开发中的兼容修复，本版不冒称正式 0.3.1 发布。
+
+### 上游 16 个提交的更新内容
+
+- 插件作者测试：预加载模块使用 `file://` URL，避免 Windows 盘符被误认为模块协议；显式使用 Node spec 报告，终端、重定向和不同 Node 版本输出一致。
+- 测试入口：`npm test` 与 CI 仅运行明确列出的测试文件，不再把 `test/` 下的辅助模块、子进程入口及 Forge 夹具作为独立测试执行；同步维护文档和测试列表一致性断言。
+- 跨平台兼容：Forge 语言别名测试覆盖区分大小写的文件系统；浏览器加载测试在 Windows 也正确排除 `nodeData.js`；Docker 上下文检查兼容 CRLF / LF。
+- 子进程与工作台：SIGKILL 上限探测先确认子进程进入准备阶段；看门狗断言检查子进程确实退出；忽略 SIGTERM 的探测用例给予 12 秒准备时间。
+- 异步等待：战斗运行器内容加载测试使用与模拟刷新一致的 `setImmediate`；插件房间启动、首个对局状态、插件设置与内容就绪等待上限改为 20 秒；大厅限流测试单次往返上限改为 10 秒，并区分正常丢弃请求与超额洪泛。
+- CI 配置：测试任务超时从 25 分钟调整为 40 分钟；修正文档注释及脚本排版。
+- 本轮未修改 `server/sim/`、`data/` 或官方渲染。六人房、悬赏与信标、BAN 补偿、倍速和平滑倒计时、跳过、聊天、公告、在线人数、匹配、监控、PC / 安卓联机均保留。
+
+### 安卓修复包 0.3.0-android.2（versionCode 302）
+
+- 修复 `/assets/~哈希/…`、`/fonts/~哈希/…`、`/media/~哈希/…` 本地路径解析。带哈希的请求核对本地文件 SHA-256 前 16 位，一致才使用；缺失或不匹配时从服务器获取。
+- 美术、字体、语音、音乐、3D 场景及官方战斗特效优先使用内置文件；本地场景与特效清单对应包内素材，包含 12,534 个特效文件、137 个场景文件及 7 个字体文件，两个清单引用均无缺失。
+- 页面、JS、CSS、规则数据、战斗模拟、插件、健康状态、公告及联机来自所选服务器，避免旧 APK 游戏逻辑与新服务器混用。WebView 不复用旧响应缓存，服务器更新后重新打开页面即可获取代码更新；服务器不可达时不回退过期游戏代码。
+- 主服 `http://101.132.104.41:3000`，保留切服功能。新增或变更的素材可能仍需联网；本包不是离线单机版。
+- 沿用上一包的正式签名及应用 ID，版本码由 301 提升至 302，可覆盖安装；APK 约 806 MiB，首次解压后额外占用约 1.1 GiB。
+- 本地安装包：`dist/StrongholdProtocol-0.3.0-20261017-android-local-art.apk`（不入 Git）；SHA-256：`11996a68e3f623a582d9c2b8e4251385f46c18fb69669664c623397e518109c5`。构建和签名校验通过，真机与游戏验收由维护者完成。
+
+本轮公告保留历史条目。部署保留服务器 `node_modules`、`public/assets`、字体、提取清单、插件及运行配置，不上传 APK / 美术文件；完成后核对服务健康与公告接口。
 
 ## 声明
 
@@ -295,7 +320,7 @@ npm start          # 启动服务器：http://localhost:3000
 
 ```bash
 npm run dev                 # node --watch：改动服务器代码后自动重启
-node --test                 # 单元 + 集成测试（约 3170 项；缺少素材 / 浏览器的用例会自动跳过）
+npm test                    # 单元 + 集成测试（约 3170 项；缺少素材 / 浏览器的用例会自动跳过；不带文件的 node --test 会把 test/ 下的辅助模块和夹具也当测试跑）
 SP_E2E=1 node --test test/ui/mock.e2e.test.js        # 浏览器端到端测试，需要本机 Chrome（CHROME_PATH 可指定路径）
 SP_REAL_E2E=1 node --test test/ui/real.e2e.test.js   # 需要 Chrome + 已下载的素材
 RENDER_E2E=1 node --test 'test/render/*.browser.test.js'   # 渲染测试，部分需要本地提取的棋盘贴图
@@ -306,7 +331,7 @@ node tools/perfbench.mjs --cpu 1,4,6 --profile             # 真实战斗的帧�
 - 游戏数据由 `npm run build-data`（`tools/build-data.mjs`）从官方数据表生成，不要手工修改 `data/*.json`。
 - 性能测试：`/dev/battle-perf.html` 在浏览器里跑一场真实战斗（对局用的战斗运行器、模拟和渲染），实时显示帧率与逐帧耗时；在手机上打开后点击「开始测量（10 秒）」，生成的报告可以复制后附在反馈中。用到的战斗来自 `node tools/capture-specs.mjs` 从固定种子的机器人对局里截取的数据（`public/dev/perf/`）。
 - 只重构、不改玩法的提交不能改变 `test/golden/*.json`；有意改变玩法时运行 `npm run golden:update`，检查差异后随改动一起提交（见 [test/golden/README.md](test/golden/README.md)）。
-- GitHub Actions（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 Ubuntu 与 Windows、Node 22 / 24 上运行 `npm ci`、`node --test` 和服务器冒烟测试。
+- GitHub Actions（[.github/workflows/ci.yml](.github/workflows/ci.yml)）在 Ubuntu 与 Windows、Node 22 / 24 上运行 `npm ci`、`npm test` 和服务器冒烟测试。
 - 代码怎么分层、改某个规则该从哪个文件入手，见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## 项目结构
@@ -343,7 +368,7 @@ node tools/perfbench.mjs --cpu 1,4,6 --profile             # 真实战斗的帧�
 欢迎提 Issue 反馈 bug、与官方规则不一致的地方或改进建议，也欢迎提交 Pull Request：
 
 - 准备环境、运行测试、忠实原则和提交约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-- 提交前请运行 `node --test`，并同步更新相关文档；文档使用简体中文，代码与注释使用英文。
+- 提交前请运行 `npm test`，并同步更新相关文档；文档使用简体中文，代码与注释使用英文。
 - 提交的代码将以 GPL-3.0-or-later 发布。
 - 请不要提交任何游戏素材文件（`public/assets/` 等目录已被 `.gitignore` 排除）。
 - 本项目坚持非商业：请不要提交广告、付费、打赏等任何形式的变现功能。

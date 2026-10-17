@@ -33,17 +33,15 @@ import kotlinx.coroutines.launch
  * 不给裸 IP 发证书，所以裸 IP 走不了 HTTPS。
  */
 object ServerHosts {
-    const val MAIN = "https://game.lingluotoki.dpdns.org"
+    const val MAIN = "http://101.132.104.41:3000"
     const val COVENANT = "http://101.132.104.41:3001"
     const val BACKUP = "http://116.62.39.28:3000"
     val ALL = listOf(MAIN, COVENANT, BACKUP)
 }
 
 /**
- * 唯一的界面：先把内置素材解出来、在本机起服务，再把 WebView 指向 http://127.0.0.1:<port>/。
- *
- * 「一键启动」的就是这一条路径：点图标 → 解包（仅首次）→ 进游戏。素材来自手机本地，
- * 只有 /ws（对局）与 /api/…（公告、在线人数）走网络。
+ * Extract bundled art, then open a loopback gateway in WebView.
+ * Art stays local while application code and multiplayer follow the selected upstream.
  */
 class MainActivity : Activity() {
     companion object {
@@ -405,23 +403,8 @@ class MainActivity : Activity() {
     }
 
     private fun renderDiag(problem: Boolean) {
-        runOnUiThread {
-            val parts = listOfNotNull(diagProbe, diagConsole)
-            if (parts.isEmpty()) return@runOnUiThread
-            diag.text = parts.joinToString("\n").take(600) + "\n（点这一条可立刻收起）"
-            diag.visibility = View.VISIBLE
-            diag.bringToFront()
-
-            diagHide?.let { diag.removeCallbacks(it) }
-            val hide = Runnable { diag.visibility = View.GONE }
-            diagHide = hide
-            diag.postDelayed(hide, if (problem) DIAG_PROBLEM_HIDE_MS else DIAG_OK_HIDE_MS)
-
-            diag.setOnClickListener {
-                diagHide?.let { diag.removeCallbacks(it) }
-                diag.visibility = View.GONE
-            }
-        }
+        // 屏幕诊断行已按要求隐藏：错误只写进 logcat（adb logcat 可查），不再弹到玩家屏幕上。
+        runOnUiThread { diag.visibility = View.GONE }
     }
 
     /** 界面与错误里显示的构建标识。 */
@@ -462,7 +445,8 @@ class MainActivity : Activity() {
             } catch (t: Throwable) {
                 Log.e(TAG, "启动失败", t)
                 progress.visibility = View.GONE
-                status.text = "启动失败：${t.message}\n\n${buildStamp()}\n请把这一屏截图反馈。"
+                // 不把技术异常链暴露给玩家：只给简洁提示，详细错误只在 logcat。
+                status.text = "启动失败，请检查网络后\n重新打开本应用。"
             }
         }
     }
@@ -575,7 +559,7 @@ class MainActivity : Activity() {
             mediaPlaybackRequiresUserGesture = false       // BGM 与干员语音
             allowFileAccess = false
             allowContentAccess = false
-            cacheMode = WebSettings.LOAD_DEFAULT
+            cacheMode = WebSettings.LOAD_NO_CACHE
             // 忽略系统「字体大小 / 显示大小」的无障碍缩放：否则文字被放大后布局会挤爆
             // （结算页的返回按钮被挤出视口之类），这也是玩家反馈「字好大」的来源。
             textZoom = 100
@@ -607,8 +591,43 @@ class MainActivity : Activity() {
             }
         }
         w.webViewClient = object : WebViewClient() {
+            /** 加载出错（断网/本地服务未就绪）：不显示系统默认的 net::ERR 错误页，用深色遮罩盖住，点击重试。 */
+            override fun onReceivedError(
+                view: WebView?, request: android.webkit.WebResourceRequest?,
+                error: android.webkit.WebResourceError?,
+            ) {
+                super.onReceivedError(view, request, error)
+                // 只处理主框架的错误；子资源（图片/字体/素材）失败不打断游戏。
+                if (request?.isForMainFrame != true) return
+                val v = view ?: return
+                Log.w(TAG, "页面加载失败（已隐藏系统错误页）: ${error?.description}")
+                runOnUiThread {
+                    // loading 是不透明深色面板，盖住 WebView 的系统错误页；点击后重新加载。
+                    loading.setBackgroundColor(BG)
+                    status.text = "网络连接中…\n\n轻触此处重试"
+                    status.setOnClickListener {
+                        status.setOnClickListener(null)
+                        status.text = "正在准备…"
+                        (loading.parent as? ViewGroup)?.removeView(loading)
+                        v.reload()
+                    }
+                    if (loading.parent == null) {
+                        root.addView(
+                            loading,
+                            FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                            ),
+                        )
+                        loading.bringToFront()
+                    }
+                }
+            }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                // 页面正常加载完成后撤掉错误遮罩（如果还在）
+                if (loading.parent != null) {
+                    (loading.parent as? ViewGroup)?.removeView(loading)
+                }
                 // 页面就绪后探一次 WebGL —— 简化视图最常见的原因就是它不可用
                 view?.evaluateJavascript(WEBGL_PROBE_JS) { raw ->
                     val text = raw?.trim()?.removeSurrounding("\"")?.replace("\\n", " ") ?: "(no result)"
