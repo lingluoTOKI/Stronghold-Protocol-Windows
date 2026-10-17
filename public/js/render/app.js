@@ -193,7 +193,11 @@ export async function createFieldView(host, options = {}) {
   signal?.throwIfAborted();
   const assets = resolveAssets(opts.assets);
   const data = makeData(opts.data);
-  const settings = { damageNumbers: true, officialDamageNumbers: false, ammoCount: false, mysticEnergy: false, officialFx: 'auto', quality: 'high', brightness: true, warmth: 0.5, ...(opts.settings || {}) };
+  // 地图亮度档（mod maplight）：null = 0.3.0 官方原始档（默认），true = mod「亮」档，false =「暗」档。
+  // 默认必须是 null，不能是 true ——「亮」档把 key 提到 5.84 / hemi 提到 6.455（官方的 2.2× / 10.8×），
+  // 会把 0.3.0 的 PBR 反射、法线与光照细节全部冲成一片死白（board3d/scene.js 的 LIGHTING 注释也写了这一点）。
+  // 设置界面的 MAP_BRIGHT 三档同样是 [null 官方, true 亮, false 暗]，用户可自行切换。
+  const settings = { damageNumbers: true, officialDamageNumbers: false, ammoCount: false, mysticEnergy: false, officialFx: 'auto', quality: 'high', brightness: null, warmth: 0.5, ...(opts.settings || {}) };
   // the 3D board (three.js + the official art) loads in parallel with everything else
   const boardPref = boardPreference(opts.board);
   const want3d = boardPref !== '2d' && webgl2Available(boardPref === '3d');
@@ -2184,7 +2188,9 @@ export async function createFieldView(host, options = {}) {
       if (typeof s.resolution === 'string' && RESOLUTION_MODES.includes(s.resolution)) settings.resolution = s.resolution;
       if (r !== settings.resolution) resize();
       // 地图亮度 / 冷暖度（mod maplight）：设置里改了就实时套到 3D 战场上（不重建几何/材质）
-      if (typeof s.brightness === 'boolean') settings.brightness = s.brightness;
+      // 亮度是**三档**：null = 官方 / true = 亮 / false = 暗。只判 boolean 会漏掉 null，
+      // 用户在设置里切回「官方」时不生效（会停在过曝的「亮」档）。
+      if (s.brightness === null || typeof s.brightness === 'boolean') settings.brightness = s.brightness;
       if (Number.isFinite(s.warmth)) settings.warmth = Math.max(0, Math.min(1, s.warmth));
       board3d?.setLighting?.({ brightness: settings.brightness, warmth: settings.warmth });
     },
