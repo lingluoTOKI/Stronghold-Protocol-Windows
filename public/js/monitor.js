@@ -103,6 +103,24 @@ async function adminFetch(svr, path){
 
 function dtToMs(v){ if(!v) return undefined; const d = new Date(v); return isNaN(d.getTime()) ? undefined : d.getTime(); }
 
+// ============ 服务器管理面板（折叠） ============
+// 公告编辑器与一键踢人默认收起，把首屏高度让给服务器状态与房间列表。
+// 展开状态记在 localStorage，刷新后保持；有未发布内容时不会自动收起。
+const MGMT_KEY = 'sp_monitor_mgmt_open';
+function setMgmt(open){
+  const box = $('mgmt'), bar = $('mgmtBar');
+  if(!box || !bar) return;
+  box.classList.toggle('is-open', !!open);
+  bar.setAttribute('aria-expanded', open ? 'true' : 'false');
+  try{ localStorage.setItem(MGMT_KEY, open ? '1' : '0'); }catch(e){}
+}
+function toggleMgmt(){
+  const box = $('mgmt');
+  setMgmt(!(box && box.classList.contains('is-open')));
+}
+// 页面加载时恢复上次的展开状态
+try{ if(localStorage.getItem(MGMT_KEY) === '1') setMgmt(true); }catch(e){}
+
 // ============ 公告编辑器 ============
 async function publishAnnounce(){
   const title = ($('annTitle').value || '').trim() || '服务器更新公告';
@@ -455,6 +473,31 @@ async function tick(){
 document.addEventListener('visibilitychange', ()=>{
   if(!document.hidden) tick();
 });
+
+// ============ 事件绑定（CSP 要求）============
+// 页面 CSP 是 `script-src 'self'`，**HTML 里的 onclick= 内联处理器会被直接拦截**
+// （控制台报 "Executing inline event handler violates the following Content Security Policy"），
+// 表现为所有按钮点了没反应——包括「保存」token，于是 token 存不进 localStorage、刷新就丢。
+// 因此这里统一用 addEventListener 绑定，HTML 不再写任何 on* 属性。
+function bindUi(){
+  const on = (id, fn, ev) => { const el = $(id); if (el) el.addEventListener(ev || 'click', fn); };
+  on('btnSaveToken', saveToken);
+  on('ipModeBtn', toggleIpMode);
+  on('localTestBtn', toggleLocalTest);
+  on('btnPublish', publishAnnounce);
+  on('btnAnnClear', announceClearAll);
+  on('btnAnnReset', resetAnnounce);
+  on('btnKickAll', kickAll);
+  // 折叠面板：点击 + 键盘（Enter / Space）
+  const bar = $('mgmtBar');
+  if (bar) {
+    bar.addEventListener('click', toggleMgmt);
+    bar.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMgmt(); }
+    });
+  }
+}
+bindUi();
 
 renderIpMode();
 renderLocalTest();
