@@ -777,3 +777,57 @@ test('清理旧版本素材 deletes nothing when a served manifest cannot be rea
   }
 });
 
+test('导入过程中定期落盘索引，崩溃也不会把进度全丢掉', async () => {
+  // 改编版（2026-10-18）：索引原来只在 finally 里写一次 —— 浏览器崩溃 / 页面被杀 /
+  // 用户直接关标签页时 finally 根本不执行，索引永远停在「上次正常结束」的状态，
+  // 断点续传对「导到一半崩了」这个真实场景完全无效。
+  // 现在每导入 CHECKPOINT_EVERY(200) 个文件就落一次盘。这个用例锁住该行为。
+  const N = 550;  // 要跨过 CHECKPOINT_EVERY(500) 才看得到中途落盘
+  const map = {};
+  const body = { ui: {} };
+  const files = [];
+  for (let i = 0; i < N; i++) {
+    const rel = `assets/ui/x/f${i}.png`;
+    const raw = bytesOf(`content-${i}`);
+    map[rel] = hash16(raw);
+    body.ui[`f${i}`] = `/assets/ui/x/f${i}.png`;
+    files.push({ path: `public/${rel}`, read: async () => raw });
+  }
+  const view = rewriteManifest(body, 'assets.json', indexFor(map));
+  const { fetch } = manifestFetch(view.doc);
+
+  // 记录每一次写入的顺序，看索引是不是在中途就落了盘
+  const { caches, store } = memoryCache();
+  const order = [];
+  const wrapped = {
+    async open(name) {
+      const inner = await caches.open(name);
+      return {
+        async put(url, res) { order.push(String(url)); return inner.put(url, res); },
+        match: (u) => inner.match(u),
+        keys: () => inner.keys(),
+        delete: (u) => inner.delete(u),
+      };
+    },
+    async keys() { return caches.keys(); },
+    async delete() { return caches.delete(); },
+  };
+
+  const imp = createAssetImport({ fetch, caches: wrapped });
+  await imp.start({ type: 'files', files });
+
+  assert.equal(imp.get().phase, 'complete');
+  assert.equal(imp.get().accepted, N);
+
+  const indexWrites = order.filter((u) => u === IMPORTED_INDEX_URL);
+  const lastAssetWrite = order.map((u, i) => (u === IMPORTED_INDEX_URL ? -1 : i)).filter((i) => i >= 0).pop();
+  const firstIndexWrite = order.indexOf(IMPORTED_INDEX_URL);
+
+  assert.ok(indexWrites.length >= 2, `索引至少写了 2 次（中途 + 结束），实际 ${indexWrites.length} 次`);
+  assert.ok(firstIndexWrite >= 0 && firstIndexWrite < lastAssetWrite, '第一次写索引必须早于最后一个文件写入（中途落盘）');
+
+  // 落盘的内容确实是已导入的路径
+  const listed = await listImportedPaths(wrapped);
+  assert.ok(listed.size >= 200, `中途落盘的索引至少有 500 条，实际 ${listed.size}`);
+  assert.equal(store.size > 0, true);
+});

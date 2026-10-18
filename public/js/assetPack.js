@@ -712,10 +712,51 @@ export function createAssetImport({
         }
       }
 
+      // 改编版（2026-10-18）：断点续导 —— 开跑前先读缓存索引，
+      // 已经在缓存里的文件算作「已完成」，进度条从那里接着走，
+      // 而不是每次都从 0/34148 开始（玩家会以为又要重头导一遍）。
+      //
+      // alreadyStored：缓存里已有的 pathname（带前导 /）。
+      let alreadyStored = new Set();
+      try {
+        const ls = await listImportedPaths(cachesApi);
+        if (ls && typeof ls.has === 'function') alreadyStored = ls;
+      } catch { /* 读不到索引就当空的：最坏情况是重复导一遍，不影响正确性 */ }
+      /**
+       * 缓存里存的是 **带内容哈希的 URL 的 pathname**（putImportedAsset 用 spec.url 做 key，
+       * 如 /assets/~d4a90301d39bf6da/ui/entry/bkg_01.png），而 rel 是不带哈希的相对路径
+       * （assets/ui/entry/bkg_01.png）。拿 rel 直接拼 '/assets/...' 永远对不上 ——
+       * 之前的断点续导之所以没生效，就是这个。
+       *
+       * 这里先从 rel 找到 manifest 里的条目（spec.url / spec.alts[].url），
+       * 把它换算成 pathname 再去比对。
+       */
+      const pathnameOfUrl = (u) => { try { return new URL(u, 'http://localhost').pathname; } catch { return null; } };
+      const specOf = (rel) => plan.files.get(rel) || null;
+      /** 这个 rel 的任意一个可能 URL 已经在缓存里了吗。 */
+      const alreadyImported = (rel) => {
+        const spec = specOf(rel);
+        if (!spec) return false;
+        const urls = [spec.url, ...(spec.alts || []).map((a) => a.url)];
+        for (const u of urls) {
+          const pn = pathnameOfUrl(u);
+          if (pn && alreadyStored.has(pn)) return true;
+        }
+        return false;
+      };
+
       total = packByRel.size;
+      const outcome = new Set();
+      // 本次要处理的 rel 里，有多少已经躺在缓存里 —— 它们不用解压、不用算哈希，
+      // 直接计入 done，进度条一打开就是「已导入的那部分 / 全部」。
+      for (const rel of packByRel.keys()) {
+        if (!alreadyImported(rel)) continue;
+        outcome.add(rel);
+        done++;
+        accepted++;
+      }
       phase = 'importing';
       publish(true);
-      const outcome = new Set();
 
       // 改编版（2026-10-18）：导入不稳定（3 万个文件卡住 / 被杀）的两个根因 ——
       //
@@ -735,14 +776,6 @@ export function createAssetImport({
         await new Promise((r) => (typeof setTimeout === 'function' ? setTimeout(r, 0) : Promise.resolve().then(r)));
       };
 
-      // alreadyStored：缓存里已有的 pathname（带前导 /），用来跳过重复导入。
-      let alreadyStored = new Set();
-      try {
-        const ls = await listImportedPaths(cachesApi);
-        if (ls && typeof ls.has === 'function') alreadyStored = ls;
-      } catch { /* 读不到索引就当空的：最坏情况是重复导一遍，不影响正确性 */ }
-      /** rel（相对 public/ 的路径）在缓存里已经有了吗。 */
-      const alreadyImported = (rel) => alreadyStored.has('/' + rel.replace(/^\/+/, ''));
       const reads = new Map();
       const readRel = (rel) => {
         if (!reads.has(rel)) reads.set(rel, packByRel.get(rel).read());
@@ -763,7 +796,30 @@ export function createAssetImport({
         for (const url of urls) {
           try { storedPaths.add(new URL(url, 'http://localhost').pathname); } catch { /* not a URL: never stored */ }
         }
+        await checkpointIndex();
       };
+
+      /**
+       * 改编版（2026-10-18）：**定期**把已导入的 pathname 落进索引。
+       *
+       * 原来只在 finally 里写一次 —— 浏览器崩溃、页面被杀、用户直接关标签页时
+       * finally 根本不执行，索引永远停在「上一次正常结束」的状态。于是下次导入
+       * 什么都跳过不了，断点续传对「导到一半崩了」这个真实场景完全无效。
+       *
+       * 这里每导入 200 个文件落一次盘（写入是几毫秒的 JSON，摊到 200 个文件上
+       * 可以忽略）。崩溃后最多丢 200 个的进度，而不是几万个。
+       */
+      let lastCheckpointAt = 0;
+      // 每 500 个落一次。索引是「全量重写」（Cache Storage 只能整体替换一条），
+      // 频率太高写放大很可观：200 间隔时 3.4 万个文件要重写约 130 MB 索引，
+      // 500 间隔约 53 MB（相对 1.6 GB 素材约 3%）。崩溃最多丢 500 个的进度。
+      const CHECKPOINT_EVERY = 500;
+      async function checkpointIndex() {
+        if (!cache) return;
+        if (storedPaths.size - lastCheckpointAt < CHECKPOINT_EVERY) return;
+        lastCheckpointAt = storedPaths.size;
+        try { await addImportedPaths(cache, storedPaths); } catch { /* 下次再试 */ }
+      }
 
       for (const group of plan.groups) {
         if (cancelFlag) break;
