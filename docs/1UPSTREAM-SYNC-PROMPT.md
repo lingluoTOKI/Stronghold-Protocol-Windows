@@ -1,6 +1,14 @@
 # 上游同步提示词（每次上游更新时，把本文件全文发给 AI）
 
 > 用途：官服上游 `sganggs/Stronghold-Protocol` 发布新版本后，让 AI 把上游更新**完整同步**进本改编版，同时**一个不丢地保留**下列独有功能。直接复制下方分隔线之间的内容发送即可。
+>
+> **本文件三个部分**：
+> 1. `✂` 分隔线之间 —— **发给 AI 的提示词本体**（同步要求 + 执行流程）
+> 2. **附：当前基线快照** —— 上次同步到哪个 commit、冲突怎么解的、上游新增了什么机制
+> 3. **附二/三/四** —— 部署踩过的坑、部署流程、服务器架构速记（每次同步后都要回来看）
+>
+> 最后更新：2026-10-18（同步上游 0.3.1 之后）。服务器运维的完整交接见仓库外的
+> `交接文档-卫戍协议服务器.md`。
 
 ---
 
@@ -39,6 +47,18 @@
 9. **监控大屏 monitor.html**：按房间分组玩家、单人踢/一键踢全、三服务器切换、公告编辑器（发布/撤回强制公告）；对应服务端 `routes.js` 的 `/api/admin/*`（players/rooms/kick/kickall/**room/close**/announce/announce-clear，`SP_ADMIN_TOKEN` 鉴权）与 `/healthz` CORS。
     - **鉴权走 query 参数 `?token=`，不是 HTTP header**：用 header 测会得到 403，别误判成鉴权坏了。`/api/admin/room/close` 是 **GET** 且需 `code=<4位房间号>`（无 token 403 / code 非法 400 / 房间不存在 404 / 房内有人且无 `force=1` 则 409）。
     - **⚠️ 0.3.0 起 CSP 会拦内联脚本**：上游 0.3.0 加了严格 CSP（`script-src 'self' 'sha256-<importmap-hash>'`），monitor.html 的内联 `<script>` 会被浏览器直接拦截（页面打开但数字全 `--`）。**必须把 JS 抽到外部文件**（`public/js/monitor.js`），HTML 只留 `<script src="/js/monitor.js"></script>`。合并时若上游改动了 CSP 策略，注意别把这个外部化改回内联。
+    - **⚠️ CSP 也拦 `onclick=` 内联属性**（2026-10-18 踩过）：不只是 `<script>` 标签，HTML 元素上的 `onclick="saveToken()"` 这类内联事件处理器同样被拒绝执行，报
+      `Executing inline event handler violates the following Content Security Policy directive 'script-src …'`。
+      表现极隐蔽：页面显示正常，但按钮点了毫无反应——「保存 token」因此存不进 localStorage，刷新就丢。
+      **合并后必查**：`grep -c 'onclick=' public/monitor.html` 应为 0；事件统一在 `monitor.js` 的 `bindUi()` 里用 `addEventListener` 绑定。
+    - **运行保护面板的数据不在本项目里**：大屏上那两块「运行保护」（可用内存 / 本服占用 / 对局上限 / 无人房间）
+      来自服务器上的 `stronghold-control.service`（`/opt/stronghold-stability/control.py`，只监听 127.0.0.1:31998），
+      经 nginx 的两个精确路径 `/api/admin/stability` 与 `/api/admin/stability/control` 转发。
+      **不要在 `routes.js` 里重复实现**——nginx 的精确匹配会先命中 31998，写了也不会被调用（2026-10-18 白写过一次）。
+    - **「重启服务」按钮是本改编版加的**（运维层 README 明确「没有重启功能」）：`routes.js` 的
+      `GET /api/admin/restart`，需 `SP_ALLOW_RESTART=1`（在 `service.d/monitor-ops.conf`）才启用，否则 409；
+      先刷响应再 `process.exit(0)`，由 systemd `Restart=always` 拉起。**升级上游时 `routes.js` 被整份覆盖会把这段冲掉**，
+      2026-10-18 就丢过一次，合并后 grep 确认：`grep -c 'api/admin/restart' server/http/routes.js` 应为 1。
 10. **本机/PC/安卓联机脚本**：根目录 `本机当服务器.bat`、`启动游戏.bat`、`连接服务器.bat`（共 3 个 bat；含便携 node 探测、局域网共享）、`scripts/launcher.mjs`、`scripts/launch.mjs`、`scripts/make-windows-bundle.mjs`、`scripts/zipdir.mjs`、`tools/dist.mjs`、`scripts/launcher.config.json`。**联机（本机客户端）模式**：`server/http/proxy.js`（`SP_PROXY_TO` / `opts.proxyTo`：`/ws` 与 `/api/*` 反代中心服务器，页面与素材走本机磁盘，`/healthz` 不转发）+ `server/index.js` 接线 + `routes.js` / `websocket.js` 两条转发 + `launcher.mjs --mode proxy` + 打包 `--upstream` 生成的 `连接主服务器.bat`。**上游地址只从包内 `scripts/launcher.config.json` 的 `upstream` 读，不吃命令行 / URL 参数**（会话凭证按 origin 存）。
     - **⚠️ 监听地址铁律（曾经手滑改坏过）**：`scripts/launch.mjs` 必须保持 `host: process.env.HOST || '::'`，服务端 `server/http/config.js` 的 `DEFAULT_BIND_HOST = '::'`。**`'::'` 是双栈**，改成 `'0.0.0.0'` 会只收 IPv4、**IPv6 玩家连不上本机开的服**。合并后务必用 `Select-String scripts\launch.mjs -Pattern "env\.HOST \|\|"` 确认仍是 `'::'`。
 
@@ -70,21 +90,276 @@
 
 ## 附：当前基线快照（AI 核对用，会随版本过期，以实际 fetch 为准）
 
-- **最近一次同步：2026-10-16；上游 master 最新 = `c24e17ee`（0.3.0，2026-10-16）**，已合入分支 `sync/upstream-0.3.0`（合并提交 `56888798`，后续公告 `282ff2bf`、README `9101714a`、monitor CSP 修复 `4fc7c170`、兼容文档 `7e951110`），**已确认是改编版 HEAD 的祖先、上游 commit 零遗漏、零删除文件**。
-- 更早的同步基点：`488db49f`（0.2.6）、`cf7a9400`（0.2.5）、`bc50cac0`（0.2.4）、`1db8e510`（0.2.3）。
-- 0.3.0 带来 **390 个新 commit / 807 个文件改动**（从 0.2.6 算起）；合并时 18 个冲突文件分三类解决：文档配置 9、服务端核心 5（index.js / routes.js / lobby.js / gamedata.js / Match.js）、前端核心 4（runner.js / game.js / title.js / hud.js）。
-- **0.3.0 上游新增的重要机制（合并时必须保留、不要覆盖）**：
-  - **插件系统**：`plugins/` 目录、`server/plugins/registry.js`、`shared/plugins/ui.js`、`/studio/` 工作台、Forge 导入器、脚本沙箱（`SP_PLUGIN_SCRIPTS`）。默认不开启，我们线上 plugins/ 只有 `_template`，零实际插件。
-  - **严格 CSP**：`server/http/csp.js` 的 `siteCsp(publicDir)` 只白名单 importmap hash，所有 HTML 页面套 `script-src 'self' ...`。**monitor.html 已外部化 JS**（见 10 项功能第 9 条）。
-  - **官方战斗特效**：`data/local-fx.json` 清单 + `public/assets/local/fx/`（12534 文件）。
-  - **11 战场新场景**：`public/assets/local/scene/`（137 文件）。
-  - **素材导入功能**：标题画面「导入素材包」、「下载完整素材」按哈希校验缓存。
-  - **统计页改版**、**干员多语言语音**、**攻击判定按官方碰撞箱**等大量平衡/渲染改进。
+- **最近一次同步：2026-10-18；上游 master 最新 = `d905c146`（0.3.1，2026-10-18）**，已合入分支 `sync/upstream-0.3.1`（合并提交 `e9447bb0`，双父 `cd5636e5` + `d905c146`），**已确认是改编版 HEAD 的祖先、上游 commit 零遗漏、零删除文件**。备份标签 `pre-sync-0.3.1`。
+- 更早的同步基点：`c24e17ee`（0.3.0）、`488db49f`（0.2.6）、`cf7a9400`（0.2.5）、`bc50cac0`（0.2.4）、`1db8e510`（0.2.3）。
+- **0.3.1 带来 200 个新 commit / 520 个文件改动**（从 0.3.0 算起），本改编版同区间改了 114 个文件。
+  41 个文件两边都动过，其中 **14 个是真冲突**：
+
+  | 文件 | 冲突性质 | 解法 |
+  |---|---|---|
+  | `shared/protocol.js` | 双方各加消息 | 保留我方 `g.choice` idx≤8（六人房九张悬赏）+ 上游 `g.offer` / `g.offerRefresh` |
+  | `public/js/main.js` | 两边各加 import | 合并：`UrgentNoticeHost`（公告栏）+ `joinKnown`（上游） |
+  | `public/js/ui/hud.js` | 我方函数 + 上游 JSDoc 首行 | SpeedButton/SkipGlyph/SkipButton 整段移到 `TopBar` 注释之前，注释各自完整 |
+  | `public/js/screens/lobby.js` | 导入 + `create()` | 导入合并；`create()` 同时含公共匹配分支与上游 `test` 参数 |
+  | `server/lobby.js` | 两边各加 import | 合并 `MATCH_TARGET`/`MATCH_TIMEOUT_MS` + 上游 `checkSkinSelection`/`operatorCharIds` |
+  | `public/js/ui/choiceOverlay.js` | 两边各加 DOM 块 | 我方「决策顺序」栏 + 上游 `spov__grid` 容器并存 |
+  | `scripts/launch.mjs` | 上游加函数 + 我方注释 | 上游 `warnTestMode` 在前，我方 `printShare` 注释接后 |
+  | `server/match/Match.js` | 两边各加构造参数 | 我方六人座 `startingSeatCount` + 上游 `kitted`/`rules` 并存 |
+  | `public/css/screens/result.css` | 两边各加样式块 | 我方伤害看板 + 上游 `modmark` 并存 |
+  | `test/match/fuzz.test.js` | 两边各加 case | `g.chat` + `g.offer` 并存 |
+  | `public/i18n/{en,ja,ko,zh-TW}.json` ×4 | 两边各加键 | 合并为一段，注意前段补逗号 |
+
+- **0.3.1 上游新增的重要机制（合并时必须保留、不要覆盖）**：
+  - **官方结算页**：雷达开场、个人战报、同盟页，卫戍认证按官方 60 级表（`#698`）
+  - **皮肤系统**：每座位可选干员皮肤，设置里「显示其他玩家的皮肤」默认开（`#686`/`#667`）
+  - **异形屏适配**：四个滑块，把界面从挖孔/刘海往里收（`#699`）
+  - **素材存储**：设置里可查看并申请浏览器持久保存（`#703`）
+  - **悬赏决策改版**：机变按官方样式，决策顺序显示在队伍栏头像（`#695`）
+  - **S.W.E.E.P. 报告** + 敌人图鉴按官方评级（`#696`）
+  - **Forge 导入 U1–U6**：隐藏棋子、普通/精锐双形态 id、借用官方干员的头像立绘模型语音
+  - **内容插件四规则**：`shopBias` / `prepLoadout` / `morphPairing` / `unequip`
+  - **音效改用官方音库**：各音库独立同时播放上限、替换最旧、音高范围、延迟播放
+  - 大量官方特效修正（余三技能火墙、缪尔赛思流形、瑕光、野鬃、诅咒娃娃、斯卡蒂海嗣、狼群、归溟幽灵鲨…）
+
 - **已知待优化（不影响兼容，下次可处理）**：
   - **倍速切换不丝滑**：4× 切 1× 时渲染插值速率骤降，视觉顿挫。reanchor 数学上游戏时间连续不跳，但渲染层插值器没有平滑过渡。改这个需要动渲染层插值器，风险大，暂未处理。
-- 改编版相对新基线 `c24e17ee` 的独有改动：全部属于上述 10 项独有功能。新增文件主要落在：`android/**`、`announcements.json`、`public/monitor.html` + `public/js/monitor.js`、`public/js/ui/chat.js`、`scripts/launcher.mjs`、`scripts/launcher.config.json`、`scripts/zipdir.mjs`、`tools/dist.mjs`、`server/http/announcements.js`、`server/http/proxy.js`、`shared/openingBans.js`、`test/admin-rooms.test.js`、`test/proxy.test.js`、3 个 bat、`docs/COMPAT-0.3.0.md` 及 docs/ 下改编版文档。
-- 本次验证结论：`node --check` 全过；`npm run check:imports` 退出 0；`node tools/build-data.mjs` 重建零差异；`npm run golden` 全绿；服务器已部署（build `3aa174f7fc6e`，healthz 正常）。
-- **美术资源不入库（0.3.0 更新）**：`public/assets/**`、`data/local-assets.json`、`data/local-fx.json` 在 `.gitignore` 内。3D 棋盘靠 `data/local-assets.json` + `public/assets/local/`；官方战斗特效靠 `data/local-fx.json` + `public/assets/local/fx/`。缺失会静默回退 2D/原版特效。**部署到新服务器时，必须从完整包复制这两个清单文件和 local/ 目录，否则游戏会提示素材不完整。**
+
+- **本次验证结论**：446 个 js/mjs `node --check` 全过；4 个 i18n JSON `JSON.parse` 通过；
+  `npm run check:imports` 退出 0；`npm run golden` 全绿（49/46/22/21/10/140 场景）；
+  `rhineEnabled`/`dataProfile` 代码内零命中；无删除文件。
+
+---
+
+## 附二：部署时踩过的坑（每次同步都回来看一眼）
+
+> 下面这些都是 2026-10-18 同步 0.3.1 时**真实发生过**的，不是假想。服务器运维的完整交接
+> 见仓库外的 `交接文档-卫戍协议服务器.md`，这里只留与「同步 + 部署」直接相关的。
+
+### 坑 A：部署包按目录手写清单 → 漏目录 → 服务起不来
+
+第一次部署 0.3.1 时，部署包只包含了
+`server/ shared/ public/js public/css public/i18n tools/ scripts/ test/ docs/`，
+**漏掉了 `public/studio/`、`public/dev/`、`public/icons/`、`public/vendor/`，
+以及 `public/index.html`、`public/sw.js`、`public/manifest.json`**。
+
+后果：`server/studio/authoring.js` 找不到 `public/studio/js/presentation.js`：
+
+```
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/root/stronghold/public/studio/js/presentation.js'
+  imported from /root/stronghold/server/studio/authoring.js
+```
+
+systemd `Restart=always` 把它拉进重启循环（40 秒内重启 4 次），**服务完全不可用**。
+回滚到 0.3.0 才恢复，补全目录后第二次部署成功。
+
+**正确做法**——按目录枚举，不凭记忆：
+
+```bash
+ls -d public/*/     # 看清楚有哪些目录
+```
+
+必须排除的只有：`public/assets/`（3 万+ 素材）、`public/fonts/`、`public/assets.zip`（打包产物）。
+
+### 坑 B：`git add -A` 带上 781 MB 的 `public/assets.zip`
+
+`public/assets.zip` 是 `tools/package.mjs` 的产物，**没在 `.gitignore` 里**。
+`git add -A` 把它加进暂存区后 push 被 GitHub 拒绝：
+
+```
+remote: error: File public/assets.zip is 781.48 MB; this exceeds GitHub's file size limit of 100.00 MB
+remote: error: GH001: Large files detected.
+```
+
+已补进 `.gitignore`。以后提交前先扫一遍大文件：
+
+```bash
+git diff --cached --name-only | while read f; do
+  [ -f "$f" ] && [ "$(stat -c%s "$f" 2>/dev/null || echo 0)" -gt 52428800 ] && echo "大文件: $f"
+done
+```
+
+### 坑 C：CSP 不只拦 `<script>`，也拦 HTML 里的 `onclick=`
+
+0.3.0 起有了严格 CSP。已知要外部化 `<script>`，但**很多人会忽略内联事件处理器也会被拦**：
+
+```
+Executing inline event handler violates the following Content Security Policy
+directive 'script-src 'self' 'sha256-…'
+```
+
+监控大屏原本 8 个按钮全用 `onclick="saveToken()"` 这种写法，**浏览器直接拒绝执行**。
+表现很隐蔽：页面正常显示，但点「保存」token 毫无反应 → token 存不进 localStorage → 刷新就丢。
+
+**合并后要检查 `public/monitor.html` 里是否还有 `onclick=`**：
+
+```bash
+grep -c 'onclick=' public/monitor.html   # 应为 0
+```
+
+所有事件统一在 `public/js/monitor.js` 的 `bindUi()` 里用 `addEventListener` 绑定。
+
+### 坑 D：打包产物、日志、测试残留混进提交
+
+`.playwright-cli/`、`output/`、`public/assets.zip` 等都在 `.gitignore` 里，
+但如果新增了别的产物目录，记得同步补 `.gitignore`，别靠 `git status` 事后发现。
+
+---
+
+## 附三：部署流程（同步完成、验收通过后）
+
+> 本文件顶部「最高原则」第 5 条说**不要擅自部署**——下面是在**维护者明确同意后**才执行的步骤。
+
+1. **先确认有没有人在玩**
+
+   ```bash
+   curl -s "http://127.0.0.1:3000/api/admin/rooms?token=<SP_ADMIN_TOKEN>" | node -e '…'
+   ```
+
+   看 `connectedHumans > 0` 的房间。有人的话**先问**，别自作主张重启——重启会打断对局，
+   玩家只会看到「掉线」。
+
+2. **备份当前可运行状态**（可秒回滚）
+
+   ```bash
+   BK=/root/backups/deploy-$(date +%Y%m%d-%H%M%S) && mkdir -p $BK
+   tar -czf $BK/code-before.tgz -C /root/stronghold \
+     --exclude=public/assets --exclude=public/fonts --exclude=node_modules \
+     --exclude=plugins --exclude=data/assets.json --exclude=data/local-assets.json \
+     --exclude=data/local-fx.json server shared public tools scripts data package.json
+   ```
+
+3. **解包后立刻校验**
+
+   ```bash
+   node -e 'console.log(require("/root/stronghold/package.json").version)'   # 应是新版本
+   node --check /root/stronghold/server/http/routes.js
+   ls /root/stronghold/public/studio/js/presentation.js                      # 坑 A 的检查点
+   ```
+
+4. **确认受保护文件还在**：`public/assets`、`data/assets.json`、
+   `data/local-assets.json`、`data/local-fx.json`、`announcements.json`、`plugins/`。
+
+5. **重启并按端口冒烟**
+
+   ```bash
+   systemctl restart stronghold && sleep 12 && systemctl is-active stronghold
+   curl -s localhost:3000/healthz          # app 应为新版本
+   curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/online
+   curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/announcements
+   curl -s -o /dev/null -w '%{http_code}' "localhost:3000/api/admin/rooms?token=<TOKEN>"   # 200
+   curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/admin/rooms                    # 403
+   journalctl -u stronghold --since "2 min ago" | grep -icE "error|cannot|fail|ERR_"        # 应为 0
+   ```
+
+6. **回滚**（如果起不来）
+
+   ```bash
+   systemctl stop stronghold
+   tar -xzf /root/backups/deploy-<时间>/code-before.tgz -C /root/stronghold
+   systemctl start stronghold
+   ```
+
+### 一句话记住部署范围
+
+| 类别 | 内容 | 要不要重启 |
+|---|---|---|
+| **代码** | `server/` `shared/` `public/js` `public/css` `public/i18n` `public/studio` `public/dev` `public/icons` `public/vendor` `public/*.html` `public/sw.js` | `server/` `shared/` 改了**要**；纯前端只刷新页面 |
+| **数据** | `data/*.json`（**排除** `assets.json` / `local-assets.json` / `local-fx.json`） | 要 |
+| **热加载** | `announcements.json`、`plugins/`、`public/monitor.html` `public/js/*.js` `*.css` | **不要**，改完即生效 |
+| **绝不动** | `public/assets/` `public/fonts/` `node_modules/` `plugins/`（指目录内容）`data/assets.json` `data/local-*.json` | — |
+
+---
+
+## 附四：服务器架构速记（避免重复造轮子）
+
+排查或实现任何「服务器上缺什么」之前，**先看这个再动手**。
+2026-10-18 就因为只 `grep /root/stronghold/server/`、没查 `/opt/`，
+误判「运行保护面板没有服务端实现」，把已经存在的 stability 接口又写了一遍，纯属白费功夫。
+
+```
+stronghold.service
+  └─ ExecStart = /usr/local/bin/node /opt/stronghold-stability/start.mjs
+       │          ↑ 启动入口不是 server/index.js！
+       ├─ admission.mjs        开局保护（maxMatches / maxRooms / RSS / 事件循环延迟）
+       │                       资源紧张时暂缓新开局，不影响已有对局与重连
+       └─ stronghold-control.service   127.0.0.1:31998（Python control.py）
+            └─ 只做「暂停开局」，README 明确「never restart/kick/close」
+
+nginx  location = /api/admin/stability          → 127.0.0.1:31998   （Python 运维层）
+       location = /api/admin/stability/control  → 127.0.0.1:31998   （Python 运维层）
+       /api/admin/restart                       → 127.0.0.1:3000    （Node，改编版自己加的）
+```
+
+**排查「服务器上某个功能」的检查顺序**：
+
+```bash
+ls /etc/systemd/system/stronghold.service.d/      # 有哪些 drop-in
+systemctl show stronghold -p ExecStart            # 真正的启动入口
+ls /opt/                                      # 运维层可能在这里
+grep -rn <关键词> /root/stronghold/server/     # 最后才看项目目录
+```
+
+### 掉线重连窗口：只能延长，不能缩短（★★★ 极易踩）
+
+`server/net.js` 的 `windowOf()`：
+
+```javascript
+const own = s.resumeWindowMs;
+return typeof own === 'number' && own > this.reconnectWindowMs ? own : this.reconnectWindowMs;
+```
+
+- `reconnectWindowMs` 是**基础窗口**（`NET_DEFAULTS` 里 10 分钟，官方值）。
+- `soloReconnectWindowMs` 是**单人局的官方 24 小时**（`config.constants.singleReconnectTime`）。
+- 取**较大值**，所以把 solo 那个设成 60 秒**毫无效果**——被 10 分钟基础窗口吃掉。
+
+2026-10-18 踩过：只改了 `soloReconnectWindowMs`，空房间还是留 10 分钟以上，白折腾半天。
+
+**要缩短清理时间，两个都要改**（在 `/opt/stronghold-stability/start.mjs`）：
+
+```javascript
+const server = await startServer({ maxRooms, reconnectWindowMs: 60000, soloReconnectWindowMs: 60000 });
+```
+
+清理链路（改了窗口后自动跟着变快）：
+
+```
+sweep 每 min(15s, reconnectWindowMs/4) 跑一次
+  → SessionRegistry.sweep() 找过期会话
+  → lobby.onExpire() → removeMember()
+  → 房间无人 → disposeRoom('empty')
+```
+
+实测 `reconnectWindowMs=60000`：无人房间从掉线到消失 **约 60–75 秒**。
+
+> ⚠️ `SP_SOLO_RECONNECT_MS` 环境变量在 **0.3.1 之后已失效**——上游重写 `server/http/config.js` 时
+> 去掉了读它的那段代码。现在只能走 `start.mjs` 传参。旧 systemd 环境变量已清理。
+
+### 公告正文走 URL 参数，太长会 414
+
+`socket` 层 `MAX_URL_LENGTH = 4096`，而 `monitor.js` 发布公告是把正文放进查询参数的：
+
+```javascript
+let path = `/api/admin/announce?title=${…}&content=${encodeURIComponent(content)}&force=${…}`;
+```
+
+中文经 `encodeURIComponent` 会膨胀约 3 倍，所以正文**控制在 400–500 字以内**。
+超过就返回 `414`，大屏上表现为「发布失败」但**没有任何提示**（`Invoke-WebRequest` 甚至会把 404/414 的 HTML 当成成功）。
+
+需要发长公告时直接改 `announcements.json`（热加载，不必走接口）。
+
+### 插件：如何打包分享
+
+```bash
+node tools/plugin.mjs check <id>          # 校验
+node tools/plugin.mjs pack <id> --zip     # 产物在 plugins/_dist/<id>-<version>.zip
+```
+
+`plugins/*` 在 `.gitignore` 里（服务器自己的插件不入库），只有 `_template/` 被跟踪。
+**分发要走 zip，不要发源码文件夹**——`plugin.lock.json` 是完整性校验的一部分。
+
+插件能做的事有边界：`permissions` 里 `data.patch` 可以改 `config` / `chess` / `bonds` 等表，
+但房间规则开关只认 `shopBias` / `prepLoadout` / `morphPairing` / `unequip` 四个。
+
 - 常用命令：
   - 拉上游：`git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git master`
   - 查上游新增（数量 + 标题）：`git rev-list --count HEAD..FETCH_HEAD`；`git log --oneline --reverse HEAD..FETCH_HEAD`
