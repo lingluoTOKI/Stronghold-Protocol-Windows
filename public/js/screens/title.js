@@ -191,8 +191,10 @@ export function UrgentNoticeHost() {
         .catch(() => { /* 拉不到就不弹，静默重试 */ });
     };
     load();
-    // HTTP 无推送，靠短轮询（公告接口很轻，10s 一次）。
-    const iv = setInterval(load, 10000);
+    // 紧急公告轮询。原为 10s，但每次返回 ~7.8 KB（gzip 后 ~5.5 KB），
+    // 按在线人数累积起来是服务器最大的单项流量来源（实测占最近 2 小时总流量的 23.6%）。
+    // 2026-10-18 改为 60s：公告最多晚 1 分钟到达，但流量降到约 1/6。
+    const iv = setInterval(load, 60000);
     return () => { dead = true; clearInterval(iv); };
   }, []);
   const closeUrgent = () => {
