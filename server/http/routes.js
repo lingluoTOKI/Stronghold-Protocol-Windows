@@ -268,7 +268,13 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
 
     // ---- 公开只读接口（规格 C）----
     if (parts.rawPath === '/api/online') {
-      sendJson(req, res, 200, { online: Math.max(health.network.connectionCount, 0), humans: Math.max(health.humans || 0, 0) }); // humans = 房内真人（改编版 2026-10-18）
+      sendJson(req, res, 200, {
+        online: Math.max(health.network.connectionCount, 0),
+        // 房内真人（改编版，2026-10-18）：health 是 { startedAt, network, registry, lobby, … }，
+        // 它自己不带 humans —— 那是 healthReport() 现调 lobby.stats() 算的，这里同样现调一次。
+        // lobby.stats().humans 不含机器人、不含已离开、不含掉线中的座位，一人多标签也只算一个。
+        humans: (() => { try { return Math.max(Number(health.lobby?.stats?.().humans) || 0, 0); } catch { return 0; } })(),
+      }); // humans = 房内真人（改编版 2026-10-18）
       return;
     }
     if (announcements && parts.rawPath === '/api/announcements') {
