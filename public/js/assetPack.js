@@ -17,7 +17,7 @@
 
 import { splitHashedPath } from '../../shared/assetPaths.js';
 import { mediaUrl } from './media.js';
-import { IMPORTED_ASSET_CACHE, addImportedPaths, putImportedAsset, pruneImportedPaths } from './assetCache.js';
+import { IMPORTED_ASSET_CACHE, addImportedPaths, listImportedPaths, putImportedAsset, pruneImportedPaths } from './assetCache.js';
 
 export const MAX_ZIP_ENTRIES = 500_000;
 export const MAX_ENTRY_BYTES = 256 * 1024 * 1024;
@@ -716,6 +716,33 @@ export function createAssetImport({
       phase = 'importing';
       publish(true);
       const outcome = new Set();
+
+      // 改编版（2026-10-18）：导入不稳定（3 万个文件卡住 / 被杀）的两个根因 ——
+      //
+      // ① 主循环从不让出主线程：读压缩块、算 SHA-256、写 Cache 一路串下去，
+      //    同步的哈希与 CRC 计算会把主线程钉住，浏览器判定页面无响应后直接杀掉。
+      //    这里每处理若干个文件就 await 一次，让浏览器有机会画进度条、响应用户。
+      //
+      // ② 没有跳过已缓存：中断后重导，前面已成功的文件又解压、又算哈希。
+      //    开跑前读一次导入索引（assetCache.listImportedPaths），已经在缓存里的
+      //    rel 直接判 accepted 跳过 —— 顺带就有了「断点续导」的效果。
+      let sinceYield = 0;
+      const YIELD_EVERY = 24;
+      const yieldToMain = async () => {
+        if (++sinceYield < YIELD_EVERY) return;
+        sinceYield = 0;
+        // setTimeout(0) 让出一个宏任务；没有 window 的环境（测试）退化成微任务
+        await new Promise((r) => (typeof setTimeout === 'function' ? setTimeout(r, 0) : Promise.resolve().then(r)));
+      };
+
+      // alreadyStored：缓存里已有的 pathname（带前导 /），用来跳过重复导入。
+      let alreadyStored = new Set();
+      try {
+        const ls = await listImportedPaths(cachesApi);
+        if (ls && typeof ls.has === 'function') alreadyStored = ls;
+      } catch { /* 读不到索引就当空的：最坏情况是重复导一遍，不影响正确性 */ }
+      /** rel（相对 public/ 的路径）在缓存里已经有了吗。 */
+      const alreadyImported = (rel) => alreadyStored.has('/' + rel.replace(/^\/+/, ''));
       const reads = new Map();
       const readRel = (rel) => {
         if (!reads.has(rel)) reads.set(rel, packByRel.get(rel).read());
@@ -740,6 +767,12 @@ export function createAssetImport({
 
       for (const group of plan.groups) {
         if (cancelFlag) break;
+        await yieldToMain();
+        // 整组成员都已经在缓存里：直接判定通过，不解压、不算哈希
+        if (group.members.every((m) => alreadyImported(m.rel))) {
+          for (const m of group.members) settle(m.rel, 'accepted');
+          continue;
+        }
         const present = group.members.filter((member) => packByRel.has(member.rel));
         if (present.length !== group.members.length) {
           for (const member of present) {
@@ -800,6 +833,9 @@ export function createAssetImport({
       for (const [rel, spec] of plan.files) {
         if (cancelFlag) break;
         if (outcome.has(rel) || !packByRel.has(rel)) continue;
+        await yieldToMain();
+        // 这个文件已经在缓存里：跳过解压与哈希
+        if (alreadyImported(rel)) { settle(rel, 'accepted'); continue; }
         const got = await readRel(rel);
         if (cancelFlag) break;
         if (!got?.ok || !got.bytes?.byteLength) {
