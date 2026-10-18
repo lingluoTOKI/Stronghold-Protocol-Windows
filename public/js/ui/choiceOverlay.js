@@ -214,22 +214,7 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
           ${timed ? html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />` : null}
         </div>
       </header>
-      ${order.length ? html`<div class="spov__order" aria-label=${t('决策顺序')}>
-        ${order.map((pid, i) => {
-          const p = players.get(pid);
-          const picked = sp.pickOf.has(pid);
-          const cur = sp.turnPid === pid && !picked;
-          const left = p?.status === 'left';
-          return html`<div key=${pid} class=${cx('spov__who', cur && 'is-cur', picked && 'is-done', pid === myId && 'is-self')}>
-            <span class="spov__idx num">${i + 1}</span>
-            <${PlayerAvatar} player=${p || { name: '?' }} size="sm" self=${pid === myId} />
-            <span class="spov__wname">${p?.name || t('博士')}</span>
-            <span class="spov__wstate">${left ? html`<${Icon} name="exit" />` : picked ? html`<${Icon} name="check" />` : cur ? html`<${Icon} name="hourglass" />` : html`<${Icon} name="dots" />`}</span>
-          </div>`;
-        })}
-      </div>` : null}
       <div class=${cx('spov__grid', sp.cards.length <= 3 && 'spov__grid--3', sp.cards.length > 6 && 'spov__grid--many')}>
-      <div class=${cx('spov__grid', sp.cards.length <= 3 && 'spov__grid--3')}>
         ${sp.cards.map((card) => {
           const r = resolveSpCard(card, sp.family);
           const taker = card.takenBy ? players.get(card.takenBy) : null;
