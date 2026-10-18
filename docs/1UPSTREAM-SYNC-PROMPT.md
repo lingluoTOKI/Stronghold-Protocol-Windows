@@ -2,13 +2,16 @@
 
 > 用途：官服上游 `sganggs/Stronghold-Protocol` 发布新版本后，让 AI 把上游更新**完整同步**进本改编版，同时**一个不丢地保留**下列独有功能。直接复制下方分隔线之间的内容发送即可。
 >
-> **本文件三个部分**：
+> **本文件四个部分**：
 > 1. `✂` 分隔线之间 —— **发给 AI 的提示词本体**（同步要求 + 执行流程）
 > 2. **附：当前基线快照** —— 上次同步到哪个 commit、冲突怎么解的、上游新增了什么机制
-> 3. **附二/三/四** —— 部署踩过的坑、部署流程、服务器架构速记（每次同步后都要回来看）
+> 3. **附二/三** —— 部署踩过的坑、部署流程（每次同步后都要回来看）
+> 4. **附四：服务器架构速记** —— `/opt` 运维层、重连窗口、**插件 vs 房间设置**、**带宽与 gzip**、素材包守卫
 >
-> 最后更新：2026-10-18（同步上游 0.3.1 之后）。服务器运维的完整交接见仓库外的
-> `交接文档-卫戍协议服务器.md`。
+> 最后更新：2026-10-18（同步上游 0.3.1 之后，另加当天的带宽治理与素材守卫）。服务器运维的完整交接见仓库外的 `交接文档-卫戍协议服务器.md`。
+>
+> **如果只想知道「最近改了什么」，直接跳到「附四」** —— 那里有今天的全部结论：gzip 省 90%、
+> BGM 默认关、公告轮询 60 秒、没导入素材不让建房、改动型插件为何不能用。
 
 ---
 
@@ -123,6 +126,20 @@
 
 - **已知待优化（不影响兼容，下次可处理）**：
   - **倍速切换不丝滑**：4× 切 1× 时渲染插值速率骤降，视觉顿挫。reanchor 数学上游戏时间连续不跳，但渲染层插值器没有平滑过渡。改这个需要动渲染层插值器，风险大，暂未处理。
+
+- **改编版在 0.3.1 之上新加的东西（合并时要保住）**：
+  - **首领血量挡位**：`shared/constants.js` `BOSS_HP_OPTIONS = [1, 3.25]`、`shared/protocol.js`
+    `room.setBossHp`、`server/lobby.js` `setBossHp` + `Room.bossHp` + `room.state.bossHp`、
+    `server/match/Match.js` 传 `opts.bossHp`、`server/match/gamedata.js` 构造函数第 4 参数
+    `bossHpOverride`（在 `bossPoolShare()` 里乘上去）、`public/js/screens/room.js` `BossHpPicker`
+    + `public/css/screens/room.css` `.bosshp`。**这是「房间设置」而不是插件**——理由见附四。
+  - **素材包守卫**：`public/js/screens/lobby.js` `requireAssetPack()`，拦 `create` / `join` / `startMatch`。
+  - **BGM 默认关**：`public/js/ui/gameLogic/settings.js` `DEFAULT_SETTINGS.bgm = 0`、
+    `public/js/audio.js` `this.volumes.bgm = 0`。
+  - **公告轮询 60 秒**：`public/js/screens/title.js` 的 `setInterval(load, 60000)`（原 10 秒）。
+  - **监控大屏「重启服务」**：`server/http/routes.js` `GET /api/admin/restart`（需 `SP_ALLOW_RESTART=1`）
+    + `public/monitor.html` 两个按钮 + `public/js/monitor.js` `restartService()`。
+    **升级上游时 `routes.js` 被整份覆盖会冲掉它**，2026-10-18 就丢过一次。
 
 - **本次验证结论**：446 个 js/mjs `node --check` 全过；4 个 i18n JSON `JSON.parse` 通过；
   `npm run check:imports` 退出 0；`npm run golden` 全绿（49/46/22/21/10/140 场景）；
@@ -276,6 +293,16 @@ grep -c 'onclick=' public/monitor.html   # 应为 0
 2026-10-18 就因为只 `grep /root/stronghold/server/`、没查 `/opt/`，
 误判「运行保护面板没有服务端实现」，把已经存在的 stability 接口又写了一遍，纯属白费功夫。
 
+**本附四还收录了几件「看着该做、其实别做」的事**，都是那天实测踩出来的：
+
+| 想做的事 | 别做的原因 |
+|---|---|
+| 给 `/assets/` 加长缓存 | 已经有 `immutable` 一年，先 `curl -D -` 看响应头 |
+| 把首领血量做成插件 | 插件必进 `cs` → 强制子进程 → 小机器出「不出怪」 |
+| 把重连窗口设小（只设 solo） | `windowOf()` 只取较大值，基础窗口会盖掉 |
+| 在大厅加提示条引导导入素材 | 维护者要的是**拦截**，不是横幅 |
+| 以为服务器被打了 | 24 次重启是部署失败的重启循环，不是流量 |
+
 ```
 stronghold.service
   └─ ExecStart = /usr/local/bin/node /opt/stronghold-stability/start.mjs
@@ -288,6 +315,16 @@ stronghold.service
 nginx  location = /api/admin/stability          → 127.0.0.1:31998   （Python 运维层）
        location = /api/admin/stability/control  → 127.0.0.1:31998   （Python 运维层）
        /api/admin/restart                       → 127.0.0.1:3000    （Node，改编版自己加的）
+```
+
+`start.mjs` 里还传了几个关键参数（换机器时**必须一并搬过去**）：
+
+```javascript
+const server = await startServer({
+  maxRooms,
+  reconnectWindowMs: 60000,        // 基础重连窗口 10 分钟 → 60 秒
+  soloReconnectWindowMs: 60000,    // 单人局 24 小时 → 60 秒（两个都要改，见下）
+});
 ```
 
 **排查「服务器上某个功能」的检查顺序**：
@@ -347,7 +384,7 @@ let path = `/api/admin/announce?title=${…}&content=${encodeURIComponent(conten
 
 需要发长公告时直接改 `announcements.json`（热加载，不必走接口）。
 
-### 插件：如何打包分享
+### 插件：能做什么、不能做什么
 
 ```bash
 node tools/plugin.mjs check <id>          # 校验
@@ -359,6 +396,97 @@ node tools/plugin.mjs pack <id> --zip     # 产物在 plugins/_dist/<id>-<versio
 
 插件能做的事有边界：`permissions` 里 `data.patch` 可以改 `config` / `chess` / `bonds` 等表，
 但房间规则开关只认 `shopBias` / `prepLoadout` / `morphPairing` / `unequip` 四个。
+
+**★★★ 改数据的插件会让房间强制走服务器子进程。** `server/lobby.js:1626`：
+
+```javascript
+const match = modded && this.hosts
+  ? this.hosts.create(room.content.cs, opts)   // 插件房：起 match host 子进程
+  : new this.MatchClass(opts);                 // 普通房：本进程
+```
+
+而 `modded` 的判据是 `cs !== vanilla.cs`，`cs` 的哈希输入里有 `plugins: parts`
+（`server/plugins/contentSet.js` 的 `contentHashOf`）——**只要加载任何插件就 `modded = true`**，
+哪怕这插件只改外观、没动 data。
+
+后果（2026-10-18 实测）：2 核 1.6 GB 的小机器上，每开一个插件房就起一个子进程重新加载
+全部数据，表现为**「不出怪」**和客户端红字**「插件卡死，本场由服务器接管」**
+（真实日志是 `rejected client result … its content is not named is not the room's <cs>`：
+房主中途改了插件设置，其他玩家还在用旧哈希上报）。那个 `boss-hp-scale` 插件已下架。
+
+**所以「改游戏数值」这类需求不要做成插件**，做成房间设置：
+照 `room.setDifficulty` 的模式加一条协议消息，服务端 `GameData` 直接读，不进 `cs`、不起子进程。
+`room.setBossHp`（首领血量 1× / 3.25×）就是这么做的，可作为范例。
+
+### 带宽：小主机最容易被打爆的地方
+
+按实测流量占比从大到小（2026-10-18，最近 2000 条请求）：
+
+| 来源 | 占比 | 处置 |
+|---|---|---|
+| **紧急公告轮询**（10 秒一次 × 7.8 KB/次） | **23.6%** | 改 60 秒（`title.js`） |
+| BGM 音频（两个 ~1.9 MB 的 loop） | 23.6% | 默认音量 0（`bgmSilent` 时**不下载**，不是静音播放） |
+| 素材（干员立绘 / Spine / 特效） | 37% | 引导玩家导入素材包，没导入就拦住建房 |
+| JS/CSS/JSON | 22% | **nginx gzip**（见下） |
+
+#### nginx 的 gzip 默认几乎没生效（★★★ 极易忽略）
+
+```nginx
+gzip on;               # 看起来开了
+# gzip_types ...;      # 但默认 gzip_types 只有 text/html！
+```
+
+**JS / CSS / JSON 全是裸传的。** 补上后实测（`/etc/nginx/nginx.conf`）：
+
+| 文件 | 原始 | gzip 后 | 节省 |
+|---|---|---|---|
+| `data/chess.json` | 1,876,337 B | 165,317 B | **91%** |
+| `data/config.json` | 113,113 B | 10,552 B | 91% |
+| `css/screens/lobby.css` | 20,303 B | 4,799 B | 76% |
+| `js/main.js` | 25,404 B | 9,752 B | 62% |
+
+```nginx
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 6;
+gzip_min_length 1024;
+gzip_types text/plain text/css text/javascript application/javascript
+           application/json application/manifest+json image/svg+xml
+           text/xml application/xml application/xml+rss;
+```
+
+**不要给 png / webp / ogg / mp3 / woff2 加 gzip**（已经压过了，再压只费 CPU）。
+改完 `nginx -t` 然后 `systemctl reload nginx`——**不用重启游戏服务**。
+
+⚠️ 这份配置**不在 git 仓库里**，换机器或重装 nginx 要重新配。
+
+#### 缓存头其实已经有，别重复做
+
+应用层已经会按文件名里的内容哈希返回 `Cache-Control: public, max-age=31536000, immutable`
+（`server/http/static.js` 的 `IMMUTABLE_JSON`、`files.js`）；不带哈希的走 `max-age=86400`。
+`/media/` 与 `/assets/` 都命中。**先 `curl -D -` 看一眼响应头再动手**，别以为没配。
+
+#### 判断是不是被阿里云限速
+
+- `tc qdisc show dev eth0` 只有 `fq_codel`、`iptables` 里没有 limit → **服务器自身没限速**
+- 限制在阿里云虚拟化层：经济型 e 实例（`ecs.e-c1m1.large`）是**突发带宽**，
+  配额用完后回落到基础带宽（常见 1 Mbps）
+- 元数据查不到带宽值，得看控制台
+- 判据看 `/proc/net/dev` 的累计发送量和 nginx 的每小时字节数，别凭感觉
+
+### 素材包守卫（没导入不让进对局）
+
+`public/js/screens/lobby.js` 的 `requireAssetPack()`，拦住 `create` / `join` / `startMatch` 三个入口，
+没导入就弹窗提示导入方法。
+
+- 用 `countImportedFiles()`（`public/js/assetCache.js`）判断，返回 0 = 没导入
+- **不支持导入的环境要放行**（`importSupport().ok === false`：http 非安全上下文 / 缺 Cache API），
+  否则那些浏览器就完全玩不了
+- **读缓存出错也放行**：宁可放过，不误伤
+- 只拦「进入对局」，大厅本身照常可看，玩家可以回标题页导入再回来
+
+做过又删掉的：大厅顶部的黄色提示条（维护者只要拦截、不要横幅）。
 
 - 常用命令：
   - 拉上游：`git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git master`
