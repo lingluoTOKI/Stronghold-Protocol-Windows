@@ -237,6 +237,26 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
       sendJson(req, res, 200, { ok: true, updatedAt: r.updatedAt, removed: r.removed });
       return;
     }
+    // ---- 重启本服务（监控大屏的「重启服务」按钮，2026-10-18 经管理员批准加入）----
+    // 注意：/api/admin/stability 与 /stability/control 由 /opt/stronghold-stability/control.py 提供，
+    // 经 nginx 精确路径转发到 127.0.0.1:31998，**不在**这里实现，避免与之冲突。
+    // 重启是唯一未纳入那套运维层的操作（运维层 README 明确「没有重启功能」），
+    // 且重启会中断所有进行中的对局，所以这里额外用 SP_ALLOW_RESTART=1 当总开关。
+    if (parts.rawPath === '/api/admin/restart') {
+      if (!adminAuthorized()) { sendError(req, res, 403, '拒绝 · Forbidden'); return; }
+      if (process.env.SP_ALLOW_RESTART !== '1') {
+        sendError(req, res, 409, '未启用重启 · restart disabled (set SP_ALLOW_RESTART=1)');
+        return;
+      }
+      const q = new URLSearchParams(parts.query || '');
+      const reason = (q.get('reason') || 'admin console').slice(0, 120);
+      const stats = typeof health.lobby.stats === 'function' ? health.lobby.stats() : null;
+      log.warn(`[admin] RESTART requested by monitor (${reason}); rooms=${stats ? stats.rooms : '?'} matches=${stats ? stats.matches : '?'}`);
+      sendJson(req, res, 200, { ok: true, restarting: true, reason, at: new Date().toISOString(), rooms: stats || null });
+      // 先把响应刷出去再退出，避免浏览器拿到 ERR_EMPTY_RESPONSE；systemd 的 Restart= 负责拉起
+      setTimeout(() => { try { process.exit(0); } catch { /* ignore */ } }, 400);
+      return;
+    }
 
     // ---- 联机（本机客户端）模式：/ws 与 /api/* 交给中心服务器（server/http/proxy.js）----
     // 放在本机的运维接口之后：页面与素材始终由本机回答，实时状态与接口则报中心服务器的。

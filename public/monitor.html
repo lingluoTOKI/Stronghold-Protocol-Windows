@@ -231,6 +231,9 @@
   .stability__actions{display:flex;gap:5px}
   .stability button{font:inherit;font-size:10px;cursor:pointer;border:1px solid var(--line);color:var(--dim);background:transparent;border-radius:6px;padding:5px 8px;white-space:nowrap;transition:background .15s,border-color .15s}
   .stability button:hover:enabled{border-color:var(--accent);color:var(--accent);background:rgba(63,216,165,.06)}
+  .stability button.danger{border-color:rgba(255,107,107,.5);color:var(--danger)}
+  .stability button.danger:hover:enabled{border-color:var(--danger);color:var(--danger);background:rgba(255,107,107,.1)}
+  .stability button.danger:disabled{opacity:.45}
   .stability button:disabled{opacity:.35;cursor:not-allowed}
   .stability details{color:var(--muted);font-size:10px;margin-top:8px}
   .stability summary{cursor:pointer;user-select:none}
@@ -340,7 +343,7 @@
         <div class="stability__metric"><span>对局 / 上限</span><b id="guard0_capacity">—</b></div>
         <div class="stability__metric"><span>无人房间</span><b id="guard0_away">—</b></div>
       </div>
-      <div class="stability__foot"><p id="guard0_reason">输入管理 token 查看保护状态</p><div class="stability__actions"><button id="guard0_pause" disabled>暂停开局</button><button id="guard0_resume" disabled>自动保护</button></div></div>
+      <div class="stability__foot"><p id="guard0_reason">输入管理 token 查看保护状态</p><div class="stability__actions"><button id="guard0_pause" disabled>暂停开局</button><button id="guard0_resume" disabled>自动保护</button><button class="danger" id="guard0_restart" disabled title="重启本服务：会中断所有进行中的对局">重启服务</button></div></div>
       <details><summary>更多指标</summary><p id="guard0_detail">—</p><p>暂停仅限制新房间和新开局，已有对局与重连保持可用。</p></details>
       <p class="stability__message" id="guard0_message"></p>
     </section>
@@ -372,7 +375,7 @@
         <div class="stability__metric"><span>对局 / 上限</span><b id="guard1_capacity">—</b></div>
         <div class="stability__metric"><span>无人房间</span><b id="guard1_away">—</b></div>
       </div>
-      <div class="stability__foot"><p id="guard1_reason">输入管理 token 查看保护状态</p><div class="stability__actions"><button id="guard1_pause" disabled>暂停开局</button><button id="guard1_resume" disabled>自动保护</button></div></div>
+      <div class="stability__foot"><p id="guard1_reason">输入管理 token 查看保护状态</p><div class="stability__actions"><button id="guard1_pause" disabled>暂停开局</button><button id="guard1_resume" disabled>自动保护</button><button class="danger" id="guard1_restart" disabled title="重启本服务：会中断所有进行中的对局">重启服务</button></div></div>
       <details><summary>更多指标</summary><p id="guard1_detail">—</p><p>暂停仅限制新房间和新开局，已有对局与重连保持可用。</p></details>
       <p class="stability__message" id="guard1_message"></p>
     </section>

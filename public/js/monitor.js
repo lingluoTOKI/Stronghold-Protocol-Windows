@@ -315,6 +315,43 @@ async function setAdmissionPause(el,paused){
   finally {guardBusy[el]=false; await fetchStability(SRVS[Number(el)]);}
 }
 
+
+/**
+ * 重启本服务（大屏的「重启服务」按钮）。
+ *
+ * 服务端 /api/admin/restart 先把 {ok:true} 刷给浏览器再 process.exit(0)，systemd 的 Restart= 负责拉起。
+ * 点两次确认：这个操作会中断所有进行中的对局，误点代价很大。
+ */
+async function restartService(el){
+  if(guardBusy[el]) return;
+  const svr = SRVS[Number(el)];
+  const message = $('guard'+el+'_message');
+  const label = (svr && svr.label) || ('端口 '+el);
+  if(!confirm('确定重启「'+label+'」？\n\n这会中断所有进行中的对局，玩家需要重新进入。')) return;
+  if(!confirm('再次确认：真的要现在重启吗？')) return;
+  guardBusy[el]=true;
+  const btn = $('guard'+el+'_restart');
+  if(btn) btn.disabled=true;
+  if(message) message.textContent='正在重启…（约 5–15 秒后恢复）';
+  try{
+    const token = $('token').value.trim();
+    if(!token) throw new Error('请先输入并保存 admin token');
+    const port = Number(el)===1 ? 3001 : 3000;
+    const r = await fetch(location.origin+'/api/admin/restart?port='+port+'&token='+encodeURIComponent(token)+'&reason=monitor', {cache:'no-store'});
+    const j = await r.json().catch(()=>({}));
+    if(r.status===403) throw new Error('管理 token 不正确或权限不足');
+    if(r.status===409) throw new Error('该服务器未启用重启（缺少 SP_ALLOW_RESTART=1）');
+    if(!r.ok || !j.ok) throw new Error(j.error || '重启请求失败');
+    if(message) message.textContent='已发送重启命令，服务正在重新启动…';
+    setTimeout(()=>{ fetchStability(SRVS[Number(el)]); }, 12000);
+  }catch(error){
+    if(message) message.textContent=error.message;
+  }finally{
+    guardBusy[el]=false;
+    if(btn) btn.disabled=false;
+  }
+}
+
 // ============ 房间对局 + 在线玩家 合并渲染 ============
 const roomData = {
   0:{ rooms:null, groups:new Map(), lobby:[], playersUnsupported:false },
@@ -554,7 +591,7 @@ document.addEventListener('visibilitychange', ()=>{
 function bindUi(){
   const on = (id, fn, ev) => { const el = $(id); if (el) el.addEventListener(ev || 'click', fn); };
   on('btnSaveToken', saveToken);
-  ['0','1'].forEach(el=>{on('guard'+el+'_pause',()=>setAdmissionPause(el,true));on('guard'+el+'_resume',()=>setAdmissionPause(el,false));});
+  ['0','1'].forEach(el=>{on('guard'+el+'_pause',()=>setAdmissionPause(el,true));on('guard'+el+'_resume',()=>setAdmissionPause(el,false));on('guard'+el+'_restart',()=>restartService(el));});
   on('ipModeBtn', toggleIpMode);
   on('localTestBtn', toggleLocalTest);
   on('btnPublish', publishAnnounce);
