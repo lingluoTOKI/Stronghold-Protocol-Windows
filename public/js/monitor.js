@@ -301,6 +301,8 @@ async function fetchStability(svr){
     reason.textContent=a.manualPaused?'新开局已暂停 · 已有对局继续':a.pressure?'资源紧张 · 暂缓新开局':full?'等待已有对局结束后恢复':roomsFull?'已有房间可继续开局':'运行正常 · 已有对局与重连优先';
     pause.disabled=guardBusy[el]||a.manualPaused;
     resume.disabled=guardBusy[el]||!a.manualPaused;
+    const restartBtn=$('guard'+el+'_restart');
+    if(restartBtn) restartBtn.disabled=guardBusy[el];
   }catch(error){state.textContent='暂不可用';state.dataset.mode='warn';reason.textContent=error.name==='AbortError'?'请求超时，请稍后重试':error.message;}
 }
 async function setAdmissionPause(el,paused){
