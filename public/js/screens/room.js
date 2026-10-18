@@ -17,7 +17,7 @@
 // Texts go through t() (docs/I18N.md).
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
+import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS, BOSS_HP_OPTIONS } from '../../../shared/constants.js';
 import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyTag, DifficultyIcon, Tooltip, confirmDialog, doctorNo, Modal,
 } from '../ui/components.js';
@@ -223,6 +223,31 @@ function DifficultyPicker({ room, isHost, busy, onPick }) {
   </div>`;
 }
 
+/**
+ * 首领血量挡位（改编版，2026-10-18）：房主在开局前选 1×（官方原版）或 3.25×。
+ * 只改服务端 GameData 的共享首领血池倍率——不走插件、不进内容哈希、不起 match host 子进程。
+ * 非房主只读显示当前挡位。
+ */
+function BossHpPicker({ room, isHost, busy, onPick }) {
+  const cur = Number(room.bossHp) > 0 ? Number(room.bossHp) : 1;
+  const fmt = (v) => (v === 1 ? t("1×（官方原版）") : v + "×");
+  if (!isHost) {
+    return html`<span class="bosshp bosshp--ro" title=${t("首领血量挡位")}>
+      <span class="bosshp__lbl">${t("首领血量")}</span>
+      <span class="bosshp__val">${fmt(cur)}</span>
+      <span class="t-dim">${t("由创建者选择")}</span>
+    </span>`;
+  }
+  return html`<span class="bosshp" role="radiogroup" aria-label=${t("首领血量挡位")}>
+    <span class="bosshp__lbl">${t("首领血量")}</span>
+    ${BOSS_HP_OPTIONS.map((v) => html`<button key=${v} type="button" role="radio"
+        aria-checked=${cur === v ? "true" : "false"} disabled=${!!busy}
+        class=${"bosshp__opt" + (cur === v ? " is-active" : "")}
+        title=${v === 1 ? t("官方原版强度") : t("首领血量 {v} 倍，更难", { v })}
+        onClick=${() => cur !== v && onPick(v)}>${fmt(v)}</button>`)}
+  </span>`;
+}
+
 /** The 「AI 队友最后选择」 switch (co-op): the host toggles it, everybody else sees its state. */
 function AiLastToggle({ option, busy, onToggle }) {
   if (!option) return null;
@@ -279,6 +304,9 @@ export function RoomScreen() {
     if (ok) run(`kick${seat}`, () => net.request('room.kick', { seat, playerId }));
   };
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
+
+  // 首领血量挡位（改编版）：只写房间状态，开局时由服务端 GameData 生效
+  const setBossHp = (bossHp) => run('bosshp', () => net.request('room.setBossHp', { bossHp }));
   const setAiLast = (on) => run('ailast', () => net.request('room.setAiPicksLast', { on }));
   // spectator seats: the host frees one; a spectator takes a free player seat with room.join of this room
   const removeSpectator = (playerId) => run(`rs${playerId}`, () => net.request('room.removeSpectator', { playerId }));
@@ -367,6 +395,7 @@ export function RoomScreen() {
         <span class="room-bar__label">${t('模拟难度')}<${MicroLabel}>DIFFICULTY<//></span>
         <div class="room-bar__opts">
           <${DifficultyPicker} room=${room} isHost=${facts.isHost} busy=${busy} onPick=${setDifficulty} />
+          <${BossHpPicker} room=${room} isHost=${facts.isHost} busy=${busy} onPick=${setBossHp} />
           <${AiLastToggle} option=${aiLastOption(room, me.playerId)} busy=${busy} onToggle=${setAiLast} />
           ${coop ? html`<span class="room-bar__bans">${info.openingBanNote}<span class="t-dim"> ${t('· {n} 人（含 AI）', { n: facts.occupied.length })}</span></span>` : null}
         </div>

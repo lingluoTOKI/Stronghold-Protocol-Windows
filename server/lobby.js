@@ -162,7 +162,7 @@
 //     a player seat (the seat is kept and given back on resume).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, MATCH_TARGET, MATCH_TIMEOUT_MS } from '../shared/constants.js';
+import { DIFFICULTIES, BOSS_HP_DEFAULT, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, MATCH_TARGET, MATCH_TIMEOUT_MS } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
@@ -269,6 +269,8 @@ export class Room {
     this.code = code;
     this.mode = mode;
     this.difficulty = difficulty;
+    /** 首领血量挡位（改编版）：房主可在开局前改，见 setBossHp */
+    this.bossHp = BOSS_HP_DEFAULT;
     /**
      * 「AI 队友最后选择」 (room.setAiPicksLast, GitHub #338; co-op only, off by default): the match's strategy and 机变 drafts
      * put every human seat before every AI seat (Match opts.aiPicksLast). Kept across the room's matches.
@@ -352,6 +354,8 @@ export class Room {
       hostId: this.hostId,
       mode: this.mode,
       difficulty: this.difficulty,
+      // 首领血量挡位（改编版）：客户端据此显示当前选择
+      bossHp: this.bossHp ?? BOSS_HP_DEFAULT,
       aiPicksLast: this.aiPicksLast,
       inMatch: !!this.match,
       seats: this.seats.map((s) => (s
@@ -657,6 +661,7 @@ export class Lobby {
       case 'room.leave': return this.leave(session);
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
+      case 'room.setBossHp': return this.setBossHp(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
       case 'room.addBot': return this.addBot(session);
       case 'room.removeBot': return this.removeBot(session, msg);
@@ -1075,6 +1080,24 @@ export class Lobby {
     if (room.difficulty !== difficulty || room.content?.modeId) {
       room.difficulty = difficulty;
       if (room.content?.modeId) { const rest = { ...room.content }; delete rest.modeId; room.content = Object.freeze(rest); }
+      for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
+  /**
+   * 首领血量挡位（改编版，2026-10-18）：房主在开局前选 1 或 3.25。
+   * 只写房间状态，开局时通过 opts.bossHp 交给 Match → GameData；不碰 data、不进内容哈希、不起 match host。
+   */
+  setBossHp(session, { bossHp }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.bossHp !== bossHp) {
+      room.bossHp = bossHp;
+      // 改了会影响战斗，其他真人要重新准备（与改难度同样处理）
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
       this.broadcastState(room);
     }
@@ -1591,6 +1614,8 @@ export class Lobby {
         roomCode: room.code,
         mode: room.mode,
         difficulty: room.difficulty,
+        // 首领血量挡位（改编版）：GameData 用它缩放共享首领血池
+        bossHp: room.bossHp ?? BOSS_HP_DEFAULT,
         // a plugin mode the host chose (header "Gameplay plugins"), else the official mode of the difficulty
         modeId: room.content?.modeId || modeIdFor(room.mode, room.difficulty),
         // 「AI 队友最后选择」 (GitHub #338): fixed for the match

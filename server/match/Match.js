@@ -297,7 +297,7 @@ export class Match {
       startingSeatCount++;
     }
     this.startingPlayerCount = startingSeatCount;
-    this.gd = new GameData(this.data, this.modeId, this.startingPlayerCount);
+    this.gd = new GameData(this.data, this.modeId, this.startingPlayerCount, opts.bossHp);
     // [ASSUMED] Only an array is a content list. Omitting the key (every vanilla match) leaves setDiy on KITTED_CHARS.
     // A copy so a caller's freeze or later mutation cannot change the check, and so the key stays off public views.
     if (Array.isArray(opts.kitted)) this.diyKitted = Object.freeze(opts.kitted.filter((id) => typeof id === 'string'));
@@ -319,7 +319,7 @@ export class Match {
     this._offerResume = null;
     /** window sequence (diagnostics and messages) */
     this.offerSeq = 0;
-    this.gd = new GameData(this.data, this.modeId);
+    this.gd = new GameData(this.data, this.modeId, 1, opts.bossHp);
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
     /** 「AI 队友最后选择」 (opts.aiPicksLast, GitHub #338): humans draft before AI seats (MatchPhases.humansFirst) */

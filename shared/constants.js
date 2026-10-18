@@ -32,6 +32,15 @@ export const ROOM_CODE_LEN = 4;
 export const NAME_MAX_LEN = 12;
 
 export const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
+
+/**
+ * 首领血量挡位（改编版，2026-10-18）：房主建房时选，服务端 GameData 按此缩放共享首领血池。
+ * 1 = 官方原版；3.25 = 维护者实测觉得合适的强度。
+ * 不做成插件——任何插件启用都会进内容哈希并强制走 match host 子进程，2 核小机器扛不住。
+ */
+export const BOSS_HP_OPTIONS = Object.freeze([1, 3.25]);
+/** 缺省挡位：官方原版。 */
+export const BOSS_HP_DEFAULT = 1;
 export const DIFFICULTY_NAMES = { FUNNY: N_('标准模拟'), NORMAL: N_('险境模拟'), HARD: N_('绝境模拟'), ABYSS: N_('终极模拟') };
 export const DIFFICULTY_COLORS = { FUNNY: '#f6a329', NORMAL: '#e85a1a', HARD: '#e73118', ABYSS: '#ff0024' };
 

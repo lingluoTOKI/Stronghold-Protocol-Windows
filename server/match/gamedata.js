@@ -99,12 +99,18 @@ export class GameData {
    * @param {string} modeId e.g. 'mode_multi_hard'
    * @param {number} [startingPlayerCount=1] 开局占用席位数（人座 + AI 座），用于六人座的血池翻倍与开局少 BAN
    */
-  constructor(data, modeId, startingPlayerCount = 1) {
+  constructor(data, modeId, startingPlayerCount = 1, bossHpOverride = null) {
     this.raw = data && typeof data === 'object' ? data : {};
     this.config = getConfig(this.raw) || {};
     this.modeId = modeId;
     /** @type {number} 对局开始时占用的座位数（不是仍存活的人数） */
     this.startingPlayerCount = Number.isInteger(startingPlayerCount) && startingPlayerCount >= 1 ? startingPlayerCount : 1;
+    /**
+     * 首领血量挡位覆盖（改编版，2026-10-18）：房主建房时选的 1 或 3.25。
+     * null = 用 data/config.json 的 bossHpScale（原版行为）。
+     * 只影响共享首领血池，不改任何 data 表、不进内容哈希、不触发 match host 子进程。
+     */
+    this.bossHpOverride = (typeof bossHpOverride === 'number' && Number.isFinite(bossHpOverride) && bossHpOverride > 0) ? bossHpOverride : null;
     this.mode = getMode(modeId, this.raw) || {};
     // Mode-level globals inherit field by field; the vanilla mode never changes its config object.
     const overrides = Object.fromEntries(Object.keys(this.config).filter(k => k !== 'modes' && Object.hasOwn(this.mode, k)).map(k => [k, this.mode[k]]));
@@ -183,7 +189,9 @@ export class GameData {
     // 六人座：开局坐满六人时共享血池翻倍为「四人基准 ×200%」。上游 bossPoolShareOf 已以 aliveFull=4
     // 封顶按存活人数缩放，这里的 ×2 与之相乘叠加（startingPlayerCount 是开局占用席位数）。
     const sixPlayerHp = this.startingPlayerCount === 6 ? 2 : 1;
-    return sixPlayerHp * bossPoolShareOf(this.mode.bossHpScale, this.config.bossHpScale, this.isSolo, aliveCount);
+    // 改编版：房主选的首领血量挡位（1 或 3.25）。与六人房的 ×2、按存活人数的缩放相乘叠加。
+    const bossHpScale = this.bossHpOverride ?? 1;
+    return sixPlayerHp * bossHpScale * bossPoolShareOf(this.mode.bossHpScale, this.config.bossHpScale, this.isSolo, aliveCount);
   }
 
   /** config.titles with the tuning overrides (stat / rule per title id) merged in. */
