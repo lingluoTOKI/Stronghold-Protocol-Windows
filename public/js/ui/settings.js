@@ -57,7 +57,19 @@ import { cosmetics } from '../cosmetics.js';
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
 /** Settings store: { bgm, sfx, voice, voiceLang, voiceNative, voiceOverrides, muted, damageNumbers, officialDamageNumbers, ammoEnergyCount, combatMetrics, prepDeployFold, quality, textSize, keys }. */
-export const settingsStore = createStore(sanitizeSettings(loadPref('settings', null)));
+// 改编版（2026-10-18）：BGM 一律按 0 起手，无视 localStorage 里存的旧值。
+//
+// 只在 audio.setVolumes() 那一处覆盖是**不够**的：settingsStore 里的 bgm 仍是
+// localStorage 里的 0.6，而订阅回调 audio.setVolumes(s) 直接传 s ——
+// 玩家改任何一项设置（画质、音量、字号…）都会触发回调，BGM 就被写回 0.6 并开始下载。
+// 实测：一小时 649 次 /media/ 请求、120 MB，占单类流量 29%。
+//
+// 所以在这里就把 bgm 归零，store 里永远是 0；玩家在设置里调高 → 走 updateSettings，
+// sanitizeSettings 会保留他改后的值，回调照常生效。
+export const settingsStore = createStore((() => {
+  const s = sanitizeSettings(loadPref('settings', null));
+  return { ...s, bgm: 0 };
+})());
 
 /**
  * 设置 →「文字大小」: put the step on <html data-text> — css/theme.css turns it into the text root `--t`

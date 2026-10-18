@@ -1,3 +1,5 @@
+// 改编版（2026-10-18）：默认 bgm: 0（省带宽）。凡是「取消静音后应该下载 BGM」的用例，
+// setVolumes 必须同时给出 bgm > 0，否则 bgmSilent 仍为 true，什么都不会下载。
 // Audio manager (public/js/audio.js): BGM selection, manifest resolution, SFX limiter, and the manager's
 // never-throw behaviour with a fake Web Audio implementation.
 
@@ -596,6 +598,7 @@ describe('AudioManager', () => {
     globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
     try {
       const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+      a.setVolumes({ bgm: 1 });  // 改编版：默认 bgm: 0（省带宽），这里显式打开才能测到下载
       a.install();
       a.playBgm('prep'); // remembered while locked
       assert.equal(urls.length, 0);
@@ -651,7 +654,7 @@ describe('AudioManager', () => {
       await tick();
       assert.ok(!asked(urls, prep), 'muted: a phase change fetches nothing');
       assert.equal(a.wantBgm, 'prep', 'the wanted track is remembered');
-      a.setVolumes({ muted: false });
+      a.setVolumes({ muted: false, bgm: 1 });
       await tick();
       assert.ok(asked(urls, prep), 'unmuted: the track the screen wants now is fetched');
       assert.ok(!asked(urls, lobby), 'never the track wanted before');
@@ -676,7 +679,7 @@ describe('AudioManager', () => {
       const n = urls.length;
       const started = fw.made.started;
       a.playBgm('lobby');
-      a.setVolumes({ muted: false });
+      a.setVolumes({ muted: false, bgm: 1 });
       await tick();
       assert.equal(a.bgm?.loopUrl, lobby);
       assert.equal(urls.length, n, 'no new request');
@@ -716,6 +719,7 @@ describe('AudioManager', () => {
     globalThis.fetch = async (u) => { urls.push(u); return u.startsWith('/media/') ? { ok: false, status: 404 } : { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
     try {
       const a = new AudioManager({ win: fw.win, getManifest: () => served });
+      a.setVolumes({ bgm: 1 });  // 改编版：默认 bgm: 0
       a.install();
       fw.fire('pointerdown');
       a.playBgm('prep');
@@ -743,6 +747,7 @@ describe('AudioManager', () => {
       };
       try {
         const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+        a.setVolumes({ bgm: 1 });  // 改编版：默认 bgm: 0
         a.install();
         fw.fire('pointerdown');
         a.playBgm('prep');
@@ -763,6 +768,7 @@ describe('AudioManager', () => {
       globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
       try {
         const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+        a.setVolumes({ bgm: 1 });  // 改编版：默认 bgm: 0，这里显式打开
         a.install();
         fw.fire('pointerdown');
         a.playBgm('prep');
@@ -791,6 +797,7 @@ describe('AudioManager', () => {
       };
       try {
         const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+        a.setVolumes({ bgm: 1 });  // 改编版：默认 bgm: 0，这里显式打开
         a.install();
         fw.fire('pointerdown');
         a.playBgm('prep');
@@ -818,6 +825,7 @@ describe('AudioManager', () => {
       };
       try {
         const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+        a.setVolumes({ bgm: 1 });  // 改编版：默认 bgm: 0，这里显式打开
         a.install();
         fw.fire('pointerdown');
         a.playBgm('prep');
@@ -924,6 +932,7 @@ describe('impact sounds (user playtest #4 item 6)', () => {
     const origFetch = globalThis.fetch;
     globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
     const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+    a.setVolumes({ bgm: 1 });  // 改编版：默认 bgm: 0，这里显式打开
     a.install();
     fw.fire('pointerdown');
     a.setFieldUnits(units);
@@ -1014,6 +1023,7 @@ describe('the running skill\'s own attack / impact sound (sfx.units[id].attacks 
     const origFetch = globalThis.fetch;
     globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
     const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+    a.setVolumes({ bgm: 1 });  // 改编版：默认 bgm: 0，这里显式打开
     a.install();
     fw.fire('pointerdown');
     a.setFieldUnits(units);
@@ -1158,6 +1168,7 @@ describe('漏怪 sound', () => {
     const origFetch = globalThis.fetch;
     globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
     const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+    a.setVolumes({ bgm: 1 });  // 改编版：默认 bgm: 0，这里显式打开
     a.install();
     fw.fire('pointerdown');
     const settle = () => new Promise((r) => setTimeout(r, 10));
