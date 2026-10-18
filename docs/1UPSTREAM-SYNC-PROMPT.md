@@ -5,13 +5,18 @@
 > **本文件四个部分**：
 > 1. `✂` 分隔线之间 —— **发给 AI 的提示词本体**（同步要求 + 执行流程）
 > 2. **附：当前基线快照** —— 上次同步到哪个 commit、冲突怎么解的、上游新增了什么机制
-> 3. **附二/三** —— 部署踩过的坑、部署流程（每次同步后都要回来看）
-> 4. **附四：服务器架构速记** —— `/opt` 运维层、重连窗口、**插件 vs 房间设置**、**带宽与 gzip**、素材包守卫
+> 3. **附二/三** —— 部署踩过的坑（**坑 A–E**）、部署流程（每次同步后都要回来看）
+> 4. **附四：服务器架构速记** —— `/opt` 运维层、重连窗口、**插件 vs 房间设置**、
+>    **带宽 / gzip / `/data/` 长缓存**、素材包守卫
 >
-> 最后更新：2026-10-18（同步上游 0.3.1 之后，另加当天的带宽治理与素材守卫）。服务器运维的完整交接见仓库外的 `交接文档-卫戍协议服务器.md`。
+> 最后更新：2026-10-18（同步上游 0.3.1 之后，另加当天的带宽治理、素材守卫与机变界面修复）。服务器运维的完整交接见仓库外的 `交接文档-卫戍协议服务器.md`。
 >
-> **如果只想知道「最近改了什么」，直接跳到「附四」** —— 那里有今天的全部结论：gzip 省 90%、
-> BGM 默认关、公告轮询 60 秒、没导入素材不让建房、改动型插件为何不能用。
+> **如果只想知道「最近改了什么」，直接跳到「附四」** —— 那里有当天的全部结论：gzip 省 90%、
+> `/data/` 加 `?v=` 长缓存、BGM 启动时强制关、公告轮询 60 秒、没导入素材不让建房、
+> 改动型插件为何不能用。
+>
+> **如果同步后界面整页变「SYSTEM FAULT」**，先看**附二的坑 E**：冲突解完删不干净
+> （留了个裸变量）会让机变阶段直接崩，`node --check` 和 `check:imports` 都抓不到。
 
 ---
 
@@ -134,12 +139,20 @@
     `bossHpOverride`（在 `bossPoolShare()` 里乘上去）、`public/js/screens/room.js` `BossHpPicker`
     + `public/css/screens/room.css` `.bosshp`。**这是「房间设置」而不是插件**——理由见附四。
   - **素材包守卫**：`public/js/screens/lobby.js` `requireAssetPack()`，拦 `create` / `join` / `startMatch`。
-  - **BGM 默认关**：`public/js/ui/gameLogic/settings.js` `DEFAULT_SETTINGS.bgm = 0`、
-    `public/js/audio.js` `this.volumes.bgm = 0`。
+  - **BGM 启动时强制关**：`public/js/ui/gameLogic/settings.js` `DEFAULT_SETTINGS.bgm = 0`、
+    `public/js/audio.js` `this.volumes.bgm = 0`，**以及** `public/js/ui/settings.js` 启动那次
+    `audio.setVolumes({ ...settingsStore.get(), bgm: 0 })`（只压启动那一次，订阅回调不动）。
+    只改默认值的话，老玩家 localStorage 里的 `bgm: 0.6` 会照旧下载，见附四。
+  - **`/data/` 长缓存**：`public/js/data.js` 的 `urlFor()` 与 `loadOverlay()` 拼 `?v=${APP_VERSION}`；
+    `server/http/static.js` 的 assetViews 分支（`assets.json` / `local-assets.json` / `local-fx.json`）
+    带 `?v=` 时用 `IMMUTABLE_JSON`，不带仍是 `no-cache`。
   - **公告轮询 60 秒**：`public/js/screens/title.js` 的 `setInterval(load, 60000)`（原 10 秒）。
   - **监控大屏「重启服务」**：`server/http/routes.js` `GET /api/admin/restart`（需 `SP_ALLOW_RESTART=1`）
     + `public/monitor.html` 两个按钮 + `public/js/monitor.js` `restartService()`。
     **升级上游时 `routes.js` 被整份覆盖会冲掉它**，2026-10-18 就丢过一次。
+  - **机变界面修复**：`public/js/ui/choiceOverlay.js` —— 删掉上游已废弃、我们解冲突时没删净的
+    `spov__order` 渲染（引用了不存在的 `order`），并合并重复的 `spov__grid` div。
+    上游一旦再次改动这个组件，**记得确认这段别被合回来**，见附二坑 E。
 
 - **本次验证结论**：446 个 js/mjs `node --check` 全过；4 个 i18n JSON `JSON.parse` 通过；
   `npm run check:imports` 退出 0；`npm run golden` 全绿（49/46/22/21/10/140 场景）；
@@ -219,6 +232,41 @@ grep -c 'onclick=' public/monitor.html   # 应为 0
 
 `.playwright-cli/`、`output/`、`public/assets.zip` 等都在 `.gitignore` 里，
 但如果新增了别的产物目录，记得同步补 `.gitignore`，别靠 `git status` 事后发现。
+
+### 坑 E：冲突解完但**删不干净**，留下裸变量让界面整页崩（★★★ 最隐蔽）
+
+2026-10-18 同步 0.3.1 时，上游把「机变 / 悬赏决策」的**决策顺序**从顶栏挪到了队伍栏头像上
+（新增 `spMarks`，`public/js/ui/choiceOverlay.js`）。旧的那段渲染在我们的分支里还在，
+解冲突时**删了一半**——渲染块留着，它引用的局部变量 `order` 已经没了：
+
+```javascript
+${order.length ? html`<div class="spov__order" …>`}   // ← order 不存在
+```
+
+症状：任何走进机变阶段的玩家，整页变成「**界面发生错误 · SYSTEM FAULT**」，
+报 `Can't find variable: order`（Chrome）或 `order is not defined`（Edge）
+——**报错措辞还能不一样，别以为换了文件**。机变是联机必经阶段，等于对局直接没法打。
+
+同一段里还有第二个残留：`spov__grid` 的 `<div>` 连着开了两遍，两行 `class` 还不一致
+（外层带 `spov__grid--many`，内层只带 `--3`），DOM 结构本来就是坏的。
+
+**教训：`node --check` 和 `check:imports` 都抓不到这类问题**（语法合法、导入也能解析），
+`node --test test/ui/*` 里没有渲染这个组件的用例。只能靠**人工看 + 浏览器实测**。
+
+同步完成后的检查清单，把这条加上：
+
+```bash
+# 1) 冲突解完后，搜一遍「可疑的裸标识符」——注释里的不算
+grep -rn "spov__order\|order\.length" public/js/ui/choiceOverlay.js
+
+# 2) 结构类残留：同一个 class 的 div / 标签连着开两遍
+grep -rn -A1 '<div class=\${cx(' public/js/ui/choiceOverlay.js | grep -B1 'cx('
+
+# 3) 真正的兜底：起本地服，进一次「机变阶段」，看控制台有没有红字
+```
+
+发现这类问题的排查顺序：`grep` 报错信息里那个标识符 → 确认它是**裸变量**而不是
+`x.order` 属性 → 看它所在的渲染块是不是上游已经废弃的（对照 `git log -p` 上游那次 commit）。
 
 ---
 
@@ -467,6 +515,38 @@ gzip_types text/plain text/css text/javascript application/javascript
 （`server/http/static.js` 的 `IMMUTABLE_JSON`、`files.js`）；不带哈希的走 `max-age=86400`。
 `/media/` 与 `/assets/` 都命中。**先 `curl -D -` 看一眼响应头再动手**，别以为没配。
 
+#### `/data/*.json` 也带了 `?v=<APP_VERSION>`（省最多的一项）
+
+`files.js` 的 `cacheControlFor()` 本来就认 `?v=`（有就 `immutable`，没有就 `no-cache`），
+但**前端从来没带过**。实测当天 `/data/` 被反复请求：
+
+| URL | 一天请求次数 | 字节 |
+|---|---|---|
+| `/data/assets.json` | **878** | 106 MB |
+| `/data/local-assets.json` | **797** | — |
+| `/data/chess.json` | **628** | 97 MB |
+| `/data/config.json` | **613** | — |
+
+同一版本里这些文件根本不会变，每次验证纯属浪费。修法两处：
+
+- `public/js/data.js`：`urlFor()` 和语言包的 `loadOverlay()` 都拼上 `?v=${dataVer}`，
+  `dataVer` 取 `APP_VERSION`（`opts.version` 可覆盖）。
+- `server/http/static.js`：`/data/assets.json`、`local-assets.json`、`local-fx.json`
+  走的是 `assetViews` 生成的 manifest，原来硬编码 `cacheControl: 'no-cache'` **无视 `?v=`**，
+  改成带 `?v=` 时用 `IMMUTABLE_JSON`；不带 `?v=` 的老 URL 仍是 `no-cache`（旧页面照常工作）。
+
+实测：
+
+```
+/data/chess.json?v=0.3.1          → public, max-age=31536000, immutable
+/data/assets.json?v=0.3.1         → public, max-age=31536000, immutable
+/data/local-assets.json?v=0.3.1   → public, max-age=31536000, immutable
+/data/*.json（不带 ?v=）           → no-cache（不变）
+```
+
+⚠️ 改 `static.js` **要重启游戏服务**（其他三项都是静态文件，不用重启）。
+重启前按规矩先看有没有人在玩。
+
 #### 判断是不是被阿里云限速
 
 - `tc qdisc show dev eth0` 只有 `fq_codel`、`iptables` 里没有 limit → **服务器自身没限速**
@@ -474,6 +554,40 @@ gzip_types text/plain text/css text/javascript application/javascript
   配额用完后回落到基础带宽（常见 1 Mbps）
 - 元数据查不到带宽值，得看控制台
 - 判据看 `/proc/net/dev` 的累计发送量和 nginx 的每小时字节数，别凭感觉
+
+控制台上「峰值公网带宽 **1.01 / 200 Mbps**」这种读数，含义是**标称峰值 200、当下只有 1**。
+提示文字自己也写了「不作为业务承诺指标……资源争抢时可能受到限制」——**1 Mbps 是限速后的档位**，
+不是突然变慢。
+
+#### 一天的流量能被哪些项目吃掉（实测拆解）
+
+单日 4,654 MB 的完整构成，按优化收益排序：
+
+| 类别 | MB | 占比 | 对策 |
+|---|---|---|---|
+| 素材 `assets/*` | 1,949 | **41.9%** | 素材包拦截（没导入不让进） |
+| **BGM `/media/`** | **1,000** | **21.5%** | 强制关（见下） |
+| 代码 js/css/vendor | 754 | 16.2% | gzip 已经压过 |
+| 数据 `/data/*.json` | 429 | 9.2% | `?v=` 长缓存 |
+| **公告轮询** | **368** | **7.9%** | 10 秒 → 60 秒 |
+
+三件最划算的（都已做）：gzip、BGM 关、公告放宽，**合计能省 58%**。
+
+#### BGM 要「启动时强制 0」，只改默认值不够
+
+`DEFAULT_SETTINGS.bgm` 改成 0 只对**新玩家**生效——老玩家 localStorage 里还存着
+`bgm: 0.6`，照旧下载。所以 `public/js/ui/settings.js` 启动那次调用直接覆盖：
+
+```javascript
+audio.setVolumes({ ...settingsStore.get(), bgm: 0 });   // 启动时
+settingsStore.subscribe((s) => { audio.setVolumes(s); });  // 玩家改了就照他的，别覆盖回去
+```
+
+关键是**只覆盖启动那一次**，订阅回调保持原样，否则玩家调大音量又被压回 0。
+
+`audio.js` 的 `bgmSilent`（`volumes.muted || volumes.bgm <= 0`）此时会让 `playBgm` **根本不发起下载**，
+所以这是真省流量，不是静音播放。
+
 
 ### 素材包守卫（没导入不让进对局）
 
