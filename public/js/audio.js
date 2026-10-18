@@ -577,7 +577,7 @@ export class AudioManager {
     this.bgmGain = null;
     this.sfxGain = null;
     this.voiceGain = null;
-    this.volumes = { bgm: 0.6, sfx: 0.8, voice: 0.8, muted: false };
+    this.volumes = { bgm: 0, sfx: 0.8, voice: 0.8, muted: false }; // 改编版：BGM 默认关（省带宽）
     this.buffers = new Map(); // url → Promise<AudioBuffer|null> (insertion order = LRU)
     this.bufBytes = new Map(); // url → decoded PCM bytes (the byte budget of the LRU, see _buffer)
     this.warned = new Set();
