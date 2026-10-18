@@ -167,3 +167,7 @@
 /* 左栏底部为固定按钮留出空间，避免把「本局耗时」压在按钮下面 */
 .result__hero { padding-bottom: 1.05rem; }
 
+
+/* a match with gameplay plugins (DESIGN §32.6): the unofficial mark under the headline */
+.result__modmark { align-self: flex-start; margin-top: .06rem; }
+.result__test { display: flex; align-items: center; gap: .08rem; margin: .08rem 0 0; color: #e8b84a; }

@@ -1,0 +1,170 @@
+- generic [active] [ref=f1e1]:
+  - banner [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - heading "卫戍协议 · 联机监控大屏" [level=1] [ref=f1e4]
+      - generic [ref=f1e5]: STRONGHOLD PROTOCOL · SERVER OPS
+    - generic [ref=f1e6]:
+      - text: "admin token:"
+      - textbox "SP_ADMIN_TOKEN（留空=只读）" [ref=f1e7]
+      - button "保存" [ref=f1e8] [cursor=pointer]
+      - 'button "IP: 星号屏蔽（点击看明文）" [ref=f1e9] [cursor=pointer]'
+      - 'button "本地测试: 关" [ref=f1e10] [cursor=pointer]'
+      - generic [ref=f1e11]: "--:--:--"
+  - button "▶ ⚙️ 服务器管理 公告发布 · 一键踢人 已就绪" [ref=f1e13] [cursor=pointer]:
+    - generic [ref=f1e14]: ▶
+    - generic [ref=f1e15]: ⚙️ 服务器管理
+    - generic [ref=f1e16]: 公告发布 · 一键踢人
+    - generic [ref=f1e17]: 已就绪
+  - generic [ref=f1e20]:
+    - generic [ref=f1e22]:
+      - generic [ref=f1e23]: "--"
+      - generic [ref=f1e24]: 三台服务器在线连接总数
+    - generic [ref=f1e25]:
+      - generic [ref=f1e26]:
+        - generic [ref=f1e27]: "--"
+        - generic [ref=f1e28]: 真人
+      - generic [ref=f1e29]:
+        - generic [ref=f1e30]: "--"
+        - generic [ref=f1e31]: 房间
+      - generic [ref=f1e32]:
+        - generic [ref=f1e33]: "--"
+        - generic [ref=f1e34]: 对局中
+  - generic [ref=f1e35]:
+    - generic [ref=f1e36]:
+      - heading "上海 · 主服 主服" [level=2] [ref=f1e38]:
+        - text: 上海 · 主服
+        - generic [ref=f1e40]: 主服
+      - generic [ref=f1e41]: https://***.***.***.***
+      - generic [ref=f1e43]:
+        - generic [ref=f1e44]:
+          - generic [ref=f1e45]: "--"
+          - generic [ref=f1e46]: 在线连接
+        - generic [ref=f1e47]:
+          - generic [ref=f1e48]: "--"
+          - generic [ref=f1e49]: 真人
+        - generic [ref=f1e50]:
+          - generic [ref=f1e51]: "--"
+          - generic [ref=f1e52]: AI
+        - generic [ref=f1e53]:
+          - generic [ref=f1e54]: "--"
+          - generic [ref=f1e55]: 房间
+        - generic [ref=f1e56]:
+          - generic [ref=f1e57]: "--"
+          - generic [ref=f1e58]: 对局
+        - generic [ref=f1e59]:
+          - generic [ref=f1e60]: "--"
+          - generic [ref=f1e61]: 观战
+      - region "稳定性保护" [ref=f1e62]:
+        - generic [ref=f1e63]:
+          - generic [ref=f1e64]: 运行保护
+          - generic [ref=f1e65]: 未认证
+        - generic [ref=f1e66]:
+          - generic [ref=f1e67]:
+            - generic [ref=f1e68]: 可用内存 · 全机
+            - text: —
+          - generic [ref=f1e69]:
+            - generic [ref=f1e70]: 本服占用
+            - text: —
+          - generic [ref=f1e71]:
+            - generic [ref=f1e72]: 对局 / 上限
+            - text: —
+          - generic [ref=f1e73]:
+            - generic [ref=f1e74]: 无人房间
+            - text: —
+        - generic [ref=f1e75]:
+          - paragraph [ref=f1e76]: 输入管理 token 查看保护状态
+          - generic [ref=f1e77]:
+            - button "暂停开局" [disabled] [ref=f1e78]
+            - button "自动保护" [disabled] [ref=f1e79]
+        - group [ref=f1e80]:
+          - generic "更多指标" [ref=f1e81] [cursor=pointer]
+      - generic [ref=f1e83]:
+        - generic [ref=f1e84]: 运行 --
+        - generic [ref=f1e85]: "--"
+      - generic [ref=f1e86]:
+        - heading "🏠 房间对局 · 在线玩家" [level=3] [ref=f1e87]
+        - generic [ref=f1e89]: 输入 admin token 后显示
+    - generic [ref=f1e91]:
+      - heading "3001 · 独立部署 独立" [level=2] [ref=f1e93]:
+        - text: 3001 · 独立部署
+        - generic [ref=f1e95]: 独立
+      - generic [ref=f1e96]: https://***.***.***.***/alliance
+      - generic [ref=f1e98]:
+        - generic [ref=f1e99]:
+          - generic [ref=f1e100]: "--"
+          - generic [ref=f1e101]: 在线连接
+        - generic [ref=f1e102]:
+          - generic [ref=f1e103]: "--"
+          - generic [ref=f1e104]: 真人
+        - generic [ref=f1e105]:
+          - generic [ref=f1e106]: "--"
+          - generic [ref=f1e107]: AI
+        - generic [ref=f1e108]:
+          - generic [ref=f1e109]: "--"
+          - generic [ref=f1e110]: 房间
+        - generic [ref=f1e111]:
+          - generic [ref=f1e112]: "--"
+          - generic [ref=f1e113]: 对局
+        - generic [ref=f1e114]:
+          - generic [ref=f1e115]: "--"
+          - generic [ref=f1e116]: 观战
+      - region "稳定性保护" [ref=f1e117]:
+        - generic [ref=f1e118]:
+          - generic [ref=f1e119]: 运行保护
+          - generic [ref=f1e120]: 未认证
+        - generic [ref=f1e121]:
+          - generic [ref=f1e122]:
+            - generic [ref=f1e123]: 可用内存 · 全机
+            - text: —
+          - generic [ref=f1e124]:
+            - generic [ref=f1e125]: 本服占用
+            - text: —
+          - generic [ref=f1e126]:
+            - generic [ref=f1e127]: 对局 / 上限
+            - text: —
+          - generic [ref=f1e128]:
+            - generic [ref=f1e129]: 无人房间
+            - text: —
+        - generic [ref=f1e130]:
+          - paragraph [ref=f1e131]: 输入管理 token 查看保护状态
+          - generic [ref=f1e132]:
+            - button "暂停开局" [disabled] [ref=f1e133]
+            - button "自动保护" [disabled] [ref=f1e134]
+        - group [ref=f1e135]:
+          - generic "更多指标" [ref=f1e136] [cursor=pointer]
+      - generic [ref=f1e138]:
+        - generic [ref=f1e139]: 运行 --
+        - generic [ref=f1e140]: "--"
+      - generic [ref=f1e141]:
+        - heading "🏠 房间对局 · 在线玩家" [level=3] [ref=f1e142]
+        - generic [ref=f1e144]: 输入 admin token 后显示
+    - generic [ref=f1e146]:
+      - heading "杭州 · 备用服 备用" [level=2] [ref=f1e148]:
+        - text: 杭州 · 备用服
+        - generic [ref=f1e150]: 备用
+      - generic [ref=f1e151]: https://***.***.***.***/backup
+      - generic [ref=f1e153]:
+        - generic [ref=f1e154]:
+          - generic [ref=f1e155]: "--"
+          - generic [ref=f1e156]: 在线连接
+        - generic [ref=f1e157]:
+          - generic [ref=f1e158]: "--"
+          - generic [ref=f1e159]: 真人
+        - generic [ref=f1e160]:
+          - generic [ref=f1e161]: "--"
+          - generic [ref=f1e162]: AI
+        - generic [ref=f1e163]:
+          - generic [ref=f1e164]: "--"
+          - generic [ref=f1e165]: 房间
+        - generic [ref=f1e166]:
+          - generic [ref=f1e167]: "--"
+          - generic [ref=f1e168]: 对局
+        - generic [ref=f1e169]:
+          - generic [ref=f1e170]: "--"
+          - generic [ref=f1e171]: 观战
+      - generic [ref=f1e173]:
+        - generic [ref=f1e174]: 运行 --
+        - generic [ref=f1e175]: "--"
+      - generic [ref=f1e176]:
+        - heading "🏠 房间对局 · 在线玩家" [level=3] [ref=f1e177]
+        - generic [ref=f1e179]: 输入 admin token 后显示
