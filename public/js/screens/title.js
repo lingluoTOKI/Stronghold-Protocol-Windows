@@ -332,6 +332,10 @@ export function TitleScreen() {
   const valid = isValidName(name);
   const start = async () => {
       if (!valid) { toast(t('请输入博士代号'), 'warn'); return; }
+      // 改编版（2026-10-18）：人少的时候不拦，人多才要求先导入素材包。
+      // 理由：不导入时每局要从服务器下载几十 MB（立绘 / Spine / 特效 / 音频），
+      // 人一多就把上行带宽占满；人少（< 5）时服务器扛得住，不该为难玩家。
+      // 房间内人数取自 /api/online 的 humans（lobby.stats()：不含机器人、不含已离开的座位）。
       if (importSupport().ok) {
         // 改编版（2026-10-18）：房内真人 ≥ 10 人、且没导入素材包 → 不让开始，直接带到导入界面。
         // 人少（< 10）时服务器扛得住，不打扰玩家。
@@ -346,17 +350,32 @@ export function TitleScreen() {
             if (r.ok) { const j = await r.json(); if (typeof j.humans === 'number') humans = j.humans; }
           } catch { /* 网络抖动：按人多处理 */ }
           if (humans >= 10) {
-            // 不弹「取消」，直接把玩家带到页面底部的「导入素材包」按钮（data-testid=asset-import）。
-            // 导入完成后回到这里再点「开始」即可。
-            toast(t('现在有 {n} 人在玩：请先导入素材包再开始', { n: humans }), 'warn');
+            // 改编版（2026-10-18）：人满了给两条路 —— 去契约服（人少、不用等），
+            // 或者留在本服但先导入素材包（省带宽，服务器扛得住）。
+            // 「去契约服」直接跳转；「导入素材包」则打开本页的导入窗口并留在原地。
+            const leave = await confirmDialog({
+              title: t('现在有 {n} 人在玩', { n: humans }),
+              text: t('人有点多，有两个办法：') + '\n\n'
+                + t('① 去契约服 —— 人少，不用等：') + '\n' + '   https://alliance.lingluo-toki.top/' + '\n\n'
+                + t('② 留在本服 —— 请先导入素材包，每局就不用再从服务器下载几十 MB 了。'),
+              okText: t('去契约服'),
+              cancelText: t('导入素材包'),
+            });
+            if (leave) {
+              // 去契约服：直接跳走，不打开导入窗口
+              location.href = 'https://alliance.lingluo-toki.top/';
+              return;
+            }
+            // 选择留下：打开导入窗口，玩家导完后回来再点一次「开始」
+            toast(t('导入完成后，再点一次「开始」即可进入'), 'warn');
             const btn = document.querySelector('[data-testid="asset-import"]');
             if (btn) {
-              btn.click();                                    // 打开导入窗口
+              btn.click();
               btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
             } else {
               toast(t('请在页面下方点「导入素材包」，选中素材包 zip'), 'warn');
             }
-            return;                                          // 不进入大厅
+            return;
           }
         }
       }
