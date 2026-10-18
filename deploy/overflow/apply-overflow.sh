@@ -1,5 +1,5 @@
 #!/bin/bash
-# apply-overflow.sh — 给「溢流服」（杭州 116.62.39.28:3000，0.2.1）加前两服满员才开放的分流
+# apply-overflow.sh — 给「溢流服」（杭州 116.62.39.28:3000，0.2.1）加主服满员才开放的分流
 #
 # 用法：把本目录整个传到目标机的 /root/ 下，然后
 #   cd /root/overflow-patch && bash apply-overflow.sh /root/stronghold
@@ -34,8 +34,9 @@ echo "════════ 1) 写 server/overflow.js ═══════�
 cat > "$ROOT/server/overflow.js" <<'OVERFLOW_JS'
 // server/overflow.js — 溢流服的分流判断（改编版，2026-10-18）。
 //
-// 这台机器当「溢流服」：只有主服（3000）和契约服（3001）都满员时才开放。
-// 没满的时候玩家该去主服 —— 那里是包月的，这台是按量计费，流量贵得多。
+// 这台机器当「溢流服」：主服（3000）满员时开放。
+// 主服没满的时候玩家该去主服 —— 那里是包月的，这台是按量计费，流量贵得多。
+// 契约服不再作为前置条件（它常年只有 1–2 人，两服都满等于永不开放）。
 //
 // 判断依据是前两服 /api/online 的 humans（房内真人），不是连接数：
 // 挂着大厅没进房间的人不算，否则一个挂机会让溢流服误以为「满了」。
@@ -46,7 +47,7 @@ export const OVERFLOW_SOURCES = Object.freeze([
   { name: '契约服', url: 'https://alliance.lingluo-toki.top/api/online' },
 ]);
 
-/** 前两服各自达到这个人数就算「满了」，溢流服才开放。 */
+/** 主服达到这个人数就算「满了」，溢流服才开放。 */
 export const OVERFLOW_THRESHOLD = 10;
 
 const CACHE_MS = 15_000;
@@ -83,9 +84,12 @@ export async function overflowOpen({ log } = {}) {
 
   const results = await Promise.all(OVERFLOW_SOURCES.map(async (s) => ({ ...s, humans: await readHumans(s.url) })));
   const detail = results.map((r) => `${r.name} ${r.humans == null ? '?' : r.humans}/${OVERFLOW_THRESHOLD}`).join(' · ');
-  // 只有每个都「读到了且达到门槛」才开放。读不到就当没满 ——
-  // 宁可让人去主服，也不要因为一台机器网络抖动就把人放进溢流服。
-  const open = results.every((r) => r.humans != null && r.humans >= OVERFLOW_THRESHOLD);
+  // 主服读不到就当没满 —— 宁可让人去包月的主服，
+  // 也不要因为一次网络抖动就把人放进按量计费的机器。
+  // 只要「主服」满员就开放，不要求契约服也满。
+  // 契约服常年只有 1–2 人，「两服都满」等于永远不开放，这台按量计费的机器白买。
+  const main = results.find((r) => r.name === '主服');
+  const open = !!main && main.humans != null && main.humans >= OVERFLOW_THRESHOLD;
 
   if (!cache || cache.open !== open) {
     try { log?.info?.(`[overflow] ${open ? '开放' : '关闭'}（${detail}）`); } catch { /* 日志坏了不影响判断 */ }
