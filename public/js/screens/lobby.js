@@ -19,7 +19,6 @@ import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_S
 import { openingBanCounts } from '../../../shared/openingBans.js';
 import { html, confirmDialog, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, Modal } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
-import { countImportedFiles, importSupport } from '../assetCache.js';
 import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
 import { SweepReport } from './sweep.js';
@@ -418,32 +417,6 @@ function BackgroundButton() {
 
 /** Lobby screen component. */
 
-/**
- * 素材包守卫（改编版，2026-10-18）：没导入素材包就不让建房 / 加入 / 快速匹配。
- *
- * 不导入时每局都要从服务器下载几十 MB（干员立绘 / Spine 模型 / 特效 / 音频），
- * 实测占服务器总流量的 30%+，是上行带宽的主要来源；被打到 1 Mbps 限速后所有人一起卡。
- *
- * 只拦「进入对局」的动作，大厅本身照常可看 —— 玩家可以回标题页导入素材包再回来。
- * 不支持导入的环境（http 非安全上下文 / 缺 Cache API）不拦，否则那些浏览器就完全玩不了。
- * 读缓存出错也不拦：宁可放过，不误伤。
- * @returns {Promise<boolean>} true = 已导入或不适用，可以继续
- */
-async function requireAssetPack() {
-  if (!importSupport().ok) return true;
-  let count = -1;
-  try { count = await countImportedFiles(); } catch { return true; }
-  if (!Number.isFinite(count) || count > 0) return true;
-  await confirmDialog({
-    title: t("请先导入素材包"),
-    text: t("没导入素材包时，每局都要从服务器下载几十 MB，又慢又容易卡，也会拖垮其他玩家。") + "\n\n"
-      + t("回标题页点「导入素材包」→「选择 zip」，选 QQ 群 1104628970 里的素材包，等 1–2 分钟即可。只导入一次。"),
-    okText: t("知道了"),
-  });
-  return false;
-}
-
-
 export function LobbyScreen() {
   const me = useStore((s) => s.me, shallowEqual);
   const conn = useStore((s) => s.connection, shallowEqual);
@@ -490,7 +463,6 @@ export function LobbyScreen() {
     clearMatch();
   };
   const startMatch = async () => {
-    if (!(await requireAssetPack())) return;
     if (matching || !online) return;
     matchState.current.active = true;
     setMatching(true); setMatchWait(false); setMatchCount(1); setMatchTarget(MATCH_TARGET);
@@ -546,14 +518,12 @@ export function LobbyScreen() {
     }
   };
   const create = async () => {
-    if (!(await requireAssetPack())) return;
     if (roomMode === 'coop' && coopCreate === 'match') return startMatch(); // 公共匹配池
     return run('create', () => net.request('room.create', {
       mode: roomMode, difficulty, ...(testMode && asTest ? { test: true } : {}),
     }));
   };
   const join = async (c = code) => {
-    if (!(await requireAssetPack())) return;
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
     // `undefined` — codeArg keeps an event target out of the key and falls back to the input field
     const k = codeArg(c, code);

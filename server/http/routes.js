@@ -268,7 +268,7 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
 
     // ---- 公开只读接口（规格 C）----
     if (parts.rawPath === '/api/online') {
-      sendJson(req, res, 200, { online: Math.max(health.network.connectionCount, 0) });
+      sendJson(req, res, 200, { online: Math.max(health.network.connectionCount, 0), humans: Math.max(health.humans || 0, 0) }); // humans = 房内真人（改编版 2026-10-18）
       return;
     }
     if (announcements && parts.rawPath === '/api/announcements') {

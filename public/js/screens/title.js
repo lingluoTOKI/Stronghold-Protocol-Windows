@@ -24,7 +24,7 @@ import { AssetDownloadButton } from '../ui/assetDownload.js';
 import { AssetImportButton } from '../ui/assetImport.js';
 import { useEffect, useMemo, useState } from '../../vendor/hooks.module.js';
 import { NAME_MAX_LEN, APP_VERSION, DEV_BUILD } from '../../../shared/constants.js';
-import { html, Button, Icon, MicroLabel, TextField, PingPill, Modal } from '../ui/components.js';
+import { html, Button, Icon, MicroLabel, TextField, PingPill, Modal, confirmDialog } from '../ui/components.js';
 import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
 import { toast } from '../ui/toasts.js';
@@ -39,6 +39,7 @@ import { GIcon } from '../ui/gameComponents.js';
 import { SettingsModal } from '../ui/settings.js';
 import { installedCount } from '../content.js';
 import { NoticesButton } from '../ui/notices.js';
+import { countImportedFiles, importSupport } from '../assetCache.js';
 import { sanitizeName, isValidName } from '../ui/playerName.js';
 
 export { stripLoneSurrogates, sanitizeName, isValidName } from '../ui/playerName.js';
@@ -329,10 +330,38 @@ export function TitleScreen() {
   const cssRidges = assetsSettled && (!ridges || ridgesFailed);
 
   const valid = isValidName(name);
-  const start = () => {
-    if (!valid) { toast(t('请输入博士代号'), 'warn'); return; }
-    enterSession(name);
-  };
+  const start = async () => {
+      if (!valid) { toast(t('请输入博士代号'), 'warn'); return; }
+      if (importSupport().ok) {
+        // 改编版（2026-10-18）：房内真人 ≥ 10 人、且没导入素材包 → 不让开始，直接带到导入界面。
+        // 人少（< 10）时服务器扛得住，不打扰玩家。
+        // 人数取自 /api/online 的 humans（lobby.stats()：不含机器人、不含已离开的座位）。
+        let imported = -1;
+        try { imported = await countImportedFiles(); } catch { imported = 1; }
+        if (Number.isFinite(imported) && imported === 0) {
+          // 拿不到人数就当作「人多」，宁可拦一下也不放任
+          let humans = 10;
+          try {
+            const r = await fetch('/api/online', { headers: { accept: 'application/json' } });
+            if (r.ok) { const j = await r.json(); if (typeof j.humans === 'number') humans = j.humans; }
+          } catch { /* 网络抖动：按人多处理 */ }
+          if (humans >= 10) {
+            // 不弹「取消」，直接把玩家带到页面底部的「导入素材包」按钮（data-testid=asset-import）。
+            // 导入完成后回到这里再点「开始」即可。
+            toast(t('现在有 {n} 人在玩：请先导入素材包再开始', { n: humans }), 'warn');
+            const btn = document.querySelector('[data-testid="asset-import"]');
+            if (btn) {
+              btn.click();                                    // 打开导入窗口
+              btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+              toast(t('请在页面下方点「导入素材包」，选中素材包 zip'), 'warn');
+            }
+            return;                                          // 不进入大厅
+          }
+        }
+      }
+      enterSession(name);
+    };
 
   const online = conn.status === 'online' || conn.status === 'connected';
   const dotClass = online ? 'is-on' : conn.status === 'reconnecting' || conn.status === 'connecting' || conn.status === 'handshaking' ? 'is-warn' : 'is-bad';
