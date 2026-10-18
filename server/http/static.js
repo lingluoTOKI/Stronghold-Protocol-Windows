@@ -254,7 +254,12 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
     if (views && (decoded === '/data/assets.json' || decoded === '/data/local-assets.json' || decoded === '/data/local-fx.json')) {
       const view = await views.get(decoded.slice('/data/'.length));
       if (view) {
-        await serveBuffer(req, res, { body: view.body, hash: view.hash, type: MIME['.json'], cacheControl: 'no-cache', key: `view:${decoded}`, cache: gzipCache });
+        // 改编版（2026-10-18）：带 `?v=` 的 URL 与 files.js cacheControlFor() 一样长缓存。
+        // 这三个 manifest 只在发版 / 素材更新时变，而实测 assets.json 一天被请求 878 次、
+        // local-assets.json 797 次，全是白跑一次协商。前端 data.js 现在统一带 `?v=<APP_VERSION>`。
+        const vQuery = new URL(req.url || '/', 'http://localhost').searchParams.get('v');
+        const cacheControl = vQuery ? IMMUTABLE_JSON : 'no-cache';
+        await serveBuffer(req, res, { body: view.body, hash: view.hash, type: MIME['.json'], cacheControl, key: `view:${decoded}:${vQuery || ''}`, cache: gzipCache });
         return;
       }
     }

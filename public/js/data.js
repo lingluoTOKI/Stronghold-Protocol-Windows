@@ -42,6 +42,7 @@
 import { useEffect, useReducer } from '../vendor/hooks.module.js';
 import { applyFileOverlay } from '../../shared/i18nData.js';
 import { canonicalLang } from '../../shared/i18nPacks.js';
+import { APP_VERSION } from '../../shared/constants.js';
 
 /** Known data files (name → URL basename). Unknown names are allowed too (`/data/<name>.json`). */
 export const DATA_FILES = Object.freeze({
@@ -136,6 +137,18 @@ const transientFailure = (err) => {
  *   `timeoutMs` 0 turns the art-manifest clock off. `setTimeout` / `clearTimeout` let a test fire that clock.
  */
 export function createDataStore(opts = {}) {
+  /**
+   * 数据文件请求的版本号（改编版，2026-10-18）：加在 URL 末尾的 `?v=`。
+   *
+   * server/http/files.js 的 cacheControlFor() 里，带 `v=` 的 URL 返回
+   * `public, max-age=31536000, immutable`（一年、不再询问）；不带的返回 `no-cache`
+   * （每次都要向服务器确认）。
+   *
+   * 实测：/data/chess.json 一天被请求 633 次、assets.json 878 次——同一个版本里
+   * 这些文件根本不会变，每次验证纯属浪费往返和带宽（当天 /data/ 共 429 MB）。
+   * 数据只在发版时变，所以用 APP_VERSION 当键正好：发版 = 新 URL = 重新下载一次。
+   */
+  const dataVer = opts.version === undefined ? APP_VERSION : opts.version;
   const base = opts.base ?? '/data/';
   const doFetch = opts.fetch || ((...a) => globalThis.fetch(...a));
   const retryDelays = Array.isArray(opts.retryDelays) ? opts.retryDelays : RETRY_DELAYS_MS;
@@ -180,7 +193,7 @@ export function createDataStore(opts = {}) {
     }
   };
 
-  const urlFor = (name) => base + (DATA_FILES[name] || `${name}.json`);
+  const urlFor = (name) => base + (DATA_FILES[name] || `${name}.json`) + (dataVer ? `?v=${dataVer}` : '');
 
   /**
    * One attempt at a file. Art manifests reject with a transient `{ timeout: true }` when the clock fires; a response
@@ -309,7 +322,7 @@ export function createDataStore(opts = {}) {
    * the language folder's data/i18n/<lang>.json, or — a content set with texts of its own for the language (setContent) —
    * the set's i18n/<lang>.json through its `overlay` loader; resolves to it, or null when unavailable.
    */
-  function loadOverlay(lang, url = `${base}i18n/${lang}.json`, overlayUrl = null) {
+  function loadOverlay(lang, url = `${base}i18n/${lang}.json${dataVer ? `?v=${dataVer}` : ''}`, overlayUrl = null) {
     const own = content && content.overlay && content.langs.has(lang) ? content : null;
     const key = own ? `${own.id}|${lang}` : lang;
     if (overlayLoads.has(key)) return overlayLoads.get(key);

@@ -78,7 +78,11 @@ settingsStore.subscribe((s) => {
   audio.setVoiceNative(s.voiceNative);
   applyTextSize(s.textSize);
 });
-audio.setVolumes(settingsStore.get());
+// 改编版（2026-10-18）：BGM 一律强制为 0，无视 localStorage 里的旧设置。
+// 原因：BGM 两个 loop 各约 1.9 MB，实测占服务器当天总流量的 21.5%（1,000 MB/天）。
+// 改成默认 0 只对新玩家生效，老玩家浏览器里还存着 bgm: 0.6，所以这里直接覆盖。
+// 玩家想听：设置 →「背景音乐」调到 > 0，本次会话和以后都会生效（订阅回调写回 audio）。
+audio.setVolumes({ ...settingsStore.get(), bgm: 0 });
 audio.setVoiceLang(settingsStore.get().voiceLang, settingsStore.get().voiceOverrides);
 audio.setVoiceNative(settingsStore.get().voiceNative);
 // before the first render (main.js boot renders after its imports ran): the stored step is on screen without a flash
