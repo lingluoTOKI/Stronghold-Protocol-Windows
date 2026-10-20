@@ -1,3 +1,4 @@
+.medal-preview .btn { min-height: 32px; padding: 6px 12px; font-size: 13px; line-height: 1.2; }
 .permanent-collection .btn { min-height: 32px; padding: 6px 12px; font-size: 13px; line-height: 1.2; }
 .permanent-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .permanent-tools .medal-preview { margin: 0; }

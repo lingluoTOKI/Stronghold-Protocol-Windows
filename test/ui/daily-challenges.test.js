@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { challengeDay, dailyChallenges, funReport, CHALLENGES } from '../../public/js/ui/dailyChallenges.js';
+import { challengeDay, dailyChallenges, CHALLENGES } from '../../public/js/ui/dailyChallenges.js';
 
 const now = Date.parse('2026-10-20T12:00:00+08:00');
 const record = (extra = {}) => ({ end: 'settled', t: now - 1000, selfId: 'me', difficulty: 'ABYSS', victory: true,
@@ -28,14 +28,12 @@ test('completion uses only current-day settled original personal records, includ
   for (const extra of [{ t: now - 86400000 }, { t: now + 1000 }, { t: NaN }, { end: 'quit' }, { test: true },
     { content: { cs: 'modded' } }, { selfId: 'spectator' }, { players: [] }]) {
     assert.ok(dailyChallenges([record(extra)], now).challenges.every(c => !c.done), JSON.stringify(extra));
-    if (extra.end || extra.test || extra.content || extra.selfId || extra.players) assert.deepEqual(funReport(record(extra)), []);
   }
 });
 test('personal survival and victory are required; missing perfect count is not eight', () => {
   const r = record({ victory: true, players: [{ playerId: 'me', victory: false, roundsPassed: 10, stats: {} }] });
   assert.equal(CHALLENGES.find(c => c.id === 'perfect').pass(r), false);
   assert.equal(CHALLENGES.find(c => c.id === 'victory').pass(r), false);
-  assert.deepEqual(funReport(r).map(b => b.name), ['坚守阵线']);
 });
 test('ultimate tier thresholds: seven is insufficient, core requires actual clear, dead teammates do not inherit wins', () => {
   const r = record();
@@ -52,19 +50,11 @@ test('ultimate tier thresholds: seven is insufficient, core requires actual clea
 test('left and bot seats cannot receive awards', () => {
   for (const flag of ['left', 'isBot']) {
     const r = record();r.players[0][flag] = true;
-    assert.deepEqual(funReport(r), []);
     assert.ok(dailyChallenges([r], now).challenges.every(c => !c.done));
   }
 });
-test('fun awards reflect recorded facts, not teammate rankings, and tolerate compact records', () => {
-  const r = record({ compact: true });
-  const names = funReport(r).map(b => b.name);
-  assert.deepEqual(names, ['凯旋归来', '滴水不漏', '合成专家', '整装出击', '随遇而安']);
-  r.players.push({ playerId: 'other', stats: { merges: 1000 } });
-  assert.deepEqual(funReport(r).map(b => b.name), names);
-});
 test('derivation does not mutate statistics or require storage/network APIs', () => {
   const r = record();const before = JSON.stringify(r);
-  dailyChallenges([r, r], now);funReport(r);
+  dailyChallenges([r, r], now);
   assert.equal(JSON.stringify(r), before);
 });

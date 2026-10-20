@@ -331,6 +331,8 @@ test('real HTTP and lobby settlement hook: only server results score; POST is re
   const collection = await (await fetch(server.url + '/api/achievements', { headers: { cookie: restoredCookie } })).json();
   assert.deepEqual(Object.keys(collection.unlocked.solo), ['ultimate-clear']);
   assert.equal(collection.progress.solo['hidden-core'], 1);
+  const sharedRecovery = await (await fetch(url + '/identity', { headers: { cookie: restoredCookie } })).json();
+  assert.equal(sharedRecovery.recoveryCode, exported.recoveryCode, 'daily points and permanent collection share one stable recovery code, not a score snapshot');
   assert.equal((await fetch(server.url + '/api/achievements', { method: 'POST', body: '{}' })).status, 405);
   const invalid = await fetch(url + '/identity', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recoveryCode: 'fake', score: 3 }) });
   assert.equal(invalid.status, 400);

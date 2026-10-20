@@ -2,14 +2,12 @@ import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Button } from './components.js';
 import { t, N_ } from '../../../shared/i18n.js';
 import { challengeDay } from './dailyChallenges.js';
-import { funReport } from '../../../shared/funReport.js';
-import { FunReport } from './funReport.js';
 import { identity } from '../net.js';
 import { ChallengeMedal } from './challengeMedal.js';
 import { ChallengeIdentity } from './challengeIdentity.js';
 const LEVELS = [N_('基础挑战'), N_('进阶挑战'), N_('高阶挑战')];
 
-export function DailyActivities({ records }) {
+export function DailyActivities() {
   const [now, setNow] = useState(() => Date.now());
   const [board, setBoard] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -45,7 +43,6 @@ export function DailyActivities({ records }) {
     globalThis.document?.addEventListener('visibilitychange', tick);
     return () => { clearInterval(timer); globalThis.document?.removeEventListener('visibilitychange', tick); };
   }, []);
-  const latest = [...records].filter(r => funReport(r).length).sort((a, b) => b.t - a.t)[0];
   const completed = new Set(board?.self?.completed || []);
   const allDone = board?.challenges?.length === 3 && board.challenges.every(c => completed.has(c.id));
   const refresh = () => {
@@ -96,7 +93,6 @@ export function DailyActivities({ records }) {
         <tbody>${board.rows.map((r, i) => html`<tr key=${i} class=${r.mine ? 'is-self' : ''}><td>${r.rank}</td><td>${r.name}</td><td>${r.points} / 3</td></tr>`)}</tbody></table>`
         : board ? html`<p>${t('今日暂无完成挑战的博士。')}</p>` : null}
     </section>
-    ${latest ? html`<p class="local-activities-caption">${t('最近一场可生成称号的本机原版结算')}</p><${FunReport} record=${latest} />`
-      : html`<p class="local-activities-caption">${t('完成原版对局后，这里会显示你的趣味战报。')}</p>`}
+
   </div>`;
 }

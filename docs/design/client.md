@@ -498,8 +498,10 @@ first release has daily display rather than a permanent collection. The phone la
 Scoring APIs are read-only; a bounded, same-origin identity recovery endpoint accepts signed identity only, not scores.
 The HTML response and existing socket handshake register identity with no extra request. Daily page code, ranking
 data and art load only on deliberate opening; hiding/unmounting stops requests, and no ranking poll is scheduled.
-Local imports never award ranked points. Existing local personal fun reports remain separate from ranked medals,
-with no teammate ranking and no new statistics schema. Missing counters never imply zero. See DAILY-CHALLENGES.md.
+Local imports never award ranked points. Entertainment titles were retired at the maintainer’s request; only
+server-issued new-achievement settlement notices remain. Recovery tools on both pages use the same signed identity
+code: one backup covers future daily points and permanent progress, and existing exports stay valid. Daily and permanent views hide local-statistics import/export/clear controls;
+ordinary statistics tabs retain them. See DAILY-CHALLENGES.md.
 
 The statistics page is being progressively aligned with the [official statistics template](https://ak-webview.hypergryph.com/autoChess/act1autochess).
 

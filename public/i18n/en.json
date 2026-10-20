@@ -2366,5 +2366,13 @@
   "每场符合条件的结算最多累计一次；未满次数时保存进度，达到目标后永久解锁。": "Each eligible settlement counts once. Progress is saved before the target is reached; reaching it unlocks the medal permanently.",
   "累计进度：{n} / {target}": "Cumulative progress: {n} / {target}",
   "获得条件：终极模拟、官方 1 倍首领血量、全程无 AI 队友及 AI 托管。": "Requirements: Ultimate Simulation, official 1× boss HP, and no AI teammates or autoplay at any time.",
-  "获得规则与计次说明": "Eligibility and counting rules"
+  "获得规则与计次说明": "Eligibility and counting rules",
+  "积分与成就共用恢复码": "Shared recovery code for points and achievements",
+  "积分、永久成就及累计进度保存在服务器；重启和清空本机战绩不会删除，记录变更时保存主备存档。": "Points, permanent medals and cumulative progress are saved on the server with primary and backup files. Restarting or clearing local history does not delete them.",
+  "同一服务器的每日挑战与永久成就共用同一份恢复码，备份一次即可。恢复码不是成绩快照，新增积分或成就后不必重新导出。": "Daily challenges and permanent achievements on the same server share one recovery code. Save it once. It identifies you rather than capturing a score snapshot, so new progress requires no new export.",
+  "两个页面的导出入口完全相同；以前导出的积分恢复码仍然有效，不需要换新。请私密保存，清理浏览器或换设备后导入。": "Both pages export the same code. Your previous points recovery file remains valid; no replacement is needed. Keep it private and import it after clearing the browser or changing devices.",
+  "已生成共用恢复码，请确认下载成功；以后新增积分与成就不需要重新导出。": "Shared recovery file created. Confirm the download; future points and achievements do not require another export.",
+  "积分与成就身份已恢复，记录已重新读取。": "Points and achievement identity restored; records reloaded.",
+  "导出恢复码": "Export recovery code",
+  "导入恢复码": "Import recovery code"
 }
