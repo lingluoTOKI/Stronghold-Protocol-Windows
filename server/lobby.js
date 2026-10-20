@@ -1608,7 +1608,7 @@ export class Lobby {
     });
     // lastPublic / results: the latest m.public broadcast and the m.result frames (encoded), kept for the replay.
     const ctx = { live: true, ended: false, disposed: false, match: null, lastPublic: null, sharedResult: null, results: new Map() };
-    ctx.challenge = { mode: room.mode, difficulty: room.difficulty, bossHp: room.bossHp ?? BOSS_HP_DEFAULT,
+    ctx.challenge = { runId: randomBytes(16).toString('hex'), mode: room.mode, difficulty: room.difficulty, bossHp: room.bossHp ?? BOSS_HP_DEFAULT,
       participants: seats.map(s => ({ playerId: s.playerId, isBot: s.isBot === true })) };
     let seed = 0;
     try { seed = this.seedFn() >>> 0; } catch { seed = randomInt(2 ** 32); }
@@ -1677,7 +1677,7 @@ export class Lobby {
   onMatchEnd(room, ctx, summary) {
     if (ctx.ended || !ctx.live || room.matchCtx !== ctx || room.disposed) return;
     ctx.ended = true;
-    try { this.dailyBoard?.record(room, summary, this.registry, { ...ctx.challenge, usedAI: ctx.match?.challengeUsedAI }); }
+    try { if (!ctx.challengeRecorded) this.dailyBoard?.record(room, summary, this.registry, { ...ctx.challenge, usedAI: ctx.match?.challengeUsedAI }); }
     catch (e) { this.log.error('[daily] settlement recording failed', e); }
     room.lastSummary = summary ?? null;
     room.match = null;
@@ -1706,8 +1706,23 @@ export class Lobby {
     }
   }
 
+  /** Record once, before sending the first result; only server-owned unlocks reach the settlement UI. */
+  challengeSettlement(room, ctx, msg) {
+    if (!ctx.live || ctx.ended || room.matchCtx !== ctx || room.disposed) return {};
+    if (!ctx.challengeRecorded) {
+      ctx.challengeRecorded = true;
+      try { ctx.newAchievements = this.dailyBoard?.record(room, msg, this.registry, { ...ctx.challenge, usedAI: ctx.match?.challengeUsedAI }) || {}; }
+      catch (e) { ctx.newAchievements = {};this.log.error('[daily] settlement recording failed', e); }
+    }
+    return ctx.newAchievements || {};
+  }
+
   /** Match unicast; m.result frames are also kept for the replay. */
   matchSend(room, ctx, playerId, msg) {
+    if (this.dailyBoard && msg && msg.t === 'm.result') {
+      const awards = this.challengeSettlement(room, ctx, msg);
+      msg = { ...msg, newAchievements: awards[playerId] || [] };
+    }
     if (msg && msg.t === 'm.result') {
       const data = encode(msg);
       if (data != null) ctx.results.set(playerId, data);
@@ -1717,6 +1732,14 @@ export class Lobby {
 
   /** Match broadcast; the latest m.public and a broadcast m.result are also kept for the replay. */
   matchBroadcast(room, ctx, msg) {
+    if (this.dailyBoard && msg?.t === 'm.result') {
+      this.challengeSettlement(room, ctx, msg);
+      // Personalized settlements: one player's unlock notice never becomes a spectator's own award.
+      for (const s of [...room.seats, ...room.spectators]) {
+        if (s && !s.isBot && !s.left) this.matchSend(room, ctx, s.playerId, msg);
+      }
+      return;
+    }
     const data = this.broadcastRoom(room, msg);
     if (data == null) return;
     if (msg.t === 'm.public') ctx.lastPublic = data;

@@ -44,17 +44,18 @@ const statsStore = createStore({ open: false, tab: 'overview', withModded: false
 
 /** Open the stats viewer (title screen / lobby / room entry points). */
 export function openStats(tab = 'overview') {
-  if (tab !== 'daily') {
+  if (!['daily', 'achievements'].includes(tab)) {
     data.load('config');
     data.load('bands');
     data.load('bonds');
     data.load('assets');
   }
-  statsStore.set({ open: true, tab: tab === 'daily' ? 'daily' : 'overview' });
+  statsStore.set({ open: true, tab: ['daily', 'achievements'].includes(tab) ? tab : 'overview' });
 }
 export const closeStats = () => statsStore.set({ open: false });
 
 const TABS = [
+  { id: 'achievements', name: N_('永久成就'), micro: 'PERMANENT COLLECTION' },
   { id: 'daily', name: N_('每日挑战'), micro: 'DAILY / LOCAL' },
   { id: 'overview', name: N_('总览'), micro: 'OVERVIEW' },
   { id: 'bands', name: N_('盟约&策略'), micro: 'ALLIANCES / STRATEGIES' },
@@ -482,12 +483,12 @@ function Replay({ rec, onBack }) {
     content=${rec.content ? { cs: rec.content.cs, vanilla: false, plugins: rec.content.plugins } : null} />`;
 }
 
-function LazyDailyActivities({ records }) {
+function LazyDailyActivities({ records, collection = false }) {
   const [View, setView] = useState(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true;
-    import('../ui/localActivities.js').then(module => { if (active) setView(() => module.DailyActivities); })
+    (collection ? import('../ui/achievementCollection.js') : import('../ui/localActivities.js')).then(module => { if (active) setView(() => collection ? module.AchievementCollection : module.DailyActivities); })
       .catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, []);
@@ -497,7 +498,7 @@ function LazyDailyActivities({ records }) {
 
 /** The overlay, rendered while open (its data hooks run only then). */
 function StatsScreen({ tab }) {
-  const ready = useData(...(tab === 'daily' ? [] : ['config', 'bands', 'bonds', 'assets']));
+  const ready = useData(...(['daily', 'achievements'].includes(tab) ? [] : ['config', 'bands', 'bonds', 'assets']));
   const gd = useMemo(() => makeLookups(ready), [ready, data.locale()]);
   const [stats, setStats] = useState(() => loadStats());
   const [replay, setReplay] = useState(null);
@@ -597,7 +598,7 @@ function StatsScreen({ tab }) {
     ${stats.dropped ? html`<p class="st-note is-warn"><${Icon} name="warn" />${t('有 {n} 条记录已损坏，已忽略。', { n: stats.dropped })}</p>` : null}
     <div class="ui-slot" data-ui-slot="stats.tab" aria-label=${t('界面插件')} dangerouslySetInnerHTML=${{ __html: '' }}></div>
     <main class="st-body" data-tab=${tab}>
-      ${tab === 'daily' && !stats.newer ? html`<${LazyDailyActivities} records=${stats.records} />`
+      ${['daily', 'achievements'].includes(tab) && !stats.newer ? html`<${LazyDailyActivities} key=${tab} records=${stats.records} collection=${tab === 'achievements'} />`
         : !ready ? html`<div class="st-loading"><${Spinner} size="md" /></div>`
         : stats.newer ? html`<p class="st-empty">${t('检测到更新版本的统计数据，请先升级客户端再查看，以免覆盖数据。')}</p>`
           : empty ? html`<p class="st-empty">${t('还没有记录 —— 完成一局对局后，这里会开始积累。')}</p>`

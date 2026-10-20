@@ -45,6 +45,7 @@ export function ChallengeIdentity({ onRestored }) {
     <summary>${t('积分数据保存与恢复')}</summary>
     <p>${t('积分及获章记录保存在服务器，重启和清空本机战绩不会删除。服务器在积分变更时保存主文件和备份。')}</p>
     <p>${t('恢复码用于找回积分身份，不能修改分数。请自行保存，不要公开；清理浏览器或换设备后可导入。')}</p>
+    <p>${t('同一恢复码也可找回永久成就；永久收藏不受每日榜 8 天保留期限影响。')}</p>
     <p>${t('本服最近 8 天的每日记录会保留，到期清理不属于意外丢失；恢复码不能找回已过期的记录。')}</p>
     <div class="daily-division">
       <${Button} size="sm" variant="secondary" disabled=${busy} onClick=${exportIdentity}>${t('导出积分恢复码')}<//>

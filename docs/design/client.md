@@ -693,3 +693,23 @@ keys override and missing/invalid entries retain built-in text. Scope remains br
 room content and simulation. Pure geometry SDK helpers return frozen values and accept at most 1024 range cells.
 Forge UI mounts without an equivalent slot require an explicit manual-adaptation report, separate from script copying.
 Art/audio templates ship original CC0 sample media; the studio fills the target's first editable slot [ASSUMED].
+
+
+### Fork permanent achievement collection (2026-10-20)
+
+The maintainer chose six cumulative permanent medals, separate from daily points: first Ultimate clear,
+10 personal zero-leak clears, 10 Hidden Core clears, and 5 clears each with the own Yan / Laterano / Kjerag
+covenant active at count >= 6 and tier >= 2 in the final settlement. All require personal survival, official
+1x boss HP, no starting bots or autoplay at any time, and the same separate solo / 2–6 human co-op profiles.
+Rules and named medal conditions: [PERMANENT-ACHIEVEMENTS.md](../PERMANENT-ACHIEVEMENTS.md).
+
+Permanent capped counters, first unlock timestamps and a bounded recent-run ledger survive daily trimming.
+Server-issued run identity and one registration before settlement send prevent repeated callbacks adding counts.
+Per-recipient `m.result.newAchievements` lists only newly unlocked medals; reconnect replays keep the original
+notice. The read-only collection API exposes only the current signed identity's progress, never accepts scores.
+The existing primary/backup store and recovery code retain previous daily scores and signing keys on upgrade.
+Meaningful counter changes are persisted once per settlement; counts require saving before the final unlock.
+
+Collection page and its independent six-image atlas load only on explicit viewing; switching divisions is local.
+No collection request at welcome, daily page, or result screen; the result notice uses text only. No polling,
+per-tick evaluation or extra combat simulation. Past local records cannot retroactively grant server medals.

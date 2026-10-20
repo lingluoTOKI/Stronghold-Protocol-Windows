@@ -3,16 +3,17 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { challengeDay, dailyChallenges, DAILY_VERSION } from '../shared/dailyChallenges.js';
+import { ACHIEVEMENTS, earnedAchievements } from '../shared/achievements.js';
 
 const COOKIE = 'sp_challenge_identity';
 const CAP = 2000;
 const RETAIN_DAYS = 8;
 export async function createDailyChallengeBoard({ file, legacyFile = null, now = Date.now, log = console }) {
-  let data = { version: 2, rules: DAILY_VERSION, secret: randomBytes(32).toString('hex'), days: {} };
+  let data = { version: 2, rules: DAILY_VERSION, secret: randomBytes(32).toString('hex'), days: {}, achievements: {} };
   let healthy = true, writing = Promise.resolve();
   let cachedDay = null, cachedRows = {};
   async function load(source) {
-    if ((await fs.stat(source)).size > 8 * 1024 * 1024) throw new Error('leaderboard data too large');
+    if ((await fs.stat(source)).size > 16 * 1024 * 1024) throw new Error('leaderboard data too large');
     const raw = await fs.readFile(source, 'utf8');
     const parsed = JSON.parse(raw);
     if (![1, 2].includes(parsed.version) || !/^[a-f0-9]{64}$/.test(parsed.secret) || !parsed.days || typeof parsed.days !== 'object' || Array.isArray(parsed.days)) throw new Error('invalid leaderboard data');
@@ -31,6 +32,23 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
         if (!/^[a-f0-9]{32}$/.test(id) || typeof row?.name !== 'string' || row.name.length > 24
           || !Array.isArray(row.completed) || row.completed.length > 3 || new Set(row.completed).size !== row.completed.length
           || row.completed.some(task => !dailyChallenges([], Date.parse(day + 'T12:00:00+08:00')).challenges.some(c => c.id === task))) throw new Error('invalid score entry');
+        }
+      }
+    }
+    if (!Object.hasOwn(parsed, 'achievements')) parsed.achievements = {};
+    if (!parsed.achievements || typeof parsed.achievements !== 'object' || Array.isArray(parsed.achievements) || Object.keys(parsed.achievements).length > 10000) throw new Error('invalid permanent collection');
+    for (const [id, divisions] of Object.entries(parsed.achievements)) {
+      if (!/^[a-f0-9]{32}$/.test(id) || !divisions || typeof divisions !== 'object' || Array.isArray(divisions)) throw new Error('invalid collector');
+      for (const [division, state] of Object.entries(divisions)) {
+        if (!['solo', 'coop'].includes(division) || !state || typeof state !== 'object' || Array.isArray(state)
+          || !Array.isArray(state.recent) || state.recent.length > 32 || state.recent.some(k => !/^[a-f0-9]{32}$/.test(k))) throw new Error('invalid collection division');
+        for (const field of ['progress', 'unlocked']) {
+          if (!state[field] || typeof state[field] !== 'object' || Array.isArray(state[field])) throw new Error('invalid collection state');
+          for (const [key, value] of Object.entries(state[field])) {
+            const def = ACHIEVEMENTS.find(a => a.id === key);
+            if (!def || !Number.isSafeInteger(value) || value <= 0
+              || (field === 'progress' ? value > def.target : state.progress[key] !== def.target)) throw new Error('invalid achievement value');
+          }
         }
       }
     }
@@ -116,6 +134,16 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
   return {
     ensureCookie,
     bindRequest,
+    collection(req, res, registry) {
+      const id = ensureCookie(req, res), session = sessionOf(req, registry);
+      if (session?.connected && id && !identities.has(session)) identities.set(session, id);
+      const own = data.achievements[id] || {};
+      const body = JSON.stringify({ ok: healthy, achievements: ACHIEVEMENTS, unlocked: { solo: own.solo?.unlocked || {}, coop: own.coop?.unlocked || {} },
+        progress: { solo: own.solo?.progress || {}, coop: own.coop?.progress || {} } });
+      res.statusCode = healthy ? 200 : 503;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Content-Length', Buffer.byteLength(body));res.end(req.method === 'HEAD' ? undefined : body);
+    },
     async identity(req, res, registry) {
       const reply = (status, value) => {
         const body = JSON.stringify(value);res.statusCode = status;
@@ -162,7 +190,7 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
     },
     record(room, result, registry, proof) {
       if (!healthy || result?.difficulty !== 'ABYSS' || room.test === true || result?.test === true || (room.content && room.content.vanilla !== true) || !Array.isArray(result?.players)) return;
-      if (!proof || proof.usedAI !== false || proof.difficulty !== 'ABYSS' || proof.bossHp !== 1 || !Array.isArray(proof.participants)) return;
+      if (!proof || !/^[a-f0-9]{32}$/.test(proof.runId) || proof.usedAI !== false || proof.difficulty !== 'ABYSS' || proof.bossHp !== 1 || !Array.isArray(proof.participants)) return;
       const { participants, mode: division } = proof;
       const ids = new Set(participants.map(p => p.playerId));
       if (participants.some(p => p.isBot !== false) || ids.size !== participants.length
@@ -171,12 +199,29 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
       trim();
       const day = challengeDay(now());
       let changed = false;
+      const newlyUnlocked = {};
       for (const player of result.players) {
         if (!player?.playerId || player.isBot || player.left) continue;
         const seat = room.seatOf(player.playerId);
         const session = registry.byPlayerId.get(player.playerId);
         const id = session && identities.get(session);
         if (!id || !seat || seat.isBot || seat.left) continue;
+        const earned = earnedAchievements(result, player.playerId);
+        if (!earned.length) continue;
+        if (data.achievements[id]?.[division]?.recent.includes(proof.runId)) continue;
+        if (data.achievements[id] || Object.keys(data.achievements).length < 10000) {
+          const collection = data.achievements[id] || (data.achievements[id] = {});
+          const state = collection[division] || (collection[division] = { progress: {}, unlocked: {}, recent: [] });
+          state.recent = [...state.recent, proof.runId].slice(-32);
+          const added = [], at = now();
+          for (const key of earned) {
+            const target = ACHIEVEMENTS.find(a => a.id === key).target;
+            if ((state.progress[key] || 0) >= target) continue;
+            state.progress[key] = (state.progress[key] || 0) + 1;changed = true;
+            if (state.progress[key] === target) { state.unlocked[key] = at;added.push({ id: key, division, at }); }
+          }
+          if (added.length) newlyUnlocked[player.playerId] = added;
+        }
         const record = { ...result, end: 'settled', t: now(), selfId: player.playerId, content: null };
         const done = dailyChallenges([record], record.t).challenges.filter(c => c.done).map(c => c.id);
         if (!done.length) continue;
@@ -190,6 +235,7 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
         changed = true;
       }
       if (changed) { cachedRows[division] = null; void persist(); }
+      return newlyUnlocked;
     },
     flush: () => writing,
     snapshot: (division = 'solo') => snapshot(null, division),

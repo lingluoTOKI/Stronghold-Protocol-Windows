@@ -110,6 +110,9 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
       sendError(req, res, 405, '不支持的请求方法 · Method not allowed');
       return;
     }
+    if (parts.rawPath === '/api/achievements' && dailyBoard && !proxy) {
+      dailyBoard.collection(req, res, health.registry);return;
+    }
     if (parts.rawPath === '/api/daily-challenges' && dailyBoard && !proxy) {
       await dailyBoard.handle(req, res, health.registry);
       return;
