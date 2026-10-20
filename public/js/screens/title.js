@@ -416,6 +416,7 @@ export function TitleScreen() {
     <div class="title-corner title-corner--tr">
       <div>
         <div class="title-corner__tools">
+          <${Button} variant="ghost" size="sm" onClick=${() => openStats('daily')}>${t('每日挑战')}<//>
           <${Button} variant="ghost" size="sm" icon="chart" class="title-stats" onClick=${openStats} title=${t('统计数据')}>${t('统计')}<//>
           <${LangToggle} class="title-lang" />
         </div>

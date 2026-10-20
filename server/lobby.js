@@ -397,6 +397,8 @@ export class Lobby {
    */
   constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, content = null, plugins = null, hosts = null, options = {} }) {
     this.registry = registry;
+    /** @type {Awaited<ReturnType<typeof import('./dailyChallenges.js').createDailyChallengeBoard>> | null} */
+    this.dailyBoard = null;
     /** the vanilla content set every room plays (header "Content identity"), or null */
     this.vanilla = content && isContentHash(content.cs) ? Object.freeze({ cs: content.cs, vanilla: true, plugins: Object.freeze([]) }) : null;
     /** the server's room sets — visual and content (header "The room's plugins", "Gameplay plugins"), or null */
@@ -1606,6 +1608,8 @@ export class Lobby {
     });
     // lastPublic / results: the latest m.public broadcast and the m.result frames (encoded), kept for the replay.
     const ctx = { live: true, ended: false, disposed: false, match: null, lastPublic: null, sharedResult: null, results: new Map() };
+    ctx.challenge = { mode: room.mode, difficulty: room.difficulty, bossHp: room.bossHp ?? BOSS_HP_DEFAULT,
+      participants: seats.map(s => ({ playerId: s.playerId, isBot: s.isBot === true })) };
     let seed = 0;
     try { seed = this.seedFn() >>> 0; } catch { seed = randomInt(2 ** 32); }
     const modded = room.modded;
@@ -1673,6 +1677,8 @@ export class Lobby {
   onMatchEnd(room, ctx, summary) {
     if (ctx.ended || !ctx.live || room.matchCtx !== ctx || room.disposed) return;
     ctx.ended = true;
+    try { this.dailyBoard?.record(room, summary, this.registry, { ...ctx.challenge, usedAI: ctx.match?.challengeUsedAI }); }
+    catch (e) { this.log.error('[daily] settlement recording failed', e); }
     room.lastSummary = summary ?? null;
     room.match = null;
     room.matchCtx = null;

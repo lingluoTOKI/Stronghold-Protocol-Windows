@@ -93,12 +93,16 @@ const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.tes
  *   plugin studio (server/studio/index.js), or none
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null, announcements = null, announcePublish = null, announceClear = null, proxy = null }) {
+export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null, announcements = null, announcePublish = null, announceClear = null, proxy = null, dailyBoard = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
     const parts = splitUrl(url);
     if (!parts) { sendError(req, res, 400, '请求地址无效 · Bad request'); return; }
+    if (parts.rawPath === '/api/daily-challenges/identity') {
+      if (proxy) { proxy.proxyHttp(req, res);return; }
+      if (dailyBoard) { await dailyBoard.identity(req, res, health.registry);return; }
+    }
     if (trustedRuntime && parts.rawPath.startsWith('/x/') && await trustedRuntime.route(req,res,parts.rawPath)) return;
     if (studio && studio.handles(parts.rawPath)) { await studio.handle(req, res, parts.rawPath, parts.query); return; }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -106,6 +110,11 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
       sendError(req, res, 405, '不支持的请求方法 · Method not allowed');
       return;
     }
+    if (parts.rawPath === '/api/daily-challenges' && dailyBoard && !proxy) {
+      await dailyBoard.handle(req, res, health.registry);
+      return;
+    }
+    if (dailyBoard && !proxy && (parts.rawPath === '/' || parts.rawPath === '/index.html')) dailyBoard.ensureCookie(req, res);
     // 监控大屏从别的 origin 打开 /healthz 与 admin 接口：方法闸之后才加，故 405/414/400 错误响应不带 CORS 头。
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');

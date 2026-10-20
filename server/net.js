@@ -515,6 +515,8 @@ class Connection {
     this.alive = true;
     /** @type {Session | null} */
     this.session = null;
+    /** @type {null | ((session: Session) => void)} */
+    this.sessionHook = null;
     this.bucket = new TokenBucket(opts.ratePerSec, opts.rateBurst, now);
     this.heavy = new TokenBucket(opts.heavyPerSec, opts.heavyBurst, now);
     this.dropWindowAt = now;
@@ -550,6 +552,8 @@ export class Network {
     this.log = log;
     this.now = now;
     this.opts = { ...NET_DEFAULTS, ...options };
+    /** @type {null | ((session: Session, req: any) => void)} Optional server-owned session observer. */
+    this.sessionHook = null;
     /** @type {Map<import('ws').WebSocket, Connection>} */
     this.conns = new Map();
     /** @type {Map<string, number>} open sockets per client network key */
@@ -587,6 +591,7 @@ export class Network {
   handleConnection(ws, req) {
     if (this.closed) { try { ws.close(CLOSE.SHUTDOWN, 'server shutdown'); } catch { /* ignore */ } return; }
     const conn = new Connection(ws, clientAddress(req, this.opts.trustProxy), this.now(), this.opts);
+    conn.sessionHook = this.sessionHook ? session => this.sessionHook(session, req) : null;
     this.conns.set(ws, conn);
     if (conn.key) this.connsPerKey.set(conn.key, (this.connsPerKey.get(conn.key) || 0) + 1);
     ws.on('message', (data, isBinary) => {
@@ -721,6 +726,7 @@ export class Network {
     }
     session.name = name;
     session.lastSeen = now;
+    try { conn.sessionHook?.(session); } catch (e) { this.log.error('[net] session observer failed', e); }
     session.addr = conn.ip;
     session.limitKey = conn.key;
 

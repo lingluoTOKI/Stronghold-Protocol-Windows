@@ -58,6 +58,7 @@ import { createStudio } from './studio/index.js';
 import { MIME, COMPRESSIBLE, acceptsGzip, pickEncoding, parseRange } from './http/files.js';
 import { BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag } from './http/buildTag.js';
 import { createRequestHandler } from './http/routes.js';
+import { createDailyChallengeBoard } from './dailyChallenges.js';
 import { parseProxyOrigin, createProxy } from './http/proxy.js';
 import { createAnnouncements } from './http/announcements.js';
 import { createTrafficCounter } from './http/traffic.js';
@@ -86,6 +87,7 @@ export {
  *   proxyTo?: string,
  *   assetIndex?: boolean | { cacheFile?: string | null, delayMs?: number }, studio?: boolean,
  *   matchHost?: object,
+ *   dailyChallenges?: false | { file?: string },
  * }} [opts]
  *   assetIndex: the content-hash index (default on; false or SP_ASSET_INDEX=0: off — config.js assetIndexOptionsFrom);
  *   studio: the plugin studio at /studio/ (default on for this machine and the local network — SP_STUDIO=local|off;
@@ -133,6 +135,11 @@ export async function startServer(opts = {}) {
   const transport = String(process.env.SP_MATCH_HOST || '').trim().toLowerCase() === 'worker' ? 'worker' : 'process';
   const hosts = createMatchHosts({ contents, log, options: { transport, maxWorkers: Math.max(1, policy.get().maxSets), ...(opts.matchHost || {}) } });
   const { registry, lobby, network } = createSessionStack(opts, { data, log, content, plugins: roomSets, hosts });
+  const dailyBoard = opts.dailyChallenges === false || (opts.port === 0 && !opts.dailyChallenges) ? null
+    : await createDailyChallengeBoard({ file: opts.dailyChallenges?.file || path.join(ROOT, 'runtime', 'daily-challenges.json'),
+      legacyFile: opts.dailyChallenges?.file ? null : path.join(ROOT, '.cache', 'daily-challenges.json'), log });
+  lobby.dailyBoard = dailyBoard;
+  network.sessionHook = dailyBoard ? (session, req) => dailyBoard.bindRequest(session, req) : null;
   const serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, simDir, packsDir, pluginsDir, packs, content, log, assetIndex, views, visual, contents });
   // the plugin studio (DESIGN §32.9): its page and API for this machine and the local network; it watches plugins/ only
   // once it is used (hot reload), and rooms whose host is the author or alone follow a plugin's changes by themselves
@@ -196,7 +203,7 @@ export async function startServer(opts = {}) {
     trustProxy: network.opts.trustProxy,
     studio,
     trustedRuntime,
-    announcements, announcePublish: announceApi.publish, announceClear: announceApi.clear, proxy,
+    announcements, announcePublish: announceApi.publish, announceClear: announceApi.clear, proxy, dailyBoard,
   }));
   server.on('clientError', answerClientError);
   const wss = attachWebSocket(server, { network, log, traffic, proxy });
@@ -262,6 +269,7 @@ export async function startServer(opts = {}) {
       try { lobby.shutdown('shutdown'); } catch (e) { log.error('[shutdown] lobby', e); }
       try { hosts.close(); } catch (e) { log.error('[shutdown] match hosts', e); }
       network.close();
+      await dailyBoard?.flush();
       assetIndex?.close();
       studio?.close();
       await trustedRuntime?.close();

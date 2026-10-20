@@ -479,6 +479,28 @@ It does not diagnose a particular user's GPU or persist a disabled renderer pref
 
 ### Local statistics
 
+Fork-only daily activities (rules version 3): three fixed tasks require ABYSS, official boss HP multiplier 1 and
+personal survival plus victory. Basic: clear; advanced: clear with at least 8 personal perfect rounds; elite:
+clear the hidden core. Solo requires independent mode and exactly one starting human; co-op requires 2–6 starting
+humans. Immutable lobby metadata and a latched Match AI-use flag reject initial bots or any subsequent autoplay,
+even if disabled later. Ordinary disconnect/reconnect does not mark AI. Missing metadata fails closed. Tasks score
+once per UTC+8 settlement day per division, up to 3 points; ties share rank. One run may complete several tasks.
+Old easy-rule scores are archived instead of promoted. No client score-submission route exists.
+A signed HttpOnly browser cookie preserves scoring identity across sessions and restart; no account or one-person
+uniqueness is claimed. Same-browser tabs share identity and identical names stay distinct. A deliberately exported
+signed recovery file restores identity after browser cleanup; it cannot edit scores. Public rankings never expose
+session tokens or recovery credentials. Durable runtime storage has an atomic primary and backup; bad primary data
+can recover from backup. Eight-day retention is intentional, not a permanent medal collection.
+Original medal art uses one cached transparent WebP atlas (about 135 KiB), cropped by inline SVG viewports. It turns
+from grayscale to full enamel-and-metal color on server-confirmed completion; all three grant
+a collection medal without additional points or combat bonuses. The page includes a labeled visual preview, and
+first release has daily display rather than a permanent collection. The phone layout targets landscape.
+Scoring APIs are read-only; a bounded, same-origin identity recovery endpoint accepts signed identity only, not scores.
+The HTML response and existing socket handshake register identity with no extra request. Daily page code, ranking
+data and art load only on deliberate opening; hiding/unmounting stops requests, and no ranking poll is scheduled.
+Local imports never award ranked points. Existing local personal fun reports remain separate from ranked medals,
+with no teammate ranking and no new statistics schema. Missing counters never imply zero. See DAILY-CHALLENGES.md.
+
 The statistics page is being progressively aligned with the [official statistics template](https://ak-webview.hypergryph.com/autoChess/act1autochess).
 
 Accumulated play time appears first in the 战斗累计 tab, alongside the combat sums. It uses the same `duration.totalMs` aggregation and existing minute / hour formatting; the move changes no counting rule.

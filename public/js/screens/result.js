@@ -26,6 +26,7 @@ import { sentText } from '../ui/lang.js';
 import { UnofficialMark } from '../ui/pluginTag.js';
 import { TestMark } from '../ui/testConsole.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
+import { FunReport } from '../ui/funReport.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -161,6 +162,7 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         </footer>
       </section>
       <section class="result__players">
+        <${FunReport} record=${{ ...r, players: res?.players || r.players, end: 'settled', selfId: myId, test: res?.test === true, content }} />
         <h2 class="brief-h"><span>${t('同盟成员')}</span><${MicroLabel}>ALLIANCE REPORT</${MicroLabel}></h2>
         ${r.players.length ? r.players.map((p) => html`<${PlayerCard} key=${p.playerId} p=${p} myId=${myId} titles=${titles} best=${best} solo=${r.players.length < 2} />`)
           : html`<p class="t-dim">${t('暂无结算数据')}</p>`}

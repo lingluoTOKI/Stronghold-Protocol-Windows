@@ -71,3 +71,6 @@ public/dev/simcheck/data/
 
 # 打包产物（tools/package.mjs 生成），781 MB，绝不入库
 public/assets.zip
+
+# Durable challenge scores and signing key; never deploy or commit.
+/runtime/

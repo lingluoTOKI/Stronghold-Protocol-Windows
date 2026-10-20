@@ -96,6 +96,7 @@ export class MatchIntents {
   }
 
   setAutoplay(ps, on) {
+    if (on) this.challengeUsedAI = true;
     if (ps.autoplay === on) return OK;
     ps.autoplay = on;
     this.markPublic();

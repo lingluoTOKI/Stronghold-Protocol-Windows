@@ -1,3 +1,42 @@
+.local-activities { margin: 16px 0; padding: 16px; border: 1px solid var(--line); background: rgba(14, 27, 26, .85); }
+.local-activities h2 { font-size: max(.26rem, 18px); margin: 0 0 10px; }
+.local-activities h2 small { display: inline-block; font-size: 12px; font-weight: 400; color: var(--text-lo); }
+.local-activities p { font-size: max(.16rem, 13px); line-height: 1.65; color: var(--text-lo); margin: 8px 0; }
+.local-activities__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; margin-top: 16px; }
+.local-activities__grid article { padding: 16px; border: 1px solid var(--line); background: rgba(255,255,255,.025); min-width: 0; }
+.local-activities__grid article.is-complete { border-color: var(--mint-700); }
+.local-activities__grid h3 { font-size: max(.20rem, 16px); margin: 8px 0; }
+.local-activities__state { font-size: 12px; color: var(--text-lo); }
+.is-complete .local-activities__state { color: var(--mint-400, #4ed8af); }
+.local-activities-caption { font-size: max(.16rem, 13px); line-height: 1.65; color: var(--text-lo); }
+.local-activities h2 small { margin-left: 8px; }
+.challenge-medal { display: block; width: 92px; height: 122px; margin: 0 auto 12px; overflow: hidden; filter: grayscale(1) brightness(.6); opacity: .72; }
+.challenge-medal.is-earned { opacity: 1; filter: drop-shadow(0 2px 3px #0008); }
+.daily-collection { display: flex; align-items: center; gap: 20px; padding-top: 16px; }
+.daily-collection .challenge-medal { margin: 0; flex: 0 0 80px; }
+.daily-collection h3 { font-size: max(.2rem, 16px); }
+.daily-ranking table { width: 100%; border-collapse: collapse; font-size: max(.16rem, 13px); margin-top: 12px; }
+.daily-ranking th, .daily-ranking td { padding: 12px; text-align: left; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.daily-ranking .is-self { color: #d6b774; background: #d6b7740c; }
+.daily-division { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.medal-preview { border: 1px solid var(--line); padding: 12px; margin: 12px 0; font-size: max(.16rem, 13px); }
+.medal-preview summary { cursor: pointer; color: #d6b774; }
+.medal-preview__pair { display: flex; justify-content: center; gap: 48px; }
+.medal-preview__pair figure { margin: 12px 0; text-align: center; }
+@media (max-height: 520px) and (min-width: 601px) {
+  .local-activities__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .local-activities__grid article { padding: 12px; }
+  .challenge-medal { width: 72px; height: 96px; margin-bottom: 6px; }
+  .local-activities { padding: 12px; margin: 8px 0; }
+}
+@media (max-width: 600px) {
+  .st .st-top { height: auto; grid-template-columns: auto 1fr; grid-template-rows: auto auto; padding: 8px 12px; gap: 8px; }
+  .st .st-top__center { grid-column: 1 / -1; grid-row: 2; align-items: stretch; }
+  .st .st-top__right { grid-column: 2; grid-row: 1; }
+  .st .st-tabs { width: 100%; }
+  .st .st-tab { padding: 8px 10px; font-size: 13px; letter-spacing: .02em; }
+}
+
 /* ==========================================================================================
    screens/stats.css — 统计数据 (js/screens/stats.js): the local match record as a full-screen overlay in the grammar of
    干员调配 (screens/loadout.css) — a top bar with the back button, four tabs (总览 / 策略 / 战斗累计 / 对局记录) and

@@ -424,6 +424,8 @@ export class Match {
     }
     if (!this.players.size) throw new TypeError('Match: seats required');
     this.order = [...this.players.values()].sort((a, b) => a.seat - b.seat);
+    // Ranking metadata only; never cleared when an AI seat/autoplay is subsequently removed.
+    this.challengeUsedAI = this.order.some(p => p.isBot);
     /**
      * Spectator seats (opts.spectators / addSpectator): playerId → a stand-in every watch path treats like an eliminated
      * human (alive false; no PlayerState, never a field's player or authority).
