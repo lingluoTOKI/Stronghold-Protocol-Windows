@@ -3,11 +3,13 @@ import { html, Button } from './components.js';
 import { t, N_, tName } from '../../../shared/i18n.js';
 import { challengeDay } from './dailyChallenges.js';
 import { identity } from '../net.js';
+import { MedalBoard } from './medalBoard.js';
 import { ChallengeMedal } from './challengeMedal.js';
 import { ChallengeIdentity } from './challengeIdentity.js';
 import { CovenantRequirement } from './covenantRequirement.js';
 const LEVELS = [N_('基础挑战'), N_('进阶挑战'), N_('高阶挑战')];
 export function DailyActivities() {
+  const [showBoard, setShowBoard] = useState(false);
   const [now, setNow] = useState(Date.now), [board, setBoard] = useState(null), [failed, setFailed] = useState(false);
   const [division, setDivision] = useState('solo'), [revision, setRevision] = useState(0), [ranking, setRanking] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(0), [collection, setCollection] = useState(null), [showCollection, setShowCollection] = useState(false);
@@ -29,13 +31,13 @@ export function DailyActivities() {
     return () => controller.abort();
   }, [day, revision, division, ranking, visible]);
   useEffect(() => {
-    if (!showCollection || !visible) return;
+    if ((!showCollection && !showBoard) || !visible) return;
     const controller = new AbortController(), token = identity.getToken();
     fetch('/api/achievements', { credentials: 'same-origin', signal: controller.signal, headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then(async r => { if (!r.ok) throw new Error('unavailable');return r.json(); })
       .then(v => { if (!controller.signal.aborted) setCollection(v); }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
-  }, [showCollection, revision, visible]);
+  }, [showCollection, showBoard, revision, visible]);
   const completed = new Set(board?.self?.completed || []);
   const seconds = Math.ceil((Date.parse(day + 'T00:00:00+08:00') + 86400000 - now) / 1000);
   const refresh = () => { if (Date.now() - lastRefresh < 15000) return;setLastRefresh(Date.now());setRevision(v => v + 1); };
@@ -44,7 +46,9 @@ export function DailyActivities() {
     <div class="daily-division" role="group" aria-label=${t('榜单分组')}>
       <${Button} variant=${division === 'solo' ? 'primary' : 'secondary'} aria-pressed=${division === 'solo'} onClick=${() => setDivision('solo')}>${t('单人榜')}<//>
       <${Button} variant=${division === 'coop' ? 'primary' : 'secondary'} aria-pressed=${division === 'coop'} onClick=${() => setDivision('coop')}>${t('多人榜（2–6 真人）')}<//>
+      <${Button} class="medal-showcase-entry" variant="secondary" aria-haspopup="dialog" onClick=${() => setShowBoard(true)}>${t('奖章背景板')}<//>
     </div>
+    ${showBoard ? html`<${MedalBoard} data=${collection} division=${division} daily=${true} failed=${failed} onClose=${() => setShowBoard(false)} />` : null}
     <p><strong>${t('入榜要求：终极模拟、官方 1 倍首领血量、全程无 AI 队友及 AI 托管。')}</strong></p>
     <div class="permanent-tools"><details class="medal-preview"><summary>${t('获得规则与计次说明')}</summary>
       <p>${t('21 个目标分成七天，每天三项，周内目标不重复，第八天重复第一天。每项 1 分，每榜每天最多 3 分，同分并列。')}</p>

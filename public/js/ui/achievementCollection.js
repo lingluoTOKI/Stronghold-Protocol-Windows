@@ -3,12 +3,14 @@ import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Button } from './components.js';
 import { t, N_ } from '../../../shared/i18n.js';
 import { identity } from '../net.js';
+import { MedalBoard } from './medalBoard.js';
 import { PermanentMedal } from './permanentMedal.js';
 import { ChallengeIdentity } from './challengeIdentity.js';
 import { CovenantRequirement } from './covenantRequirement.js';
 const CATEGORIES = [['all', N_('全部')], ['general', N_('通用')], ['core', N_('核心盟约')], ['other', N_('其他盟约')], ['collection', N_('总章')], ['legacy', N_('旧章')]];
 
 export function AchievementCollection() {
+  const [showBoard, setShowBoard] = useState(false);
   const [category, setCategory] = useState('all'), [filter, setFilter] = useState('all');
   const [data, setData] = useState(null), [failed, setFailed] = useState(false);
   const [division, setDivision] = useState('solo'), [revision, setRevision] = useState(0);
@@ -32,7 +34,9 @@ export function AchievementCollection() {
     <div class="daily-division" role="group" aria-label=${t('榜单分组')}>
       <${Button} size="sm" variant=${division === 'solo' ? 'primary' : 'secondary'} aria-pressed=${division === 'solo'} onClick=${() => setDivision('solo')}>${t('单人收藏')}<//>
       <${Button} size="sm" variant=${division === 'coop' ? 'primary' : 'secondary'} aria-pressed=${division === 'coop'} onClick=${() => setDivision('coop')}>${t('多人收藏（2–6 真人）')}<//>
+      <${Button} class="medal-showcase-entry" variant="secondary" aria-haspopup="dialog" onClick=${() => setShowBoard(true)}>${t('奖章背景板')}<//>
     </div>
+    ${showBoard ? html`<${MedalBoard} data=${data} division=${division} failed=${failed} onClose=${() => setShowBoard(false)} />` : null}
     <div class="permanent-tools"><details class="medal-preview"><summary>${t('获得规则与计次说明')}</summary>
     <p>${t('旧成就、获得日期和进度保留。新增累计章承接可核实的次数下限，无法证明的历史次数不补算。本地导入不补发服务器成就。')}</p>
     <p>${t('获得条件：终极模拟、官方 1 倍首领血量、全程无 AI 队友及 AI 托管。')}</p>
