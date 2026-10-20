@@ -1698,6 +1698,10 @@ function MatchScreen() {
 
   return html`<div class=${cx('screen', 'gm', `gm--${mode}`, drag && 'is-dragging', barCollapsed && 'is-collapsed', (sp || hasPersonalChoice || offerBlocksPrep(pub?.offers)) && 'has-sp', sp && 'has-spdraft', pen && 'is-pen', readyWhy && 'has-readywhy')}
       data-camera=${pen ? 'pen' : camKind}>
+    ${pub?.recovery?.waiting ? html`<div class="recovery-overlay" role="dialog" aria-modal="true">
+      <div><h2>${t('对局已恢复')}</h2><p>${t('已回到最近保存的休整期。所有原玩家确认后继续，等待期间不计时。')}</p>
+      <button class="btn" disabled=${pub.recovery.confirmed.includes(myId)} onClick=${() => actions.ready(true)}>${pub.recovery.confirmed.includes(myId) ? t('等待其他玩家确认') : t('确认继续对局')}</button></div>
+    </div>` : null}
     <div class="gm__field" ref=${hostRef} onContextMenu=${(e) => e.preventDefault()}></div>
     ${viewKind === 'loading' ? html`<div class="gm__loading"><${Spinner} label="LOADING FIELD" /></div>` : null}
     <div class="gm__vignette" aria-hidden="true"></div>

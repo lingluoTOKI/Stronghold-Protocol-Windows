@@ -27,7 +27,7 @@ making one, in Chinese). How to set up, test and send a change: [CONTRIBUTING.md
 
 - **The server** is one Node process: plain `node:http` plus `ws`, no framework (`server/index.js` wires
   `server/http/`). It serves the static client, the generated data and the sim's source files, and runs every room and
-  match in memory — rounds, shop, economy, bots, validation. Plugin authoring writes folders and locks to disk; the studio key persists too. Gameplay content sets use separate match children (§3).
+  match in memory — rounds, shop, economy, bots, validation. The optional fork recovery service (`server/recovery/`) stores PREP checkpoints in SQLite and reconstructs compatible rooms at startup; see [MATCH-RECOVERY.md](MATCH-RECOVERY.md). Plugin authoring writes folders and locks to disk; the studio key persists too. Gameplay content sets use separate match children (§3).
 - **The browser** loads native ES modules with no bundler and no build step; the libraries are vendored into
   `public/vendor/` by `tools/vendor.mjs` on `npm install`.
 - **The battle simulation** (`server/sim/`) is pure ESM without any Node API, served read-only at `/sim/`. Both sides

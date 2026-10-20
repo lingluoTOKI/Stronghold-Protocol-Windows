@@ -40,3 +40,7 @@
 - 横屏截图：output/playwright/rotation-daily-landscape.png、rotation-covenants-landscape.png
 - 合成结算展示：output/playwright/rotation-result-demo.png
 - 图片规格与提示词：output/imagegen/review-v2/asset-report.json、docs/art/MEDALS-V2-PROMPTS.md
+
+## 后续发布授权
+
+用户随后明确授权恢复功能验证通过后上传并重启主服。本轮将与七日轮换、扩展成就一起启用；联盟服不重启。恢复功能范围与限制见 [MATCH-RECOVERY.md](MATCH-RECOVERY.md)。

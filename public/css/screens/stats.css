@@ -421,3 +421,7 @@
 .collection-filters { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
 .covenant-requirement { color:var(--accent, #50dabb); font-weight:600; }
 .local-activities img.challenge-medal, .local-activities img.permanent-medal { object-fit:contain; aspect-ratio:1; width:108px; height:108px; }
+
+.recovery-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#071310e8;padding:20px}.recovery-overlay>div{max-width:560px;padding:24px;border:1px solid #58d8b3;background:#10221e;text-align:center}.recovery-overlay .btn{min-height:44px;margin-top:16px}
+
+.recovery-overlay{font-size:16px;line-height:1.6}.recovery-overlay h2{font-size:22px;margin:0 0 12px}.recovery-overlay p{font-size:16px}.recovery-overlay .btn{font-size:16px;padding:10px 22px}

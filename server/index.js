@@ -1,3 +1,5 @@
+import { openRecoveryStore } from './recovery/store.js';
+import { createRecoveryService, recoveryCompatibility } from './recovery/service.js';
 // server/index.js — process entry & boot (DESIGN §1, §2). Plain node:http + ws, no framework: startServer() below
 // wires the modules under server/http/, in this order —
 //
@@ -88,6 +90,7 @@ export {
  *   assetIndex?: boolean | { cacheFile?: string | null, delayMs?: number }, studio?: boolean,
  *   matchHost?: object,
  *   dailyChallenges?: false | { file?: string },
+ *   recovery?: false | { file?: string },
  * }} [opts]
  *   assetIndex: the content-hash index (default on; false or SP_ASSET_INDEX=0: off — config.js assetIndexOptionsFrom);
  *   studio: the plugin studio at /studio/ (default on for this machine and the local network — SP_STUDIO=local|off;
@@ -139,6 +142,11 @@ export async function startServer(opts = {}) {
     : await createDailyChallengeBoard({ file: opts.dailyChallenges?.file || path.join(ROOT, 'runtime', 'daily-challenges.json'),
       legacyFile: opts.dailyChallenges?.file ? null : path.join(ROOT, '.cache', 'daily-challenges.json'), log });
   lobby.dailyBoard = dailyBoard;
+  if (opts.recovery || (opts.recovery !== false && process.env.SP_MATCH_RECOVERY === '1')) {
+    const store = await openRecoveryStore(opts.recovery?.file || path.join(ROOT, 'runtime', 'matches.sqlite'));
+    lobby.recovery = createRecoveryService({ store, lobby, log, compatibility: await recoveryCompatibility(ROOT, content.cs) });
+    await lobby.recovery.restore();
+  }
   network.sessionHook = dailyBoard ? (session, req) => dailyBoard.bindRequest(session, req) : null;
   const serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, simDir, packsDir, pluginsDir, packs, content, log, assetIndex, views, visual, contents });
   // the plugin studio (DESIGN §32.9): its page and API for this machine and the local network; it watches plugins/ only
@@ -249,6 +257,7 @@ export async function startServer(opts = {}) {
       await trustedRuntime?.close();
     }
   } catch (e) {
+    await lobby.recovery?.close();
     network.close(); // stop heartbeat/sweep timers of the half-built server
     assetIndex?.close();
     studio?.close();
@@ -266,6 +275,7 @@ export async function startServer(opts = {}) {
   async function close() {
     if (closing) return closing;
     closing = (async () => {
+      await lobby.recovery?.close();
       try { lobby.shutdown('shutdown'); } catch (e) { log.error('[shutdown] lobby', e); }
       try { hosts.close(); } catch (e) { log.error('[shutdown] match hosts', e); }
       network.close();

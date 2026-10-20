@@ -434,3 +434,11 @@ test('unknown future rules fail closed without clearing or rewriting player data
   assert.equal(reopened.snapshot().ok,false);await reopened.flush();
   assert.equal(await fs.readFile(f.file,'utf8'),bytes);assert.equal(await fs.readFile(f.file+'.backup','utf8'),bytes);
 });
+
+test('durable recovery receipt prevents awards after the short recent-run list has rolled over',async t=>{
+ const f=await fixture(t);await f.bind('a');const first=settlement(['a']);first.players[0].bonds=[{bondId:'yanShip',active:true,count:6,tier:2}];
+ const proof=proofFor(['a'],{durableRecovery:true});f.board.record(f.room,first,f.registry,proof);
+ for(let i=0;i<35;i++)f.board.record(f.room,settlement(['a']),f.registry,proofFor(['a'],{durableRecovery:true}));await f.board.flush();
+ const before=JSON.parse(await fs.readFile(f.file,'utf8'));assert.equal(Object.values(before.achievements)[0].solo.progress['bond-yan'],1);
+ assert.deepEqual(f.board.record(f.room,first,f.registry,proof),{});await f.board.flush();const after=JSON.parse(await fs.readFile(f.file,'utf8'));assert.equal(Object.values(after.achievements)[0].solo.progress['bond-yan'],1);
+});

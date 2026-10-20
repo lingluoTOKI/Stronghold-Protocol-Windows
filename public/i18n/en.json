@@ -2447,5 +2447,9 @@
   "本局未计入：需要本人存活通关。": "Not counted: you must survive and clear.",
   "本局无法登记挑战成绩，请确认身份恢复码与服务器状态。": "Challenge results could not be registered. Check your recovery identity and server status.",
   "21 个目标分成七天，每天三项，周内目标不重复，第八天重复第一天。每项 1 分，每榜每天最多 3 分，同分并列。": "21 goals over seven days, three per day with no repeats within the cycle. Day eight repeats day one. Each awards 1 point, up to 3 per board per day; ties share rank.",
-  "不同盟约目标可分不同对局完成，不要求同一局同时激活。全部目标要求本人存活通关。": "Different covenant goals may be completed in separate matches; simultaneous activation is not required. All goals require surviving the clear."
+  "不同盟约目标可分不同对局完成，不要求同一局同时激活。全部目标要求本人存活通关。": "Different covenant goals may be completed in separate matches; simultaneous activation is not required. All goals require surviving the clear.",
+  "对局已恢复": "Match restored",
+  "已回到最近保存的休整期。所有原玩家确认后继续，等待期间不计时。": "Returned to the last saved preparation phase. All original players must confirm; the timer is paused while waiting.",
+  "等待其他玩家确认": "Waiting for other players",
+  "确认继续对局": "Confirm and continue"
 }

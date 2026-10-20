@@ -399,6 +399,8 @@ export class Lobby {
     this.registry = registry;
     /** @type {Awaited<ReturnType<typeof import('./dailyChallenges.js').createDailyChallengeBoard>> | null} */
     this.dailyBoard = null;
+    /** @type {any} optional durable PREP recovery service */
+    this.recovery = null;
     /** the vanilla content set every room plays (header "Content identity"), or null */
     this.vanilla = content && isContentHash(content.cs) ? Object.freeze({ cs: content.cs, vanilla: true, plugins: Object.freeze([]) }) : null;
     /** the server's room sets — visual and content (header "The room's plugins", "Gameplay plugins"), or null */
@@ -1584,7 +1586,7 @@ export class Lobby {
   // ---------------------------------------------------------------------------------------------------
 
   /** @param {Room} room @param {string | null} [key] per-network limit key of the starter */
-  startMatch(room, key = null) {
+  startMatch(room, key = null, recovered = null) {
     if (room.test && !this.testEnabled) return fail(ERR.TEST_DISABLED);
     const host = room.seatOf(room.hostId);
     if (host) host.ready = true;
@@ -1608,7 +1610,7 @@ export class Lobby {
     });
     // lastPublic / results: the latest m.public broadcast and the m.result frames (encoded), kept for the replay.
     const ctx = { live: true, ended: false, disposed: false, match: null, lastPublic: null, sharedResult: null, results: new Map() };
-    ctx.challenge = { startedAt: Date.now(), runId: randomBytes(16).toString('hex'), mode: room.mode, difficulty: room.difficulty, bossHp: room.bossHp ?? BOSS_HP_DEFAULT,
+    ctx.challenge = { ...(this.recovery ? { durableRecovery: true } : {}), startedAt: Date.now(), runId: randomBytes(16).toString('hex'), mode: room.mode, difficulty: room.difficulty, bossHp: room.bossHp ?? BOSS_HP_DEFAULT,
       participants: seats.map(s => ({ playerId: s.playerId, isBot: s.isBot === true })) };
     let seed = 0;
     try { seed = this.seedFn() >>> 0; } catch { seed = randomInt(2 ** 32); }
@@ -1650,7 +1652,9 @@ export class Lobby {
         send: (playerId, msg) => (ctx.live ? this.matchSend(room, ctx, playerId, msg) : false),
         broadcast: (msg) => { if (ctx.live) this.matchBroadcast(room, ctx, msg); },
         onEnd: (summary) => this.onMatchEnd(room, ctx, summary),
+        ...(this.recovery && !modded && !room.test ? { onPrepCheckpoint: () => this.recovery.save(room, ctx) } : {}),
       };
+      if (recovered) Object.assign(opts, recovered.options);
       // a room with gameplay plugins plays in its content set's match host; every other room here, as always
       const match = modded && this.hosts ? this.hosts.create(room.content.cs, opts) : new this.MatchClass(opts);
       ctx.match = match;
@@ -1658,10 +1662,11 @@ export class Lobby {
       room.matchCtx = ctx;
       room.matchKey = key;
       room.replay = null;
-      room.matchCount++;
+      if (!recovered) room.matchCount++;
       this.log.info(`[lobby] ${room.code} match #${room.matchCount} starting (${room.mode}/${room.difficulty}, ${seats.length} seats, seed ${seed}${room.test ? ', test' : ''}${modded ? `, content ${room.content.cs.slice(0, 8)}${match.hosted ? ' in its match host' : ''}` : ''})`);
       this.broadcastState(room);
-      match.start();
+      if (recovered) this.recovery.restoreMatch(room, ctx, recovered);
+      else { this.recovery?.attach(room, ctx); match.start(); }
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match failed to start`, e);
       if (room.matchCtx === ctx) { room.match = null; room.matchCtx = null; room.matchKey = null; }
@@ -1676,6 +1681,10 @@ export class Lobby {
   /** onEnd callback: return the room to LOBBY and dispose the match on the next macrotask. */
   onMatchEnd(room, ctx, summary) {
     if (ctx.ended || !ctx.live || room.matchCtx !== ctx || room.disposed) return;
+    if (this.recovery && !room.modded && !room.test && !ctx.recoveryCommitted) {
+      this.recovery.finish(room, ctx, summary, () => this.onMatchEnd(room, ctx, summary));
+      return;
+    }
     ctx.ended = true;
     try { if (!ctx.challengeRecorded) this.dailyBoard?.record(room, summary, this.registry, { ...ctx.challenge, usedAI: ctx.match?.challengeUsedAI }); }
     catch (e) { this.log.error('[daily] settlement recording failed', e); }
@@ -1719,6 +1728,7 @@ export class Lobby {
 
   /** Match unicast; m.result frames are also kept for the replay. */
   matchSend(room, ctx, playerId, msg) {
+    if (msg.t === 'm.result' && this.recovery && !room.modded && !room.test && this.recovery.bufferResult(ctx, playerId, msg)) return true;
     if (this.dailyBoard && msg && msg.t === 'm.result') {
       const awards = this.challengeSettlement(room, ctx, msg);
       const player = msg.players?.find(p => p.playerId === playerId);
@@ -2060,6 +2070,7 @@ export class Lobby {
    */
   disposeRoom(room, reason) {
     if (room.disposed) return;
+    this.recovery?.abandon(room, room.matchCtx, reason);
     room.disposed = true;
     if (this.rooms.get(room.code) === room) { this.trustedRuntime?.event('roomClosed',{room:room.toState()}); this.rooms.delete(room.code); }
     const ctx = room.matchCtx;

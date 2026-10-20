@@ -8,6 +8,12 @@ export function createRng(seed = 1) {
   return rngFromState((Number(seed) >>> 0) || 0x9e3779b9);
 }
 
+/** Restore an exact stream position (zero is valid), without drawing or reseeding. */
+export function restoreRng(state) {
+  if (!Number.isInteger(state) || state < 0 || state > 0xffffffff) throw new TypeError('Invalid RNG state');
+  return rngFromState(state);
+}
+
 function rngFromState(s) {
   const next = () => {
     s = (s + 0x6d2b79f5) >>> 0;

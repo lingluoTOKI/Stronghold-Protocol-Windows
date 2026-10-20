@@ -67,6 +67,7 @@ export function healthReport({ startedAt, network, registry, lobby, content = nu
     // what its rooms play (DESIGN §32): the vanilla content hash, and how many content sets with gameplay plugins rooms
     // hold now (P1c, §32.6 — a room's cosmetic plugins leave its cs the vanilla one, §32.3); how many unofficial plugins
     // it has, when it has some (a page's title screen says so; P1a)
+    ...(lobby?.recovery ? { recovery: { enabled: true, pending: lobby.recovery.status().pending, failures: lobby.recovery.status().failures.length } } : {}),
     ...(content ? { content: { vanilla: content.cs, sets: contentSets(lobby), ...pluginCount(lobby) } } : {}),
     sockets: network.connectionCount, sessions: registry.size, ...lobby.stats(),
   };

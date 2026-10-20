@@ -222,3 +222,7 @@ other owners do not replenish spent stock. [ASSUMED] Keep valid board cards in r
 index order, remove obsolete/excess cards and temp deadlines, and grant missing copies via normal overflow.
 These do not alter the default rules above. See
 [PLUGINS.md](../PLUGINS.md#rule-switches) for limits and assumptions.
+
+## Optional durable PREP recovery (fork)
+
+`SP_MATCH_RECOVERY=1` saves completed PREP-entry state in SQLite through an isolated storage worker. Recovered rooms pause until all remaining humans confirm. No new PREP grants or shop rolls run during restore. Same-code/content compatibility is required; unsupported or damaged checkpoints are retained. See [MATCH-RECOVERY.md](../MATCH-RECOVERY.md) for exclusions, terminal receipts and backup requirements.

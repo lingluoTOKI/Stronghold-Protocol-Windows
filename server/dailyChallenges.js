@@ -171,6 +171,9 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
       rows: includeRows ? ranked.slice(0, 100).map(publicRow) : [], total: ranked.length, self: own ? publicRow(own) : null };
   }
   return {
+    // Trusted server-only recovery adapter; never accepted as a client result or identity claim.
+    recoveryIdentity: session => identities.get(session) || null,
+    restoreRecoveryIdentity(session, id) { if (typeof id === 'string' && /^[a-f0-9]{32}$/.test(id)) identities.set(session, id); },
     ensureCookie,
     bindRequest,
     collection(req, res, registry) {
@@ -240,6 +243,7 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
       if (participants.some(p => p.isBot !== false) || ids.size !== participants.length
         || (division === 'solo' ? participants.length !== 1 : division !== 'coop' || participants.length < 2 || participants.length > 6)
         || result.players.length !== participants.length || result.players.some(p => !ids.has(p?.playerId) || p.isBot)) return;
+      if (proof.durableRecovery && data.recoveryReceipts?.[proof.runId]) return {};
       trim();
       const startedAt = Number.isFinite(proof.startedAt) && proof.startedAt > 0 && proof.startedAt <= now() ? proof.startedAt : now();
       const day = challengeDay(startedAt);
@@ -292,6 +296,12 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
         }
         if (completed.length === previous.length) continue;
         board[id] = { name: String(session.name || player.name || '').slice(0, 24), completed };
+        changed = true;
+      }
+      if (proof.durableRecovery) {
+        data.recoveryReceipts ||= {};
+        for (const [id, at] of Object.entries(data.recoveryReceipts)) if (at < now() - 8 * 86400000) delete data.recoveryReceipts[id];
+        data.recoveryReceipts[proof.runId] = now();
         changed = true;
       }
       if (changed) { cachedRows[division] = null; void persist(); }
