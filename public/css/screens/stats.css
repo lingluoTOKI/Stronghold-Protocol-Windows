@@ -1,5 +1,6 @@
-.medal-preview .btn { min-height: 32px; padding: 6px 12px; font-size: 13px; line-height: 1.2; }
-.permanent-collection .btn { min-height: 32px; padding: 6px 12px; font-size: 13px; line-height: 1.2; }
+.local-activities .btn, .medal-preview .btn { min-height: 32px; padding: 6px 12px; font-size: 13px; line-height: 1.2; }
+.local-activities .daily-division[role="group"] > .btn { min-width: 88px; }
+.local-activities .daily-division[role="group"] > .btn:nth-child(2) { min-width: 172px; }
 .permanent-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .permanent-tools .medal-preview { margin: 0; }
 .permanent-tools details[open] { grid-column: 1 / -1; }
