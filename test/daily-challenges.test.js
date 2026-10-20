@@ -143,7 +143,7 @@ test('daily boundary resets scores and later settlements trim retained history',
   f.setTime(time + 86400000);
   assert.equal(f.board.snapshot().rows.length, 0);
   award(f, settlement(['a']));await f.board.flush();
-  assert.equal(f.board.snapshot().rows[0].points, 3);
+  assert.equal(f.board.snapshot().rows[0].points, 1, 'rotating day requires Yan for its other goals');
   f.setTime(time + 9 * 86400000);
   award(f, settlement(['a']));await f.board.flush();
   const saved = JSON.parse(await fs.readFile(f.file, 'utf8'));
@@ -152,9 +152,9 @@ test('daily boundary resets scores and later settlements trim retained history',
 
 test('permanent criteria require a personal clear; missing leaks is not a flawless run', () => {
   const r = settlement(['a']);
-  assert.deepEqual(earnedAchievements(r, 'a'), ['ultimate-clear', 'hidden-core']);
+  assert.deepEqual(earnedAchievements(r, 'a'), ['ultimate-clear', 'clear-ten', 'clear-thirty', 'hidden-core']);
   r.players[0].stats.leaks = 0;
-  assert.deepEqual(earnedAchievements(r, 'a'), ['ultimate-clear', 'flawless-clear', 'hidden-core']);
+  assert.deepEqual(earnedAchievements(r, 'a'), ['ultimate-clear', 'clear-ten', 'clear-thirty', 'flawless-clear', 'hidden-core']);
   for (const leaks of [1, -1, null, undefined, '0']) {
     r.players[0].stats.leaks = leaks;
     assert.ok(!earnedAchievements(r, 'a').includes('flawless-clear'));
@@ -179,7 +179,7 @@ test('permanent collections survive day trimming, restart and backup recovery; r
   const state = Object.values(saved.achievements)[0].solo;const unlocks = state.unlocked;
   assert.equal(Object.keys(unlocks).length, 1);assert.equal(unlocks['ultimate-clear'], time);
   assert.equal(state.progress['flawless-clear'], 2);assert.equal(state.progress['hidden-core'], 2);
-  assert.equal(Object.keys(saved.days).length, 1);
+  assert.equal(Object.keys(saved.days).length, 0, 'permanent progress survives even when today has no qualifying covenant task');
   await fs.writeFile(f.file, 'broken');
   const reopened = await createDailyChallengeBoard({ file: f.file, now: () => time + 20 * 86400000, log: { error() {}, info() {} } });
   const own = response();reopened.collection({ method: 'GET', headers: { cookie } }, own, f.registry);
@@ -208,7 +208,7 @@ test('counter milestones separate divisions, unlock exactly at 10 and keep the f
   for (let i = 1; i <= 10; i++) {
     f.setTime(time + i * 1000);const run = settlement(['a']);run.players[0].stats.leaks = 0;
     const added = award(f, run);
-    assert.deepEqual(added.a?.map(a => a.id) || [], i === 10 ? ['flawless-clear', 'hidden-core'] : []);
+    assert.deepEqual(added.a?.map(a => a.id) || [], i === 10 ? ['flawless-clear', 'hidden-core'] : i === 9 ? ['clear-ten'] : []);
     assert.equal(f.board.snapshot().rows[0].points, 3, 'permanent progress never adds daily points');
   }
   const coop = award(f, settlement(['a', 'b']));assert.equal(coop.a.length, 1);
@@ -230,7 +230,7 @@ test('designated covenant clears count the player’s active final tier only, an
   for (let i = 0; i < 5; i++) {
     const r = settlement(['a']);r.players[0].bonds = ['yanShip', 'lateranoShip', 'kjeragShip'].map(bondId => ({ bondId, count: 6, tier: 2, active: true }));
     const added = award(f, r);
-    assert.deepEqual(added.a?.map(a => a.id) || [], i === 4 ? ['bond-yan', 'bond-laterano', 'bond-kjerag'] : []);
+    assert.deepEqual(added.a?.map(a => a.id) || [], i === 4 ? ['bond-yan', 'bond-kjerag', 'bond-laterano'] : []);
     assert.deepEqual(award(f, r), {}, 'duplicate callbacks cannot increment covenant counters');
   }
   const res = response();f.board.collection({ method: 'GET', headers: { cookie } }, res, f.registry);
@@ -338,4 +338,99 @@ test('real HTTP and lobby settlement hook: only server results score; POST is re
   assert.equal(invalid.status, 400);
   const crossOrigin = await fetch(url + '/identity', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://not-this-server.example' }, body: JSON.stringify({ recoveryCode: exported.recoveryCode }) });
   assert.equal(crossOrigin.status, 403);
+});
+
+// Rotation/migration regression coverage: all fixtures are temporary stores, never runtime/.
+test('weekly rotation uses each of the 21 goals once and repeats exactly on day eight', async () => {
+  const { challengesForDay, ROTATING_CHALLENGES } = await import('../shared/dailyChallenges.js');
+  assert.equal(ROTATING_CHALLENGES.length, 21);
+  assert.deepEqual(challengesForDay('2026-10-20').map(c => c.id), ['victory','perfect','core']);
+  const weeks = [];
+  for (let week = 0; week < 4; week++) {
+    const tasks = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(Date.parse('2026-10-21T00:00:00Z') + (week * 7 + i) * 86400000).toISOString().slice(0,10);
+      const goals = challengesForDay(day);
+      assert.equal(goals.length,3);assert.ok(goals.every(Boolean));
+      assert.equal(new Set(goals.map(c=>c.id)).size,3);
+      tasks.push(goals.map(c=>c.id));
+    }
+    assert.equal(new Set(tasks.flat()).size,21);
+    assert.deepEqual([...tasks.flat()].sort(),ROTATING_CHALLENGES.map(c=>c.id).sort());
+    weeks.push(tasks);
+  }
+  for (const week of weeks.slice(1)) assert.deepEqual(week,weeks[0]);
+});
+test('all 23 covenant definitions match game thresholds including exact/hand/elite rules', async () => {
+  const { COVENANTS, covenantActive } = await import('../shared/challengeCovenants.js');
+  const bonds = JSON.parse(await fs.readFile(new URL('../data/bonds.json', import.meta.url), 'utf8'));
+  assert.equal(COVENANTS.length, Object.keys(bonds).length);
+  for (const c of COVENANTS) {
+    assert.equal(c.count, Math.max(...bonds[c.bond].thresholds));
+    assert.equal(c.tier, bonds[c.bond].thresholds.length);
+    assert.equal(c.hand, bonds[c.bond].countsHand);
+    assert.equal(c.golden, bonds[c.bond].countsGoldenOnly);
+    const b = { bondId: c.bond, count: c.count, tier: c.tier, active: true };
+    assert.ok(covenantActive({ bonds: [b] }, c));
+    assert.ok(!covenantActive({ bonds: [{ ...b, count: c.count - 1 }] }, c));
+    assert.ok(!covenantActive({ bonds: [{ ...b, active: false }] }, c));
+    assert.ok(!covenantActive({ bonds: [{ ...b, tier: c.tier - 1 }] }, c));
+    if (c.exact) assert.ok(!covenantActive({ bonds: [{ ...b, count: 2 }] }, c));
+  }
+});
+test('rules-3 migration preserves identity, scores, dates, unfinished counts, dedup and legacy Yan', async t => {
+  const f = await fixture(t), cookie = await f.bind('a');
+  const r = settlement(['a']);r.players[0].stats.leaks = 0;
+  r.players[0].bonds = [{ bondId: 'yanShip', count: 6, tier: 2, active: true }];
+  for (let i = 0; i < 5; i++) award(f, structuredClone(r));
+  await f.board.flush();
+  const old = JSON.parse(await fs.readFile(f.file, 'utf8'));old.rules = 3;delete old.rotationStart;
+  const state = Object.values(old.achievements)[0].solo;
+  delete state.progress['clear-ten'];delete state.progress['clear-thirty'];delete state.daily;
+  await fs.writeFile(f.file, JSON.stringify(old));
+  const migrated = await createDailyChallengeBoard({ file: f.file, now: () => time });await migrated.flush();
+  const next = JSON.parse(await fs.readFile(f.file, 'utf8')), after = Object.values(next.achievements)[0].solo;
+  assert.equal(next.secret, old.secret);assert.deepEqual(next.days, old.days);
+  assert.deepEqual(after.unlocked, state.unlocked);assert.deepEqual(after.recent, state.recent);
+  for (const [id,n] of Object.entries(state.progress)) assert.equal(after.progress[id],n);
+  assert.equal(after.progress['clear-ten'],5);assert.equal(after.progress['clear-thirty'],5);
+  assert.equal(after.progress['bond-yan-nine'], undefined);assert.ok(after.daily.victory);assert.equal(after.legacyDaily.collection, '2026-10-20');
+  const res = response();await migrated.handle({ method:'GET',headers:{cookie} },res,f.registry);
+  assert.equal(JSON.parse(res.body).self.points,3);
+  assert.deepEqual(JSON.parse(await fs.readFile(f.file + '.pre-rotation','utf8')),old);
+  const reopened = await createDailyChallengeBoard({ file:f.file, now:()=>time });await reopened.flush();
+  assert.deepEqual(JSON.parse(await fs.readFile(f.file,'utf8')),next,'migration is idempotent');
+});
+test('cross-midnight settlement uses server start day, stores daily medals and task-only reads omit ranking', async t => {
+  const f = await fixture(t), cookie = await f.bind('a');
+  const start = Date.parse('2026-10-21T23:59:00+08:00');f.setTime(start + 120000);
+  const result = settlement(['a']);result.players[0].bonds = [{bondId:'yanShip',count:9,tier:3,active:true}];
+  award(f, result, f.room, { startedAt: start });await f.board.flush();
+  const saved = JSON.parse(await fs.readFile(f.file,'utf8'));
+  assert.equal(Object.keys(saved.days)[0], '2026-10-21');
+  assert.equal(Object.values(saved.days['2026-10-21'].solo)[0].completed.length,3);
+  assert.equal(f.board.snapshot().rows.length,0);
+  assert.ok(Object.values(saved.achievements)[0].solo.daily['core-yanShip']);
+  const res=response();await f.board.handle({ method:'GET',url:'/?ranking=0',headers:{cookie} },res,f.registry);
+  const body=JSON.parse(res.body);assert.deepEqual(body.rows,[]);assert.equal(body.preview.length,7);
+});
+test('collection meta medals unlock once from all covenant chapters, separately per division', async t => {
+  const { COVENANTS } = await import('../shared/challengeCovenants.js');
+  const f=await fixture(t);await f.bind('a');
+  for (let i=0;i<5;i++) {
+    const r=settlement(['a']);r.players[0].bonds=COVENANTS.map(c=>({bondId:c.bond,count:c.count,tier:c.tier,active:true}));
+    const awards=award(f,r);
+    if(i===4) { assert.ok(awards.a.some(a=>a.id==='all-core'));assert.ok(awards.a.some(a=>a.id==='all-covenants')); }
+  }
+  await f.board.flush();const state=Object.values(JSON.parse(await fs.readFile(f.file,'utf8')).achievements)[0];
+  assert.equal(state.solo.progress['all-covenants'],23);assert.equal(state.coop,undefined);
+});
+
+test('unknown future rules fail closed without clearing or rewriting player data', async t => {
+  const f=await fixture(t);await f.bind('a');award(f,settlement(['a']));await f.board.flush();
+  const raw=JSON.parse(await fs.readFile(f.file,'utf8'));raw.rules=999;
+  const bytes=JSON.stringify(raw);await fs.writeFile(f.file,bytes);await fs.writeFile(f.file+'.backup',bytes);
+  const reopened=await createDailyChallengeBoard({file:f.file,now:()=>time,log:{error(){}}});
+  assert.equal(reopened.snapshot().ok,false);await reopened.flush();
+  assert.equal(await fs.readFile(f.file,'utf8'),bytes);assert.equal(await fs.readFile(f.file+'.backup','utf8'),bytes);
 });

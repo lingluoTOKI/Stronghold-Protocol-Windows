@@ -1608,7 +1608,7 @@ export class Lobby {
     });
     // lastPublic / results: the latest m.public broadcast and the m.result frames (encoded), kept for the replay.
     const ctx = { live: true, ended: false, disposed: false, match: null, lastPublic: null, sharedResult: null, results: new Map() };
-    ctx.challenge = { runId: randomBytes(16).toString('hex'), mode: room.mode, difficulty: room.difficulty, bossHp: room.bossHp ?? BOSS_HP_DEFAULT,
+    ctx.challenge = { startedAt: Date.now(), runId: randomBytes(16).toString('hex'), mode: room.mode, difficulty: room.difficulty, bossHp: room.bossHp ?? BOSS_HP_DEFAULT,
       participants: seats.map(s => ({ playerId: s.playerId, isBot: s.isBot === true })) };
     let seed = 0;
     try { seed = this.seedFn() >>> 0; } catch { seed = randomInt(2 ** 32); }
@@ -1721,7 +1721,18 @@ export class Lobby {
   matchSend(room, ctx, playerId, msg) {
     if (this.dailyBoard && msg && msg.t === 'm.result') {
       const awards = this.challengeSettlement(room, ctx, msg);
-      msg = { ...msg, newAchievements: awards[playerId] || [] };
+      const player = msg.players?.find(p => p.playerId === playerId);
+      let feedback = awards.feedback?.[playerId] || null;
+      if (player && !feedback) {
+        const proof = ctx.challenge;
+        const reason = !proof || proof.difficulty !== 'ABYSS' ? 'difficulty'
+          : proof.bossHp !== 1 ? 'boss-hp' : ctx.match?.challengeUsedAI !== false ? 'ai'
+          : room.test || msg.test ? 'test' : room.content && !room.content.vanilla ? 'content'
+          : !(proof.mode === 'solo' ? proof.participants.length === 1 : proof.mode === 'coop' && proof.participants.length >= 2 && proof.participants.length <= 6) ? 'mode'
+          : !msg.victory || !player.victory || !player.alive || player.left ? 'survival' : 'identity';
+        feedback = { reason };
+      }
+      msg = { ...msg, newAchievements: awards[playerId] || [], challengeFeedback: feedback };
     }
     if (msg && msg.t === 'm.result') {
       const data = encode(msg);

@@ -13,7 +13,7 @@ test('daily boundary is UTC+8 and invalid dates are rejected', () => {
   assert.equal(challengeDay(NaN), null);
   assert.equal(challengeDay(1e20), null);
 });
-test('three fixed ultimate tiers reset daily without rotating back to easy tasks', () => {
+test('three ultimate tiers rotate while retaining the legacy first day', () => {
   const a = dailyChallenges([], now);
   assert.equal(a.challenges.length, 3);
   assert.equal(new Set(a.challenges.map(c => c.id)).size, 3);
@@ -21,7 +21,7 @@ test('three fixed ultimate tiers reset daily without rotating back to easy tasks
   assert.deepEqual(a, dailyChallenges([], now));
   assert.ok(a.challenges.every(c => !c.done));
   const choices = new Set(Array.from({ length: 10 }, (_, i) => dailyChallenges([], now + i * 86400000).challenges.map(c => c.id).join(',')));
-  assert.equal(choices.size, 1);
+  assert.ok(choices.size > 1);
 });
 test('completion uses only current-day settled original personal records, including imports', () => {
   assert.ok(dailyChallenges([record()], now).challenges.every(c => c.done));

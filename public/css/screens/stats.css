@@ -417,3 +417,7 @@
 }
 .sp-coarse .st-tab, .sp-coarse .st-table tr.is-clickable td { min-height: 30px; }
 @media (prefers-reduced-motion: reduce) { .st { animation: none; } }
+
+.collection-filters { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.covenant-requirement { color:var(--accent, #50dabb); font-weight:600; }
+.local-activities img.challenge-medal, .local-activities img.permanent-medal { object-fit:contain; aspect-ratio:1; width:108px; height:108px; }
