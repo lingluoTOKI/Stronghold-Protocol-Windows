@@ -2455,5 +2455,13 @@
   "奖章背景板": "Medal Board",
   "收起背景板": "Collapse Board",
   "仅展示真实收藏，未获得的奖章保持灰暗。": "Only earned medals are lit; unearned medals remain dim.",
-  "多人": "Co-op"
+  "多人": "Co-op",
+  "本局未计入挑战": "Not eligible for challenges",
+  "首次获得": "First unlock",
+  "已永久收藏": "Permanently collected",
+  "积分以本局合计为准，重复完成不会重复加分。": "Points are the total earned this run. Repeated completion awards no extra points.",
+  "目标完成": "Goal completed",
+  "每日章获得后永久收藏；这里展示本局完成情况，不代表首次获得。": "Daily medals are permanent. This shows completion in this run, not a first unlock.",
+  "永久成就进度": "Permanent achievement progress",
+  "新": "New"
 }

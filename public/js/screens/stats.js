@@ -1,3 +1,4 @@
+import { unreadAchievements, subscribeAchievements } from '../ui/achievementNotices.js';
 // The local stats viewer (统计数据): this browser's record of the matches the player took part in — see ui/stats.js for
 // what is recorded, what counts and how the storage is bounded. A full-screen overlay opened imperatively from the
 // title screen / lobby / room (`openStats()`); <StatsHost/> is mounted once by main.js. Ported from PR #323 by
@@ -498,6 +499,8 @@ function LazyDailyActivities({ records, collection = false }) {
 
 /** The overlay, rendered while open (its data hooks run only then). */
 function StatsScreen({ tab }) {
+  const [unread, setUnread] = useState(unreadAchievements);
+  useEffect(() => subscribeAchievements(() => setUnread(unreadAchievements())), []);
   const ready = useData(...(['daily', 'achievements'].includes(tab) ? [] : ['config', 'bands', 'bonds', 'assets']));
   const gd = useMemo(() => makeLookups(ready), [ready, data.locale()]);
   const [stats, setStats] = useState(() => loadStats());
@@ -583,7 +586,7 @@ function StatsScreen({ tab }) {
         <${MicroLabel} tone="mint">STATISTICS // ${tabInfo.micro}<//>
         <div class="st-tabs" role="tablist" aria-label=${t('统计数据')}>
           ${TABS.map((x) => html`<button key=${x.id} type="button" role="tab" aria-selected=${x.id === tab ? 'true' : 'false'} data-tab=${x.id}
-            class=${cx('st-tab', x.id === tab && 'is-on')} onClick=${() => statsStore.set({ tab: x.id })}>${t(x.name)}</button>`)}
+            class=${cx('st-tab', x.id === tab && 'is-on')} onClick=${() => statsStore.set({ tab: x.id })}>${t(x.name)}${x.id === 'achievements' && unread.length ? html`<span class="achievement-new">${t('新')}</span>` : null}</button>`)}
         </div>
       </div>
       ${!['daily', 'achievements'].includes(tab) ? html`      <div class="st-top__right">

@@ -1,3 +1,4 @@
+import { resetAchievementNotices } from './achievementNotices.js';
 // One identity and one recovery code for daily points and permanent achievements; loaded on demand.
 import { useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button } from './components.js';
@@ -37,7 +38,7 @@ export function ChallengeIdentity({ onRestored }) {
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ recoveryCode: value.recoveryCode }) });
       if (!response.ok) throw new Error('invalid recovery code');
-      setMessage(t('积分与成就身份已恢复，记录已重新读取。'));onRestored();
+      resetAchievementNotices();setMessage(t('积分与成就身份已恢复，记录已重新读取。'));onRestored();
     } catch { setMessage(t('恢复码操作失败，请确认文件正确、服务器可用后重试。')); }
     finally { setBusy(false); }
   }

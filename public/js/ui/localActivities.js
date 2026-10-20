@@ -1,3 +1,4 @@
+import { subscribeAchievements } from './achievementNotices.js';
 import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Button } from './components.js';
 import { t, N_, tName } from '../../../shared/i18n.js';
@@ -15,6 +16,7 @@ export function DailyActivities() {
   const [lastRefresh, setLastRefresh] = useState(0), [collection, setCollection] = useState(null), [showCollection, setShowCollection] = useState(false);
   const [visible, setVisible] = useState(() => !globalThis.document?.hidden);
   const day = challengeDay(now);
+  useEffect(() => subscribeAchievements(kind => { if (kind === 'settlement') setRevision(v => v + 1); }), []);
   useEffect(() => {
     const tick = () => { setNow(Date.now());setVisible(!document.hidden); };
     const timer = setInterval(tick, 15000);document.addEventListener('visibilitychange', tick);

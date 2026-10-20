@@ -1,3 +1,4 @@
+import { AchievementResultPanel } from '../ui/funReport.js';
 // The settlement flow of the match on screen (research 06 §10.6; the official act's settlement): a radar intro, then
 // two pages, drawn with the official settlement sprites (assets `settle/*`, `elite/*`, `entry/season_logo_settle`;
 // docs/ASSETS.md) — every sprite falls back to text / plain CSS when the resource pack is not there.
@@ -593,6 +594,7 @@ export function SettleFlow({ res, pub = null, myId = null, content = null, backL
     ${page === 'intro' ? html`<${SettleIntro} players=${r.players} myId=${myId} lose=${lose} onDone=${() => setPage('self')} />` : null}
     ${page === 'self' ? html`<${SelfPage} r=${r} res=${res} raw=${rawSelf} self=${self} gd=${gd} prog=${prog} content=${content} onNext=${() => setPage('team')} />` : null}
     ${page === 'team' ? html`<${TeamPage} r=${r} res=${res} gd=${gd} myId=${myId} at=${ctx.at} content=${content} backLabel=${backLabel} onBack=${onBack} onDetail=${() => setDetail(true)} />` : null}
+    ${self && page !== 'intro' && !detail ? html`<${AchievementResultPanel} result=${res} />` : null}
     ${detail ? html`<div class="settle__detail" data-testid="settle-detail">
       <${ResultView} res=${res} pub=${pub} myId=${myId} quiet=${true} slot=${false} content=${content} backLabel=${t('返回')} onBack=${() => setDetail(false)} /></div>` : null}
   </div>`;

@@ -1,3 +1,4 @@
+import { subscribeAchievements, unreadAchievements, markAchievementsSeen } from './achievementNotices.js';
 // This page and its atlas load only when the player deliberately opens the permanent collection.
 import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Button } from './components.js';
@@ -10,10 +11,12 @@ import { CovenantRequirement } from './covenantRequirement.js';
 const CATEGORIES = [['all', N_('全部')], ['general', N_('通用')], ['core', N_('核心盟约')], ['other', N_('其他盟约')], ['collection', N_('总章')], ['legacy', N_('旧章')]];
 
 export function AchievementCollection() {
+  const [fresh, setFresh] = useState(unreadAchievements);
   const [showBoard, setShowBoard] = useState(false);
   const [category, setCategory] = useState('all'), [filter, setFilter] = useState('all');
   const [data, setData] = useState(null), [failed, setFailed] = useState(false);
   const [division, setDivision] = useState('solo'), [revision, setRevision] = useState(0);
+  useEffect(() => subscribeAchievements(kind => { if (kind === 'settlement') { setFresh(unreadAchievements());setRevision(v => v + 1); } else if (kind === 'identity') setFresh([]); }), []);
   useEffect(() => {
     const controller = new AbortController();const token = identity.getToken();
     setFailed(false);
@@ -26,6 +29,7 @@ export function AchievementCollection() {
       }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [revision]);
+  useEffect(() => { if (data) markAchievementsSeen(division, Object.keys(data.unlocked?.[division] || {})); }, [data, division]);
   const unlocked = data?.unlocked?.[division] || {};
   const progress = data?.progress?.[division] || {};
   return html`<section class="local-activities permanent-collection" data-testid="achievement-collection">
@@ -51,7 +55,7 @@ export function AchievementCollection() {
     <div class="collection-filters" role="group" aria-label=${t('获得状态')}>${[['all',t('全部')],['earned',t('已获得')],['locked',t('未获得')]].map(([id,label]) => html`<${Button} key=${id} variant=${filter === id ? 'primary' : 'secondary'} onClick=${() => setFilter(id)}>${label}<//>`)}</div>
     ${failed ? html`<p role="alert">${t('永久成就暂不可用，请关闭后重试。')}</p>` : null}
     ${!data && !failed ? html`<p role="status">${t('正在读取永久收藏…')}</p>` : null}
-    <div class="local-activities__grid permanent-grid">${(data?.achievements || []).filter(a => (category === 'all' || a.category === category) && (filter === 'all' || (filter === 'earned' ? !!unlocked[a.id] : !unlocked[a.id]))).map(a => html`<article key=${a.id} class=${unlocked[a.id] ? 'permanent-card is-complete' : 'permanent-card'}>
+    <div class="local-activities__grid permanent-grid">${[...(data?.achievements || [])].sort((a, b) => Number(fresh.some(n => n.division === division && n.id === b.id)) - Number(fresh.some(n => n.division === division && n.id === a.id))).filter(a => (category === 'all' || a.category === category) && (filter === 'all' || (filter === 'earned' ? !!unlocked[a.id] : !unlocked[a.id]))).map(a => html`<article key=${a.id} class=${unlocked[a.id] ? 'permanent-card is-complete' : 'permanent-card'}>
       <${PermanentMedal} id=${a.id} earned=${!!unlocked[a.id]} label=${t(a.name)} />
       <h3>${t(a.name)}</h3><p>${t(a.goal)}</p><${CovenantRequirement} covenant=${a.count ? a : null} />
       <p class="permanent-progress-label">${t('累计进度：{n} / {target}', { n: progress[a.id] || 0, target: a.target })}</p>
