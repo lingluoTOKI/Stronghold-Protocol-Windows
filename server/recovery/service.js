@@ -80,7 +80,8 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
     for(const s of room.seats)if(s){s.connected=s.isBot;s.ready=false;}
     const added=[];
     try{
-     for(const saved of payload.sessions){const s=new Session({...saved,now:lobby.now()});Object.assign(s,pick(saved,SESSION_KEYS));s.roomCode=room.code;s.resumeWindowMs=86400000;
+     // 恢复出的会话沿用 lobby 的重连窗口（主服 60 秒）。写死 24 小时会让无人房间霸占名额、撑爆 maxRooms。
+     for(const saved of payload.sessions){const s=new Session({...saved,now:lobby.now()});Object.assign(s,pick(saved,SESSION_KEYS));s.roomCode=room.code;s.resumeWindowMs=null;
       lobby.registry.byPlayerId.set(s.playerId,s);lobby.registry.byTokenMap.set(s.token,s);lobby.dailyBoard?.restoreRecoveryIdentity(s,saved.challengeIdentity);added.push(s);}
      lobby.rooms.set(room.code,room);
      if(row.status==='finished'){
