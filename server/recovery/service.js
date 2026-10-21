@@ -50,8 +50,9 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
    const humans=m.order.filter(p=>!p.isBot&&!p.left);
    if(m.recoveryWaiting&&!m.ended&&humans.length&&humans.every(p=>p.connected&&m.recoveryConfirmed.has(p.playerId)))resumePrep(m,m._recoveryRemainingMs);
   };
+  // 重连即视为确认：客户端没有单独的「确认恢复」流程，只等 g.ready 会让玩家卡在恢复帧里。
   const reconnect=m.onReconnect.bind(m);
-  m.onReconnect=id=>{reconnect(id);maybeResume();};
+  m.onReconnect=id=>{reconnect(id);m.recoveryConfirmed.add(id);maybeResume();};
   const leave=m.onLeave.bind(m);
   m.onLeave=id=>{track(store.fact({id:ctx.challenge.runId,departed:id}).then(()=>{if(!m.disposed){leave(id);maybeResume();}}),ctx.challenge.runId);};
  }
