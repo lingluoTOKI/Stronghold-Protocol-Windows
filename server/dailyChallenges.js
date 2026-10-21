@@ -8,17 +8,18 @@ import { ACHIEVEMENTS, earnedAchievements, updateCollectionAwards } from '../sha
 const COOKIE = 'sp_challenge_identity';
 const CAP = 2000;
 const RETAIN_DAYS = 8;
+const TOTAL_CAP = 20000;
 export async function createDailyChallengeBoard({ file, legacyFile = null, now = Date.now, log = console }) {
-  let data = { version: 2, rules: DAILY_VERSION, secret: randomBytes(32).toString('hex'), days: {}, achievements: {}, rotationStart: challengeDay(now() + 86400000) };
+  let data = { version: 3, totals: { solo: {}, coop: {} }, rules: DAILY_VERSION, secret: randomBytes(32).toString('hex'), days: {}, achievements: {}, rotationStart: challengeDay(now() + 86400000) };
   let healthy = true, writing = Promise.resolve();
   let cachedDay = null, cachedRows = {};
   async function load(source) {
     if ((await fs.stat(source)).size > 16 * 1024 * 1024) throw new Error('leaderboard data too large');
     const raw = await fs.readFile(source, 'utf8');
     const parsed = JSON.parse(raw);
-    if (![1, 2].includes(parsed.version) || !/^[a-f0-9]{64}$/.test(parsed.secret) || !parsed.days || typeof parsed.days !== 'object' || Array.isArray(parsed.days)) throw new Error('invalid leaderboard data');
-    if (parsed.version === 2 && ![3, DAILY_VERSION].includes(parsed.rules)) throw new Error('unsupported rules version; preserve data');
-    if (parsed.version !== 2 || ![3, DAILY_VERSION].includes(parsed.rules)) {
+    if (![1, 2, 3].includes(parsed.version) || !/^[a-f0-9]{64}$/.test(parsed.secret) || !parsed.days || typeof parsed.days !== 'object' || Array.isArray(parsed.days)) throw new Error('invalid leaderboard data');
+    if (parsed.version >= 2 && ![3, DAILY_VERSION].includes(parsed.rules)) throw new Error('unsupported rules version; preserve data');
+    if (parsed.version < 2 || ![3, DAILY_VERSION].includes(parsed.rules)) {
       // Preserve identity and the old file; easy-task scores never become ultimate/no-AI scores.
       await fs.copyFile(source, source + '.previous-rules', 1).catch(e => { if (e.code !== 'EEXIST') throw e; });
       parsed.version = 2;parsed.rules = DAILY_VERSION;parsed.days = {};
@@ -79,6 +80,29 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
       for (const task of row.completed) state.daily[task] ||= Date.parse(day + 'T12:00:00+08:00');
       state.legacyDaily ||= {};
       if (day < parsed.rotationStart && ['victory','perfect','core'].every(k => row.completed.includes(k))) state.legacyDaily.collection ||= day;
+    }
+    if (parsed.version < 3) {
+      // Only retained, server-owned daily receipts are provable. Never infer points from medals.
+      await fs.copyFile(source, source + '.pre-cumulative', 1).catch(e => { if (e.code !== 'EEXIST') throw e; });
+      parsed.totals = { solo: {}, coop: {} };
+      for (const day of Object.keys(parsed.days).sort()) for (const [division, rows] of Object.entries(parsed.days[day])) {
+        for (const [id, row] of Object.entries(rows)) {
+          if (!row.completed.length) continue;
+          const total = parsed.totals[division][id] ||= { name: row.name, points: 0 };
+          total.name = row.name;total.points += row.completed.length;
+        }
+      }
+      parsed.version = 3;
+    }
+    if (!parsed.totals || typeof parsed.totals !== 'object' || Array.isArray(parsed.totals)
+      || Object.keys(parsed.totals).some(k => !['solo','coop'].includes(k))) throw new Error('invalid cumulative totals');
+    for (const division of ['solo','coop']) {
+      const rows = parsed.totals[division];
+      if (!rows || typeof rows !== 'object' || Array.isArray(rows) || Object.keys(rows).length > TOTAL_CAP) throw new Error('invalid cumulative division');
+      for (const [id, row] of Object.entries(rows)) {
+        if (!/^[a-f0-9]{32}$/.test(id) || typeof row?.name !== 'string' || row.name.length > 24
+          || !Number.isSafeInteger(row.points) || row.points < 1) throw new Error('invalid cumulative score');
+      }
     }
     return parsed;
   }
@@ -148,28 +172,30 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
   }
   function snapshot(id, division = 'solo', includeRows = true) {
     const day = challengeDay(now());
-    if (!includeRows) {
-      const own = data.days[day]?.[division]?.[id];
-      return { ok: healthy, day, division, rotationStart: data.rotationStart, challenges: dailyChallenges([], now(), data.rotationStart).challenges,
-        rows: [], self: own ? { ...own, points: own.completed.length, mine: true } : null };
-    }
+    const today = data.days[day]?.[division]?.[id];
+    const total = data.totals[division]?.[id];
+    const self = today || total ? { name: total?.name || today.name, completed: today?.completed || [],
+      points: today?.completed.length || 0, totalPoints: total?.points || 0, mine: true } : null;
+    const base = { ok: healthy, day, division, rankingScope: 'cumulative', rotationStart: data.rotationStart,
+      challenges: dailyChallenges([], now(), data.rotationStart).challenges, rows: [], self };
+    // No ranking sort or roster serialization until explicitly requested.
+    if (!includeRows) return base;
     if (cachedDay !== day) { cachedRows = {};cachedDay = day; }
     if (!cachedRows[division]) {
-      const rows = Object.entries(data.days[day]?.[division] || {}).map(([key, value]) => ({ key, ...value, points: value.completed.length }));
+      const rows = Object.entries(data.totals[division] || {}).map(([key, value]) => ({ key, ...value }));
       rows.sort((a, b) => b.points - a.points || a.key.localeCompare(b.key));
       let rank = 0, previous = -1;
       cachedRows[division] = rows.map((r, i) => {
         if (r.points !== previous) rank = i + 1;
         previous = r.points;
-        return { key: r.key, rank, name: r.name, points: r.points, completed: r.completed };
+        return { key: r.key, rank, name: r.name, points: r.points };
       });
     }
-    const publicRow = ({ key, ...r }) => ({ ...r, mine: key === id });
-    const ranked = cachedRows[division];
-    const own = ranked.find(r => r.key === id);
-    return { ok: healthy, day, division, challenges: dailyChallenges([], now(), data.rotationStart).challenges, rotationStart: data.rotationStart,
-      rows: includeRows ? ranked.slice(0, 100).map(publicRow) : [], total: ranked.length, self: own ? publicRow(own) : null };
+    const ranked = cachedRows[division], own = ranked.find(r => r.key === id);
+    return { ...base, rows: ranked.slice(0, 100).map(({ key, ...r }) => ({ ...r, mine: key === id })),
+      total: ranked.length, self: self ? { ...self, ...(own ? { rank: own.rank } : {}) } : null };
   }
+
   return {
     // Trusted server-only recovery adapter; never accepted as a client result or identity claim.
     recoveryIdentity: session => identities.get(session) || null,
@@ -287,6 +313,8 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
         const dayBoards = data.days[day] || (data.days[day] = {});
         const board = dayBoards[division] || (dayBoards[division] = {});
         if (!board[id] && Object.keys(board).length >= CAP) continue;
+        const totals = data.totals[division];
+        if (!totals[id] && Object.keys(totals).length >= TOTAL_CAP) continue;
         const previous = board[id]?.completed || [];
         if (newlyUnlocked.feedback[player.playerId]) newlyUnlocked.feedback[player.playerId].pointsAdded = done.filter(key => !previous.includes(key)).length;
         const completed = [...new Set([...previous, ...done])].slice(0, 3);
@@ -295,7 +323,14 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
           if (!state.legacyDaily.collection) { state.legacyDaily.collection = day;changed = true; }
         }
         if (completed.length === previous.length) continue;
-        board[id] = { name: String(session.name || player.name || '').slice(0, 24), completed };
+        const name = String(session.name || player.name || '').slice(0, 24);
+        const gained = completed.length - previous.length;
+        const points = (totals[id]?.points || 0) + gained;
+        if (!Number.isSafeInteger(points)) continue;
+        // Day receipts and permanent totals share the same atomic snapshot / backup.
+        // Trimming old receipts never trims totals; expired runs cannot re-add points.
+        totals[id] = { name, points };
+        board[id] = { name, completed };
         changed = true;
       }
       if (proof.durableRecovery) {

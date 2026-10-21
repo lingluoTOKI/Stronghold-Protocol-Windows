@@ -336,3 +336,11 @@ are entirely native and require consent [ASSUMED]; trusted classes cannot load i
 same-origin native script responses before import; all gameplay battle simulations run in Workers.
 
 Test-room admission requires `testAck:true` for both join and spectate; otherwise `TEST_CONFIRM` precedes any membership/state delivery. `g.test bond` accepts `{id,layers,count?}` (count is 0–99 extra members). All host attempts consume their per-command rate bucket, including malformed args. `[test-input ROOM]` init/call/timer JSON lines and `[test-audit ROOM]` results use the server logger. Test results have null titles and zero trophies/rewards and never enter browser records.
+
+## 累计积分榜（2026-10-21，本地代码待验证）
+
+按维护者要求，主榜改为永久累计积分；每天每目标首次完成 +1，每分组每天最多 3 分，七日轮换的新一天可继续得分。单人／多人独立，同分使用竞赛排名并列。仅主动查看排行榜才排序并返回前 100 条，个人名次单独显示。今日积分与累计积分分别展示。
+
+成绩文件升级为 version 3，新增 solo/coop totals，沿用原身份签名密钥和成就数据。迁移前保存 `.pre-cumulative` 副本，仅累加当前文件仍保留的有效每日明细；不以章数推断历史，不自动扫描运维备份。迁移只运行一次；以后清理八日前明细不影响累计总分。每日去重凭据与累计总分一起原子保存；超出已有八日结算窗口的旧对局不补分，避免过期凭据重复计分。恢复码继续共用。回滚服务端时必须配套处理 version 3 数据，不可直接让旧程序读取并覆盖新档案。
+
+按用户要求仅编写代码，未运行测试、未部署、未重启；启用需服务端更新并安排重启。

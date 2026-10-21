@@ -2463,5 +2463,10 @@
   "目标完成": "Goal completed",
   "每日章获得后永久收藏；这里展示本局完成情况，不代表首次获得。": "Daily medals are permanent. This shows completion in this run, not a first unlock.",
   "永久成就进度": "Permanent achievement progress",
-  "新": "New"
+  "新": "New",
+  "每日挑战累计积分榜": "Cumulative Daily Challenge Ranking",
+  "本服累计榜 · 展示前 100 条，个人名次单独显示 · 同分并列": "Server cumulative ranking · Top 100, personal rank shown separately · Equal scores share rank",
+  "暂无累计积分记录。": "No cumulative scores yet.",
+  "本榜累计积分：{n}": "Cumulative points in this division: {n}",
+  "积分长期累计，每天每项目标首次完成加 1 分，每榜每天最多 3 分；七天轮换重复后仍可获取新一天的积分。单人、多人分榜，同分并列。": "Points accumulate permanently. Each goal awards 1 point on its first completion each day, up to 3 per division per day. New days award points even when the weekly rotation repeats. Solo and co-op are separate; equal scores share rank."
 }
