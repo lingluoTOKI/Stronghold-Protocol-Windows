@@ -90,9 +90,9 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
     for(const s of room.seats)if(s){s.connected=s.isBot;s.ready=false;}
     const added=[];
     try{
-     // 对局中的房间必须留足窗口，否则重启后玩家一刷新就被切出；已结束的回放房间只在短窗口保留，避免空房占满 maxRooms。
+     // 恢复出的房间只等 60 秒：和普通掉线重连同一节奏，没人回来立刻释放，绝不留僵尸房。
      // 恢复出的会话从一开始就是掉线状态：没有 disconnectedAt 的话 isExpired 永远为假，无人回来的房间会永久占着名额。
-     const keepMs=row.status==='finished'?60000:21600000;
+     const keepMs=60000;
      for(const saved of payload.sessions){const s=new Session({...saved,now:lobby.now()});Object.assign(s,pick(saved,SESSION_KEYS));s.roomCode=room.code;s.resumeWindowMs=keepMs;
       if(!s.connected)s.disconnectedAt=lobby.now();
       lobby.registry.byPlayerId.set(s.playerId,s);lobby.registry.byTokenMap.set(s.token,s);lobby.dailyBoard?.restoreRecoveryIdentity(s,saved.challengeIdentity);added.push(s);}
