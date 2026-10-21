@@ -80,8 +80,9 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
     for(const s of room.seats)if(s){s.connected=s.isBot;s.ready=false;}
     const added=[];
     try{
-     // 恢复出的会话沿用 lobby 的重连窗口（主服 60 秒）。写死 24 小时会让无人房间霸占名额、撑爆 maxRooms。
-     for(const saved of payload.sessions){const s=new Session({...saved,now:lobby.now()});Object.assign(s,pick(saved,SESSION_KEYS));s.roomCode=room.code;s.resumeWindowMs=null;
+     // 对局中的房间必须留足窗口，否则重启后玩家一刷新就被切出；已结束的回放房间只在短窗口保留，避免空房占满 maxRooms。
+     const keepMs=row.status==='finished'?60000:86400000;
+     for(const saved of payload.sessions){const s=new Session({...saved,now:lobby.now()});Object.assign(s,pick(saved,SESSION_KEYS));s.roomCode=room.code;s.resumeWindowMs=keepMs;
       lobby.registry.byPlayerId.set(s.playerId,s);lobby.registry.byTokenMap.set(s.token,s);lobby.dailyBoard?.restoreRecoveryIdentity(s,saved.challengeIdentity);added.push(s);}
      lobby.rooms.set(room.code,room);
      if(row.status==='finished'){
