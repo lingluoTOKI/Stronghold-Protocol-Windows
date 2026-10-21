@@ -79,8 +79,11 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
    // can still read it. Finished replays stay strict — they are only kept for review and are cheap to drop.
    const stale=row.compatibility!==compatibility;
    if(stale&&row.status!=='active'){failures.set(row.id,'Version mismatch; replay retained');continue;}
-   // Finished replays are retained on disk, but only offered for one day after settlement.
-   if(row.status==='finished'&&Date.now()-row.updated>86400000)continue;
+   // Finished replays stay on disk (cheap to keep) but are only rebuilt in memory while someone could still be
+   // looking at them: the reconnect window is 60 s everywhere now, so an older settlement has no one coming back.
+   // Keeping them for a day made every restart resurrect all of yesterday's rooms, filling maxRooms until the
+   // 60 s sweep removed them again.
+   if(row.status==='finished'&&Date.now()-row.updated>60000)continue;
    try{
     const payload=deserialize(row.payload);if(payload.version!==1||payload.challenge.runId!==row.id)throw new Error('Invalid recovery envelope');
     const r=payload.room;if(row.status==='finished' && (lobby.rooms.has(r.code)||payload.sessions.some(s=>lobby.registry.byId(s.playerId))))continue;
