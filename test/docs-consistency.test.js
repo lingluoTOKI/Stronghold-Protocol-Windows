@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 import { GameData } from '../server/match/gamedata.js';
 import { helperOrder } from '../server/match/unite.js';
 import { NET_DEFAULTS } from '../server/net.js';
-import { SOLO_RECONNECT_FALLBACK_SEC } from '../server/lobby.js';
+import { SOLO_RECONNECT_FALLBACK_SEC, LOBBY_DEFAULTS } from '../server/lobby.js';
 import { moduleTypeIconUrl } from '../public/js/ui/assetUrls.js';
 import { validateC2S } from '../shared/protocol.js';
 import { ERR, PHASE } from '../shared/constants.js';
@@ -139,8 +139,9 @@ test('boss results: no synthetic zero for a running boss field (docs), handover 
   assert.match(META, /hands the field to the partner's replica or the server/);
 });
 
-test('reconnect windows: co-op 10 min, solo singleReconnectTime 24 h (code, data, every doc)', () => {
-  assert.equal(NET_DEFAULTS.reconnectWindowMs, 10 * 60_000);
+test('reconnect windows: 60 s for every mode (code, data keeps the official value, every doc)', () => {
+  assert.equal(NET_DEFAULTS.reconnectWindowMs, 60_000);
+  assert.equal(LOBBY_DEFAULTS.soloReconnectWindowMs, 60_000);
   assert.equal(SOLO_RECONNECT_FALLBACK_SEC, 86_400);
   assert.equal(DATA.config.constants.singleReconnectTime, 86_400);
   assert.match(DESIGN, /singleReconnectTime/);
@@ -148,8 +149,7 @@ test('reconnect windows: co-op 10 min, solo singleReconnectTime 24 h (code, data
   assert.match(META, /singleReconnectTime/);
   assert.match(dataRow('constants'), /singleReconnectTime/);
   for (const [name, text] of [['README', README], ['DEPLOY', DEPLOY], ['PLAYING', PLAYING]]) {
-    assert.match(text, /24 小时/, `${name}: solo resume window`);
-    assert.match(text, /10 分钟/, `${name}: co-op window`);
+    assert.match(text, /60 秒/, `${name}: reconnect window`);
   }
   assert.ok(!/断线 10 分钟内可重连，掉线期间 AI 托管/.test(README), 'README: a dropped seat is not AI-played unless 暂离');
 });

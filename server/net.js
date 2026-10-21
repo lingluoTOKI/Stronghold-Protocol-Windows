@@ -52,7 +52,7 @@ export const NET_DEFAULTS = Object.freeze({
   abuseDropsPerSec: 400,        // rate-limited messages within one second before the socket is closed (1008)
   heartbeatMs: 30_000,          // ping interval; a socket that missed one full interval is terminated
   helloTimeoutMs: 30_000,       // sockets that never say hello are closed (4002)
-  reconnectWindowMs: 10 * 60_000, // disconnected sessions stay resumable this long
+  reconnectWindowMs: 60_000,    // disconnected sessions stay resumable this long (owner's call: 60s everywhere)
   snapDropBytes: 1 << 20,       // skip b.snap while bufferedAmount exceeds this
   hardBufferBytes: 16 << 20,    // terminate a socket whose send queue exceeds this
   maxConnections: 2000,         // concurrent sockets (enforced by index.js at upgrade time)

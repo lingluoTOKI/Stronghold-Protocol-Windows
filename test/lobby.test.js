@@ -1540,8 +1540,8 @@ describe('lobby timers and match interface', () => {
     assert.ok(freed);
   });
 
-  test('a dropped solo run keeps the official singleReconnectTime (24 h), not the 10-minute window', () => {
-    assert.equal(srv.lobby.soloResumeWindowMs(), 86_400 * 1000, 'data config.constants.singleReconnectTime');
+  test('a dropped solo run now uses the 60-second window like every other mode', () => {
+    assert.equal(srv.lobby.soloResumeWindowMs(), 60_000, 'LOBBY_DEFAULTS.soloReconnectWindowMs');
     assert.ok(srv.lobby.soloResumeWindowMs() > WINDOW);
   });
 });
