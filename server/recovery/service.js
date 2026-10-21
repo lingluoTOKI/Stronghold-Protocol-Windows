@@ -9,9 +9,14 @@ import { encodePrep, restorePrep, prepOptions, resumePrep } from './checkpoint.j
 import { ERR } from '../../shared/constants.js';
 
 export async function recoveryCompatibility(root,content) {
+ // Only the persisted state shape decides whether a checkpoint can be replayed: the match tree plus the codec itself.
+ // The orchestration layer (this file, the sqlite store) never changes the bytes on disk, so editing it must not
+ // invalidate live saves — that used to wipe every in-progress game on each recovery fix.
  const hash=createHash('sha256').update('prep-v1:'+content);
  async function walk(dir){for(const e of (await readdir(dir,{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name))){const p=join(dir,e.name);if(e.isDirectory())await walk(p);else if(e.name.endsWith('.js'))hash.update(p.slice(root.length)).update(await readFile(p));}}
- await walk(join(root,'server/match'));await walk(join(root,'server/recovery'));return hash.digest('hex');
+ await walk(join(root,'server/match'));
+ hash.update('codec:').update(await readFile(join(root,'server/recovery/checkpoint.js')));
+ return hash.digest('hex');
 }
 const ROOM_KEYS=['code','mode','difficulty','bossHp','aiPicksLast','hostId','seats','matchCount','content'];
 const SESSION_KEYS=['playerId','token','name','loadout','ops','notOwned','diy','skins'];
@@ -69,7 +74,11 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
  async function restore(){
   const rows=(await store.list()).sort((a,b)=>(a.status===b.status?b.updated-a.updated:a.status==='active'?-1:1));
   for(const row of rows){
-   if(row.error||row.compatibility!==compatibility){failures.set(row.id,row.error||'Version mismatch; original retained');continue;}
+   if(row.error){failures.set(row.id,row.error);continue;}
+   // A build change must not vaporise a game people are still playing: an active save is replayed whenever the codec
+   // can still read it. Finished replays stay strict — they are only kept for review and are cheap to drop.
+   const stale=row.compatibility!==compatibility;
+   if(stale&&row.status!=='active'){failures.set(row.id,'Version mismatch; replay retained');continue;}
    // Finished replays are retained on disk, but only offered for one day after settlement.
    if(row.status==='finished'&&Date.now()-row.updated>86400000)continue;
    try{
@@ -102,6 +111,7 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
       // Departure changes team accounting. Refuse instead of guessing a new team state from an older checkpoint.
       if(row.facts?.departed?.some(id=>!deserialize(payload.checkpoint).players.find(p=>p.playerId===id)?.left))throw new Error('Departure after checkpoint; retained for operator review');
       if(row.fallback)log.warn('[recovery] used previous checkpoint',room.code);
+      if(stale)log.warn('[recovery] replayed a save from an older build',room.code,'(codec-compatible)');
      }
     }catch(e){for(const s of added)lobby.registry.remove(s);lobby.rooms.delete(room.code);room.match?.dispose();throw e;}
    }catch(e){failures.set(row.id,e.message);log.error('[recovery] retained unreadable match',row.id,e.message);}

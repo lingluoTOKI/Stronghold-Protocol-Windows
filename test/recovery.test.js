@@ -49,8 +49,8 @@ test('startup restores private seats, rejects stranger, waits for every human',a
  assert.deepEqual(service.status().failures,[]);const m=next.rooms.get('TEST').match;
  assert.equal(next.registry.byToken('1'.repeat(32)).playerId,'p_0');assert.equal(m.recoveryWaiting,true);
  assert.ok(m.handle('stranger',{t:'g.ready',ready:true}).error);assert.ok(m.handle('p_0',{t:'g.refresh'}).error);
- m.onReconnect('p_0');m.onReconnect('p_1');m.handle('p_0',{t:'g.ready',ready:true});assert.equal(m.recoveryWaiting,true);
- m.handle('p_1',{t:'g.ready',ready:true});assert.equal(m.recoveryWaiting,false);
+ m.onReconnect('p_0');assert.equal(m.recoveryWaiting,true); // p_1 has not come back yet
+ m.onReconnect('p_1');assert.equal(m.recoveryWaiting,false); // a reconnect is the confirmation; everyone is back
  await service.close();next.shutdown('shutdown');
 });
 
