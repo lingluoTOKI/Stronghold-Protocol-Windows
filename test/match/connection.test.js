@@ -7,6 +7,19 @@ import { StubMatch } from '../../server/match/StubMatch.js';
 import { DATA, makeMatch, checkInvariants, give, giveItem, chessOfTier } from './harness.js';
 import { bossPoolHp } from '../../server/match/finalAssault.js';
 
+test('six-seat co-op builds GameData with the real seat count — ban reduction must fire (regression)', () => {
+  // 曾经残留一句 this.gd = new GameData(data, modeId, 1) 把按席位数建好的实例整个覆盖，
+  // 六人少 BAN、六人血池翻倍、大房悬赏补卡全部按单人分支走。
+  const h = makeMatch({ mode: 'coop', humans: 2, bots: 4, seed: 62 }).start();
+  const m = h.m;
+  assert.equal(m.startingPlayerCount, 6, 'Match.startingPlayerCount counts occupied seats');
+  assert.equal(m.gd.startingPlayerCount, 6, 'GameData must keep the same count');
+  assert.equal(m.gd.bans(m.gd.difficulty).core, 1, 'NORMAL 6 players: core 3 - 2 = 1');
+  assert.equal(m.disabledBonds.length, 5, 'drawn bans = 1 core + 4 addon');
+  const solo = makeMatch({ mode: 'solo', seed: 63 }).start();
+  assert.equal(solo.m.gd.bans(solo.m.gd.difficulty).core, 3, 'solo keeps the base 3 core bans');
+});
+
 const STATUSES = ['acting', 'ready', 'deciding', 'combat', 'done', 'helping', 'left', 'dead'];
 
 test('public throttling starts at broadcast time even when building the previous snapshot was delayed', () => {

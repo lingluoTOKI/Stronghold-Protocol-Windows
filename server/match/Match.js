@@ -319,7 +319,8 @@ export class Match {
     this._offerResume = null;
     /** window sequence (diagnostics and messages) */
     this.offerSeq = 0;
-    this.gd = new GameData(this.data, this.modeId, 1, opts.bossHp);
+    // gd 已在本构造函数开头按开局席位数建好（六人血池翻倍、开局少 BAN、大房悬赏补卡都依赖它）；
+    // 这里曾经残留一句硬编码 1 的旧重建，会把正确实例整个覆盖，六人减负全部失效。
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
     /** 「AI 队友最后选择」 (opts.aiPicksLast, GitHub #338): humans draft before AI seats (MatchPhases.humansFirst) */
