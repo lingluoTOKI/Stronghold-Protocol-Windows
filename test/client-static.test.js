@@ -438,7 +438,16 @@ describe('net.js', () => {
     assert.ok(ws().last('ping'), 'latency probe before hello');
     net.setName('  凯尔希  ');
     const hello = ws().last('hello');
-    assert.deepEqual({ ...hello, rid: 0 }, { t: 'hello', rid: 0, name: '凯尔希', version: PROTOCOL_VERSION, token: 'tok-1' });
+    // hello names the state-delta version it understands; a server that does not know the field ignores it.
+    const { STATE_DELTA_VERSION } = await import(pathToFileURL(path.join(ROOT, 'shared/stateDelta.js')).href);
+    assert.deepEqual({ ...hello, rid: 0 }, {
+      t: 'hello',
+      rid: 0,
+      name: '凯尔希',
+      version: PROTOCOL_VERSION,
+      delta: STATE_DELTA_VERSION,
+      token: 'tok-1',
+    });
     assert.equal(net.status, 'handshaking');
     ws().recv({ t: 'welcome', rid: hello.rid, playerId: 'p_1', token: 't', name: '凯尔希', serverNow: Date.now() });
     assert.equal(net.status, 'online');
@@ -908,7 +917,7 @@ function fakeFetch(files) {
   const calls = [];
   const fn = async (url) => {
     calls.push(url);
-    const name = url.split('/').pop();
+    const name = url.split(/[?#]/)[0].split('/').pop();
     if (!(name in files)) return { ok: false, status: 404, json: async () => ({}) };
     const v = files[name];
     return { ok: true, status: 200, json: async () => (typeof v === 'string' ? JSON.parse(v) : v) };
@@ -932,7 +941,7 @@ describe('data.js', () => {
     console.warn = (m) => warns.push(m);
     try {
       const [chess] = await Promise.all([d.load('chess'), d.load('chess')]);
-      assert.equal(fetch.calls.filter((u) => u === '/data/chess.json').length, 1, 'single fetch for concurrent loads');
+      assert.equal(fetch.calls.filter((u) => u.split('?')[0] === '/data/chess.json').length, 1, 'single fetch for concurrent loads');
       assert.equal(chess.chess_a.name, 'A');
       assert.equal(d.lookup('chess', 'chess_b').name, 'B');
       await d.loadAll('bonds', 'items', 'bands', 'enemies');

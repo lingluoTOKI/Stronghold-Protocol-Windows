@@ -16,7 +16,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (p) => readFileSync(path.join(ROOT, p), 'utf8');
 
 globalThis.fetch = async (url) => {
-  const name = String(url).split('/').pop();
+  const name = String(url).split(/[?#]/)[0].split('/').pop();
   try {
     const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };
@@ -119,6 +119,14 @@ test('the game screen hands the mode-disabled set to the shop bar, the detail ca
   assert.match(src, /<\$\{ShopBar\}[\s\S]*?offBonds=\$\{offBonds\}/);
   assert.match(src, /<\$\{DetailPanel\}[\s\S]*?offBonds=\$\{offBonds\}/);
   assert.match(src, /<\$\{BondPopup\}[\s\S]*?off=\$\{offBonds\.has\(bondPop\.bondId\)\}/);
+});
+
+test('the bond popup closes on outside presses, while its own region and toggle triggers handle themselves', () => {
+  const src = read('public/js/screens/game.js');
+  assert.match(src, /const screen = hudElRef\.current\?\.parentElement/);
+  assert.match(src, /if \(!live\.current\.bondOpen \|\| e\.target\?\.closest\?\.\('\.bpop, \.bslot, \.dbond'\)\) return;\s+setBondOpen\(null\)/);
+  assert.match(src, /screen\.addEventListener\('pointerdown', onDown, true\)/);
+  assert.match(src, /screen\.removeEventListener\('pointerdown', onDown, true\)/);
 });
 
 test('hidden-layer bonds show activation and tiers without a stack badge or layer count', () => {

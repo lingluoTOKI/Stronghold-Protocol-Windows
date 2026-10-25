@@ -29,7 +29,7 @@ const EMPTY_LOCAL = { version: 1, source: 'none', count: 0, groups: {} };
 let mode = 'ok';         // data/local-assets.json: 'ok' (the manifest above) | 'empty' (the server's stand-in) | 'missing' (404)
 let assetsDoc = null;    // data/assets.json, or null (404)
 globalThis.fetch = async (url) => {
-  const u = String(url);
+  const u = String(url).split(/[?#]/)[0];
   if (u.endsWith('/local-assets.json')) {
     if (mode === 'ok') return { ok: true, status: 200, json: async () => manifest };
     if (mode === 'empty') return { ok: true, status: 200, json: async () => EMPTY_LOCAL };

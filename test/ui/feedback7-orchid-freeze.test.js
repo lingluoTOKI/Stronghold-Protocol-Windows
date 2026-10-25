@@ -14,7 +14,7 @@ import { makeMatch, DATA } from '../match/harness.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 // the browser data store reads the real data files from disk
 globalThis.fetch = async (url) => {
-  const name = String(url).split('/').pop();
+  const name = String(url).split(/[?#]/)[0].split('/').pop();
   try {
     const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };

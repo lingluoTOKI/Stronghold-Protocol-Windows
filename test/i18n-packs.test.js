@@ -332,7 +332,7 @@ test('game texts fall back per text: the pack\'s overlay, then its fallback\'s, 
   assert.equal(stale.stale, 1);
   const files = { '/data/chess.json': zh, '/packs/qaa/game.json': qaa, '/data/i18n/en.json': en };
   const calls = [];
-  const d = createDataStore({ retryDelays: [], fetch: async (url) => { calls.push(url); return files[url] ? { ok: true, status: 200, json: async () => files[url] } : { ok: false, status: 404, json: async () => null }; } });
+  const d = createDataStore({ retryDelays: [], fetch: async (url) => { url = url.split('?')[0]; calls.push(url); return files[url] ? { ok: true, status: 200, json: async () => files[url] } : { ok: false, status: 404, json: async () => null }; } });
   await d.load('chess');
   assert.equal(await d.setLocale('qaa', [{ code: 'qaa', url: '/packs/qaa/game.json' }, 'en']), 'qaa');
   assert.deepEqual(calls.filter((u) => u.includes('i18n') || u.includes('packs')).sort(), ['/data/i18n/en.json', '/packs/qaa/game.json']);

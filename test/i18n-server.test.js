@@ -22,7 +22,7 @@ let toasts;
 before(async () => {
   // the client data store (singleton) reads data/ through fetch: serve it from the repo
   globalThis.fetch = async (url) => {
-    const abs = path.join(ROOT, String(url).replace(/^\//, ''));
+    const abs = path.join(ROOT, String(url).split(/[?#]/)[0].replace(/^\//, ''));
     if (!existsSync(abs)) return { ok: false, status: 404, json: async () => null };
     const text = readFileSync(abs, 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(text) };
@@ -110,7 +110,7 @@ test('a real match: 歌蕾蒂娅 grants a chess → 「歌蕾蒂娅：获得X」
   give(m, ps, row[0], 'board', [10, 6]);
   give(m, ps, row[1], 'board', [10, 8]);
   const n0 = h.allTo('p_0', 'm.toast').length;
-  m.dispatch(ps, 'onRoundStart', { round: m.round });
+  m.dispatch(ps, 'onPrepStart', { round: m.round });   // 歌蕾蒂娅's 「<进入休整期时>」 (DESIGN §35.53)
   const frame = h.allTo('p_0', 'm.toast').slice(n0).find((t) => t.msgid === '{who}：获得{name}');
   assert.ok(frame, JSON.stringify(h.allTo('p_0', 'm.toast').slice(n0)));
   assert.ok(frame.text.startsWith('歌蕾蒂娅：获得'), frame.text);

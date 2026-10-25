@@ -49,7 +49,7 @@ test('ammo and infinite skills keep their duration semantics', () => {
 test('loadout attributes use the in-match block and keep obtain/rest triggers for both forms', async () => {
   globalThis.fetch = async (url) => {
     try {
-      const value = JSON.parse(readFileSync(new URL(`../../data/${String(url).split('/').pop()}`, import.meta.url), 'utf8'));
+      const value = JSON.parse(readFileSync(new URL(`../../data/${String(url).split(/[?#]/)[0].split('/').pop()}`, import.meta.url), 'utf8'));
       return { ok: true, json: async () => value };
     } catch { return { ok: false, status: 404 }; }
   };

@@ -36,7 +36,7 @@ test('renderInfo passes UnitInfo.items through (the teammate-unit equipment into
 // ---- the user-visible end of the chain: a teammate unit's card with its equipment ----------------------------------
 
 globalThis.fetch = async (url) => {
-  const name = String(url).split('/').pop();
+  const name = String(url).split(/[?#]/)[0].split('/').pop();
   try {
     const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };

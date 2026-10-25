@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 globalThis.fetch = async (url) => {
-  const name = String(url).split('/').pop();
+  const name = String(url).split(/[?#]/)[0].split('/').pop();
   try {
     const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
     return { ok: true, status: 200, json: async () => JSON.parse(body) };
@@ -108,7 +108,7 @@ describe('#6 the server names its offers (m.private shop.rewardOffer source / la
     const { m, ps } = prep('band_narant', 63);
     ps.shop.level = 3;
     m.round = 2;
-    m.dispatch(ps, 'onRoundStart', { round: 2 });
+    m.dispatch(ps, 'onPrepStart', { round: 2 }); // 「偶数回合进入休整期时」 (GitHub #851)
     let offer = ps.privateView().shop.rewardOffer;
     assert.ok(offer && offer.source === 'special' && offer.label === '见者有份', JSON.stringify(offer));
     assert.equal(offer.slots.length, 2);

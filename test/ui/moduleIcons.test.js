@@ -21,7 +21,7 @@ const manifest = {
 
 let mode = 'ok';
 globalThis.fetch = async (url) => {
-  if (String(url).endsWith('/local-assets.json') && mode === 'ok') return { ok: true, status: 200, json: async () => manifest };
+  if (String(url).split('?')[0].endsWith('/local-assets.json') && mode === 'ok') return { ok: true, status: 200, json: async () => manifest };
   return { ok: false, status: 404, json: async () => ({}) };
 };
 

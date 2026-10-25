@@ -249,7 +249,7 @@ describe('public/js/ui/emotes.js helpers', () => {
   const realFetch = globalThis.fetch;
 
   test('art URLs come only from what the manifests list (here the local one, keyed by picId; data/assets.json absent); unknown / unlisted → null', async () => {
-    globalThis.fetch = async (url) => (String(url).endsWith('/local-assets.json')
+    globalThis.fetch = async (url) => (String(url).split('?')[0].endsWith('/local-assets.json')
       ? { ok: true, status: 200, json: async () => manifest } : { ok: false, status: 404, json: async () => ({}) });
     try {
       const { data } = await import('../../public/js/data.js');

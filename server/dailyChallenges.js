@@ -1,3 +1,4 @@
+import { DEFAULT_VERSION } from '../shared/versions.js';
 // Settlement-only daily ranking. No client-submitted results, per-tick work, match hosts or art downloads.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -262,6 +263,7 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
       res.end(req.method === 'HEAD' ? undefined : body);
     },
     record(room, result, registry, proof) {
+      if ((room.version && room.version !== DEFAULT_VERSION) || (result?.version && result.version !== DEFAULT_VERSION)) return;
       if (!healthy || result?.difficulty !== 'ABYSS' || room.test === true || result?.test === true || (room.content && room.content.vanilla !== true) || !Array.isArray(result?.players)) return;
       if (!proof || !/^[a-f0-9]{32}$/.test(proof.runId) || proof.usedAI !== false || proof.difficulty !== 'ABYSS' || proof.bossHp !== 1 || !Array.isArray(proof.participants)) return;
       const { participants, mode: division } = proof;

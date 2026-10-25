@@ -95,28 +95,28 @@
   padding: .1rem .14rem .08rem;
   background: rgba(14, 18, 16, .82);
   border: 1px solid var(--line-2);
-  border-radius: max(.06rem, 6px);
+  border-radius: max(.06rem, calc(6px * var(--sp-ui, 1)));
   box-shadow: 0 2px 14px rgba(0, 0, 0, .35);
   color: var(--text-md);
-  font-size: max(.14rem, 11px);
+  font-size: max(calc(.14 * var(--t)), 11px);
 }
 .dmg-board__head { display: flex; align-items: baseline; gap: .1rem; padding-bottom: .06rem; flex-wrap: wrap; }
 .dmg-board__icon { width: max(.2rem, 12px); height: max(.2rem, 12px); color: var(--mint-400); align-self: center; }
-.dmg-board__head b { color: var(--text-hi); font-size: max(.17rem, 12px); letter-spacing: .06em; }
+.dmg-board__head b { color: var(--text-hi); font-size: max(calc(.17 * var(--t)), 12px); letter-spacing: .06em; }
 .dmg-board__head small { color: var(--text-dim); }
 .dmg-board__head .micro { margin-left: auto; }
 /* 列多时横向滚动，不把结算屏撑破 */
 .dmg-board__wrap { overflow-x: auto; scrollbar-width: thin; }
 .dmg-board table { width: 100%; border-collapse: collapse; table-layout: auto; }
-.dmg-board th, .dmg-board td { padding: max(.03rem, 3px) max(.07rem, 6px); text-align: right; white-space: nowrap; }
-.dmg-board th { color: var(--text-dim); font-weight: 500; font-size: max(.12rem, 10px); border-bottom: 1px solid var(--line); }
+.dmg-board th, .dmg-board td { padding: max(.03rem, calc(3px * var(--sp-ui, 1))) max(.07rem, calc(6px * var(--sp-ui, 1))); text-align: right; white-space: nowrap; }
+.dmg-board th { color: var(--text-dim); font-weight: 500; font-size: max(calc(.12 * var(--t)), 10px); border-bottom: 1px solid var(--line); }
 .dmg-board td { border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .dmg-board tbody tr:first-child td { border-top: none; }
 
 .dmg-board__rank { width: 1.8em; color: var(--text-dim); text-align: right; }
 .dmg-board__name { text-align: left; color: var(--text-hi); max-width: 14em; overflow: hidden; text-overflow: ellipsis; }
 .dmg-board__who { font-weight: 700; }
-.dmg-board__seat, .dmg-board__tag { margin-left: max(.05rem, 4px); color: var(--text-dim); font-size: max(.11rem, 9px); }
+.dmg-board__seat, .dmg-board__tag { margin-left: max(.05rem, calc(4px * var(--sp-ui, 1))); color: var(--text-dim); font-size: max(calc(.11 * var(--t)), 9px); }
 .dmg-board__tag.is-you { color: var(--mint-400); }
 
 /* 第一名与伤害那一列：看板的第一眼 */
@@ -132,10 +132,10 @@
   background: linear-gradient(90deg, var(--mint-400), rgba(89, 244, 202, .35));
 }
 .dmg-board__bad { color: var(--amber); }
-.dmg-board__hint { margin: max(.04rem, 3px) 0 0; color: var(--text-dim); font-size: max(.11rem, 9px); text-align: right; }
+.dmg-board__hint { margin: max(.04rem, calc(3px * var(--sp-ui, 1))) 0 0; color: var(--text-dim); font-size: max(calc(.11 * var(--t)), 9px); text-align: right; }
 
 @media (max-width: 900px) {
-  .dmg-board { font-size: max(.13rem, 10px); }
+  .dmg-board { font-size: max(calc(.13 * var(--t)), 10px); }
   .dmg-board__name { max-width: 8em; }
 }
 
@@ -171,3 +171,6 @@
 /* a match with gameplay plugins (DESIGN §32.6): the unofficial mark under the headline */
 .result__modmark { align-self: flex-start; margin-top: .06rem; }
 .result__test { display: flex; align-items: center; gap: .08rem; margin: .08rem 0 0; color: #e8b84a; }
+
+/* official versions (DESIGN §35.23): the version's tag under the headline */
+.result__vertag { align-self: flex-start; margin-top: .06rem; }

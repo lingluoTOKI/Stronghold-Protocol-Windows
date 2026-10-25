@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { Room } from '../lobby.js';
 import { Session } from '../net.js';
 import { encodePrep, restorePrep, prepOptions, resumePrep } from './checkpoint.js';
+import { DEFAULT_VERSION } from '../../shared/versions.js';
 import { ERR } from '../../shared/constants.js';
 
 export async function recoveryCompatibility(root,content) {
@@ -18,7 +19,7 @@ export async function recoveryCompatibility(root,content) {
  hash.update('codec:').update(await readFile(join(root,'server/recovery/checkpoint.js')));
  return hash.digest('hex');
 }
-const ROOM_KEYS=['code','mode','difficulty','bossHp','aiPicksLast','hostId','seats','matchCount','content'];
+const ROOM_KEYS=['code','mode','difficulty','bossHp','aiPicksLast','hostId','seats','matchCount','content','version','soloUnlimited','aiTakeover'];
 const SESSION_KEYS=['playerId','token','name','loadout','ops','notOwned','diy','skins'];
 const pick=(o,keys)=>Object.fromEntries(keys.map(k=>[k,o[k]]));
 export function createRecoveryService({store,lobby,compatibility,log=console}) {
@@ -28,13 +29,13 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
   sessions:room.seats.filter(s=>s&&!s.isBot&&!s.left).map(s=>{const session=lobby.registry.byId(s.playerId);if(!session)throw new Error('Missing reconnect identity');return {...pick(session,SESSION_KEYS),challengeIdentity:lobby.dailyBoard?.recoveryIdentity(session)||null};})};}
  function put(room,ctx,status,payload){return store.put({id:ctx.challenge.runId,compatibility,status,payload:serialize(payload)});}
  function save(room,ctx){
-  if(closing||ctx.ended||room.modded||room.test)return;
+  if(closing||ctx.ended||room.modded||room.test||(room.version && room.version!==DEFAULT_VERSION))return;
   try{const payload={...envelope(room,ctx),checkpoint:encodePrep(ctx.match)};
    track(put(room,ctx,'active',payload).then(()=>{failures.delete(ctx.challenge.runId);}),ctx.challenge.runId);
   }catch(e){failures.set(ctx.challenge.runId,e.message);log.error('[recovery] checkpoint unavailable',room.code,e.message);}
  }
  function attach(room,ctx){
-  const m=ctx.match;if(room.modded||room.test)return;
+  const m=ctx.match;if(room.modded||room.test||(room.version && room.version!==DEFAULT_VERSION))return;
   // A resumed match waits for every remaining human to explicitly confirm with the existing Ready action.
   const handle=m.handle.bind(m);
   m.handle=(id,msg)=>{
@@ -89,7 +90,7 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
     const r=payload.room;if(row.status==='finished' && (lobby.rooms.has(r.code)||payload.sessions.some(s=>lobby.registry.byId(s.playerId))))continue;
     if(lobby.rooms.has(r.code))throw new Error('Recovered room code conflict');
     for(const s of payload.sessions)if(lobby.registry.byId(s.playerId)||lobby.registry.byTokenMap.has(s.token)||!/^([a-f0-9]{32})$/.test(s.token))throw new Error('Reconnect identity conflict');
-    const room=new Room(r.code,r.mode,r.difficulty,lobby.now());Object.assign(room,r);room.spectators=[];
+    const room=new Room(r.code,r.mode,r.difficulty,lobby.now());Object.assign(room,r);room.version=r.version||DEFAULT_VERSION;room.spectators=[];
     for(const s of room.seats)if(s){s.connected=s.isBot;s.ready=false;}
     const added=[];
     try{

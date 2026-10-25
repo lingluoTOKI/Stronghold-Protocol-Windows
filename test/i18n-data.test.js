@@ -185,7 +185,7 @@ test('official EN skill texts keep the rich-text markup and the remake\'s number
 function diskFetch(calls) {
   return async (url) => {
     calls.push(url);
-    const rel = url.replace(/^\/data\//, 'data/');
+    const rel = url.split(/[?#]/)[0].replace(/^\/data\//, 'data/');
     const abs = path.join(ROOT, rel);
     if (!existsSync(abs)) return { ok: false, status: 404, json: async () => null };
     const text = readFileSync(abs, 'utf8');
@@ -201,7 +201,7 @@ test('data.js setLocale: getters return English records after the overlay loads,
   d.subscribe((n) => seen.push(n));
   assert.equal(d.lookup('chess', 'chess_char_3_04_a').name, '琳琅诗怀雅');
   assert.equal(await d.setLocale('en'), 'en');
-  assert.equal(calls.filter((u) => u === '/data/i18n/en.json').length, 1);
+  assert.equal(calls.filter((u) => u.split('?')[0] === '/data/i18n/en.json').length, 1);
   assert.deepEqual(seen.sort(), ['bonds', 'chess', 'config'], 'every loaded file notified');
   const swire = d.lookup('chess', 'chess_char_3_04_a');
   assert.equal(swire.name, 'Swire the Elegant Wit');
@@ -218,7 +218,7 @@ test('data.js setLocale: getters return English records after the overlay loads,
   assert.equal(d.lookup('chess', 'chess_char_3_04_a').name, '琳琅诗怀雅');
   assert.equal(d.localeName('琳琅诗怀雅'), '琳琅诗怀雅');
   await d.setLocale('en');
-  assert.equal(calls.filter((u) => u === '/data/i18n/en.json').length, 1, 'the overlay downloads once');
+  assert.equal(calls.filter((u) => u.split('?')[0] === '/data/i18n/en.json').length, 1, 'the overlay downloads once');
 });
 
 test('data.js setLocale: without an overlay the texts stay Chinese (no throw, no switch)', async () => {

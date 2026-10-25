@@ -68,6 +68,7 @@ test('a plugin sound is fetched without its extension; one that will not load fa
     layers.setRoom(doc);
     const failed = [];
     const a = new AudioManager({ win: fw.win, getManifest: () => layers.apply(BASE), onFailed: (u) => { failed.push(u); return layers.fail(u); } });
+      a.setVolumes({ bgm: 0.7 }); // Explicit opt-in: fork starts with music muted.
     a.voiceGate = new VoiceGate({ gapMs: 0 });
     a.install();
     fw.fire('pointerdown');
@@ -110,6 +111,7 @@ test('the music follows the art: a room\'s set arriving under the prep track swi
   try {
     const layers = createCosmeticLayers();
     const a = new AudioManager({ win: fw.win, getManifest: () => layers.apply(BASE), onFailed: (u) => layers.fail(u) });
+      a.setVolumes({ bgm: 0.7 }); // Explicit opt-in: fork starts with music muted.
     layers.subscribe(() => a.refreshBgm()); // main.js
     a.install();
     fw.fire('pointerdown');

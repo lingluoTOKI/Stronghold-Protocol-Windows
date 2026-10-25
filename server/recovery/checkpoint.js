@@ -2,10 +2,10 @@
 import { serialize, deserialize } from 'node:v8';
 import { PHASE } from '../../shared/constants.js';
 import { restoreRng } from '../sim/rng.js';
-const OMIT=new Set(`opts log sendFn broadcastFn onEndFn data gd ds registry dispatcher BattleClass sched ownsScheduler players order pool itemPool stage rngSetup rngShop rngWaves rngDraft rngBots rngMeta fields runner pacer spectators watchers _timers _phaseTimer _infoAdvanceTimer _turnTimer _pubTimer _pubDirty _lastPubAt _lastPubJson _privDirty _progressTimer _bossClock _poolTimer _bossPubTimer _bossPubAt _lastPoolAt _offerTimers _offerResume _rehearsalTasks recoveryWaiting recoveryError recoveryConfirmed handle onLeave onReconnect`.split(' '));
+const OMIT=new Set(`bot simPool externalAI opts log sendFn broadcastFn onEndFn data gd ds registry dispatcher BattleClass sched ownsScheduler players order pool itemPool stage rngSetup rngShop rngWaves rngDraft rngBots rngMeta fields runner pacer spectators watchers _timers _phaseTimer _infoAdvanceTimer _turnTimer _pubTimer _pubDirty _lastPubAt _lastPubJson _privDirty _progressTimer _bossClock _poolTimer _bossPubTimer _bossPubAt _lastPoolAt _offerTimers _offerResume _rehearsalTasks recoveryWaiting recoveryError recoveryConfirmed handle onLeave onReconnect`.split(' '));
 const PLAYER_OMIT=new Set(['m','gd','diyStock','_deployMap','_deployField','_diyRecords']);
 const RNG=['rngSetup','rngShop','rngWaves','rngDraft','rngBots','rngMeta'];
-const OPTIONS=['roomCode','mode','difficulty','modeId','aiPicksLast','seats','hostId','seed','matchNo','cs','vs','bossHp','clientCombat','verify','timerScale','combatSpeed','botRehearsal'];
+const OPTIONS=['roomCode','mode','difficulty','modeId','aiPicksLast','seats','hostId','seed','matchNo','cs','vs','bossHp','clientCombat','verify','timerScale','combatSpeed','botRehearsal','botStrategy','soloUnlimited'];
 function plain(value,seen=new Set()) {
  if(value==null||['string','number','boolean','undefined'].includes(typeof value))return;
  if(typeof value!=='object')throw new Error('Checkpoint contains executable state');

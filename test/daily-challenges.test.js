@@ -137,13 +137,14 @@ test('legacy easy scores are archived, not promoted into new ultimate divisions'
   assert.equal(JSON.parse(await fs.readFile(f.file + '.previous-rules', 'utf8')).version, 1);
 });
 
-test('daily boundary resets scores and later settlements trim retained history', async t => {
+test('daily boundary retains cumulative scores while trimming daily history', async t => {
   const f = await fixture(t);await f.bind('a');
   award(f, settlement(['a']));await f.board.flush();
+  const initialPoints = f.board.snapshot().rows[0].points;
   f.setTime(time + 86400000);
-  assert.equal(f.board.snapshot().rows.length, 0);
+  assert.equal(f.board.snapshot().rows[0].points, initialPoints);
   award(f, settlement(['a']));await f.board.flush();
-  assert.equal(f.board.snapshot().rows[0].points, 1, 'rotating day requires Yan for its other goals');
+  assert.equal(f.board.snapshot().rows[0].points, initialPoints + 1, 'new day adds points to the cumulative board');
   f.setTime(time + 9 * 86400000);
   award(f, settlement(['a']));await f.board.flush();
   const saved = JSON.parse(await fs.readFile(f.file, 'utf8'));
@@ -409,7 +410,7 @@ test('cross-midnight settlement uses server start day, stores daily medals and t
   const saved = JSON.parse(await fs.readFile(f.file,'utf8'));
   assert.equal(Object.keys(saved.days)[0], '2026-10-21');
   assert.equal(Object.values(saved.days['2026-10-21'].solo)[0].completed.length,3);
-  assert.equal(f.board.snapshot().rows.length,0);
+  assert.equal(f.board.snapshot().rows[0].points,3, 'cross-midnight points remain on the cumulative board');
   assert.ok(Object.values(saved.achievements)[0].solo.daily['core-yanShip']);
   const res=response();await f.board.handle({ method:'GET',url:'/?ranking=0',headers:{cookie} },res,f.registry);
   const body=JSON.parse(res.body);assert.deepEqual(body.rows,[]);assert.equal(body.preview.length,7);

@@ -181,7 +181,7 @@ test('选中干员 on every card tap (review of fb7-voices): two shop / reward c
   // nothing before, nor replaced the first card's line (the pool deals duplicates)
   const origFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
-    const name = String(url).split('/').pop();
+    const name = String(url).split(/[?#]/)[0].split('/').pop();
     let body;
     try { body = readJson(`data/${name}`); } catch { return { ok: false, status: 404, json: async () => ({}) }; }
     return { ok: true, status: 200, json: async () => body };
