@@ -226,3 +226,6 @@ These do not alter the default rules above. See
 ## Optional durable PREP recovery (fork)
 
 `SP_MATCH_RECOVERY=1` saves completed PREP-entry state in SQLite through an isolated storage worker. Recovered rooms pause until all remaining humans confirm. No new PREP grants or shop rolls run during restore. Same-code/content compatibility is required; unsupported or damaged checkpoints are retained. See [MATCH-RECOVERY.md](../MATCH-RECOVERY.md) for exclusions, terminal receipts and backup requirements.
+
+### 3000 fork: in-match customization (2026-10-25)
+Maintainer-approved deviation: g.loadout applies a validated partial skill/module map during PREP, SP_DRAFT or ROUND_START before readiness, to living human seats only. Other operators and cultivation are preserved; affected skill summons are reconciled. Combat edits are refused. Preset operator detail cards expose this action; DIY picks and stand-ins retain their existing restrictions. Skin changes reuse the charId-based cosmetic protocol in any phase. This does not rewrite the next-match default loadout.

@@ -432,3 +432,9 @@ An **unofficial, non-commercial fan remake** of Arknights' seasonal auto-chess t
 - **Disclaimer:** not affiliated with or endorsed by Hypergryph or Yostar. All Arknights names, art, audio, text and data are © their respective owners and are **not** covered by this project's GPL licence. For study and personal non-commercial use only — no selling, paid distribution, paid servers or monetisation of any kind. Content will be removed on request of the rights holders. Provided "as is", without warranty.
 - **License:** code GPL-3.0-or-later ([LICENSE](LICENSE)); game assets excluded.
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) (an English summary at its end); the code map is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+### 主服局内调配（代码已准备，尚未发布）
+- 己方干员详情新增技能、模组和时装切换；技能／模组限战斗前且未准备，皮肤全阶段可换。
+- 保留其他干员配置，不修改潜能／练度；补位、自选编队保留原有限制。
+- 按主服现有皮肤格式同步，仅使用客户端可用模型，不批量预加载素材。
+- 局内技能修改只作用于本局。正式启用涉及服务端更新，需安排主服重启。

@@ -92,6 +92,7 @@ export const actions = {
   reward: (idx) => act('g.reward', { idx }),
   offer: (offer, idx, refresh = false, cardId) => act(refresh ? 'g.offerRefresh' : 'g.offer', { offerId: offer.id, pluginId: offer.pluginId, seq: offer.seq, idx, cardId }),
   choice: (idx, choiceId) => act('g.choice', choiceId === undefined ? { idx } : { idx, choiceId }),
+  loadout: (entries) => act('g.loadout', { loadout: entries }, { sfx: 'confirm' }),
   ready: (ready) => act('g.ready', { ready }, { sfx: ready ? 'ready' : 'back' }),
   emote: (id) => act('g.emote', { id }, { quiet: true }),
   // room text chat (规格C): the server enforces CHAT_COOLDOWN_MS=1s and CHAT_MAX_LEN=200 (shared/protocol g.chat)

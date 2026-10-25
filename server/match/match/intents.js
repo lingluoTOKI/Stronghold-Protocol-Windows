@@ -43,6 +43,7 @@ export class MatchIntents {
       // the host applies the declared primitive, a plugin never reaches the match state itself
       case 'g.offer': return this.requestOffer(ps, msg.offerId, msg.idx, msg);
       case 'g.offerRefresh': return this.requestOfferRefresh(ps, msg.offerId, msg.idx, msg);
+      case 'g.loadout': return this.setPrepLoadout(ps.playerId, msg.loadout);
       case 'g.ready': return ps.setReady(!!msg.ready);
       case 'g.emote': return this.emote(ps, msg.id);
       // 对局内文字聊天（改编版独有）：文本已在 shared/protocol.js 的 C2S['g.chat'] 校验过

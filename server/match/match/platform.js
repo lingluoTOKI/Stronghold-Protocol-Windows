@@ -124,6 +124,27 @@ export class MatchPlatform {
     return res;
   }
 
+  /** Maintainer-approved fork: partial skill/module changes between battles, never cultivation. */
+  setPrepLoadout(playerId, loadout) {
+    const ps = this.players.get(playerId);
+    if (!ps || ps.isBot || ps.left || !ps.alive) return fail(ERR.NOT_IN_ROOM);
+    if (this.disposed || this.ended || ![PHASE.PREP, PHASE.SP_DRAFT, PHASE.ROUND_START].includes(this.phase) || ps.ready) {
+      return fail(ERR.WRONG_PHASE, 'loadout locked outside preparation');
+    }
+    let res = OK;
+    this.guard(() => {
+      const before = ps.allChess().map((owner) => ({ owner, choice: ps.loadoutFor(ps.gd.chess(owner.id)) }));
+      if (!ps.setLoadout(loadout, undefined, { merge: true })) { res = fail(ERR.BAD_TARGET, 'invalid loadout'); return; }
+      for (const { owner, choice } of before) {
+        const next = ps.loadoutFor(ps.gd.chess(owner.id));
+        if (choice.skillIndex !== next.skillIndex || choice.moduleId !== next.moduleId) ps._reconcileTokensFor(owner);
+      }
+      ps.recompute();
+      this.markPrivate(ps);
+    });
+    return res;
+  }
+
   onDisconnect(playerId) {
     const ps = this.players.get(playerId);
     if (!ps || ps.isBot || this.disposed) return;

@@ -1800,6 +1800,8 @@ function MatchScreen() {
         onClose=${() => setBondOpen(null)} onMember=${(id, items, standInFor, diy) => setDetail({ kind: 'chess', id, owner: bondPop.ownerId, items: items || null, standInFor: standInFor || null, diy: diy || null })} />` : null}
 
       ${resolved ? html`<${DetailPanel} detail=${resolved} snapHp=${snapHp} onClose=${() => { setDetail(null); setSel(null); }}
+        canLoadout=${!!priv && alive && !priv.ready && !spectator && !watchingOther && detailOwner === myId && !hasPersonalChoice && !offerBlocksPrep(pub?.offers) && [PHASE.PREP, PHASE.SP_DRAFT, PHASE.ROUND_START].includes(phase)}
+        canSkin=${!!priv && !spectator && !watchingOther && detailOwner === myId}
         bonds=${detailBonds} offBonds=${offBonds} loadout=${detailLoadout} ops=${priv?.ops ?? null} side=${dSide} shopOpen=${shopOpen} live=${liveStats} voice=${true}
         morphMode=${morphMode} unequipAllowed=${unequipAllow}
         onUnequip=${editable && unequipAllow ? (itemUid) => actions.unequip(itemUid) : null}

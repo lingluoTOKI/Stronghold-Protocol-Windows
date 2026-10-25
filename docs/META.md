@@ -1075,3 +1075,7 @@ blocking `battleCheck` window. Failed grants leave the seat unpicked; auto/bot f
 and skips when none grants [ASSUMED]. Native `g.offer`/`g.offerRefresh` use plugin id, local window id, sequence and slot; `m.public.offers` is a
 reconnectable, spectator-readable snapshot. Bots resolve immediately. Sources, bounds and [ASSUMED] defaults are
 [PLUGINS §10b](PLUGINS.md#10b-offers--interaction-windows); test journals carry declarations and intents.
+
+### 主服局内技能与时装调整（2026-10-25）
+维护者批准将契约服的局内操作迁入3000主服。点击己方干员详情，可在休整、机变和回合开始阶段且未准备时切换预设干员的技能／模组；补位及自选编队仍遵循原配置限制。战斗、已准备、旁观或查看他人时不提供技能编辑。新增 g.loadout 仅接受技能与模组增量，保留未指定干员和潜能／练度，更新召唤物与战前视图。仅影响本局，不自动覆盖浏览器的下局默认配置。
+皮肤沿用主服 charId 格式与 room.skins 同步，在己方干员详情按需列出可用外观，全阶段可切换，缺失模型不会作为可穿戴皮肤。未迁入契约服的棋子ID皮肤格式，也不复制整套素材。未部署、未重启，不影响现有线上对局。

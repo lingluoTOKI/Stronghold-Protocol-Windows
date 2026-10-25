@@ -589,6 +589,7 @@ export const C2S = {
   // applies the window's declared effect primitive — a plugin never receives these messages itself.
   'g.offer': { offerId: isId, pluginId: isId, seq: (v) => isInt(v, 0, 1000000), cardId: optional(isId), idx: (v) => isInt(v, 0, PLUGIN_OFFER_SLOTS - 1) },
   'g.offerRefresh': { offerId: isId, pluginId: isId, seq: (v) => isInt(v, 0, 1000000), cardId: optional(isId), idx: (v) => isInt(v, 0, PLUGIN_OFFER_SLOTS - 1) },
+  'g.loadout': { loadout: isLoadoutEntries },
   'g.ready': { ready: isBool },
   'g.emote': { id: (v) => EMOTES.includes(v) },
   // 改编版独有：对局内文字聊天（广播给同一对局的所有席位），冷却/长度见 shared/constants.js
