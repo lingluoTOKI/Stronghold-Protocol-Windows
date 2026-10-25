@@ -6,7 +6,7 @@
 //   config, chess, bonds, garrisons, items, bands, effects, choices, enemies, factions, waves,
 //   stages, bosses, tokens, backups (every field is documented in docs/DATA.md).
 //
-// Usage:  node tools/build-data.mjs [--version <id>] [--refresh | --offline] [--out <dir>] [--cache <dir>]
+// Usage:  node tools/build-data.mjs [--import-skins-from <local-project>] [--version <id>] [--refresh | --offline] [--out <dir>] [--cache <dir>]
 //                                   [--report <file>] [--quiet] [--no-research] [--force]
 //   --version      the official version to build (shared/versions.js; default act2autochess, today's data/*.json).
 //                  Another version reads its profile tools/versions/<slug>.mjs: the official commits it is pinned to,
@@ -57,7 +57,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RESEARCH_DIR = join(ROOT, 'docs', 'research');
 const GAMEDATA_URL = 'https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/';
 const pinnedUrl = (sha) => `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/${sha}/zh_CN/gamedata/`;
-const USAGE = 'usage: node tools/build-data.mjs [--version <id>] [--refresh | --offline] [--out <dir>] [--cache <dir>] [--report <file>] [--quiet] [--no-research] [--force]';
+const USAGE = 'usage: node tools/build-data.mjs [--import-skins-from <local-project>] [--version <id>] [--refresh | --offline] [--out <dir>] [--cache <dir>] [--report <file>] [--quiet] [--no-research] [--force]';
 
 /**
  * Parse the command line strictly (unknown options and missing values are errors, so a typo can
@@ -72,7 +72,7 @@ function parseArgs(argv) {
     out: null, cache: join(ROOT, '.cache', 'gamedata'), report: null, version: null,
   };
   const flags = { '--refresh': 'refresh', '--offline': 'offline', '--quiet': 'quiet', '--no-research': 'noResearch', '--force': 'force' };
-  const dirs = { '--out': 'out', '--cache': 'cache', '--report': 'report' };
+  const dirs = { '--import-skins-from': 'importSkinsFrom', '--out': 'out', '--cache': 'cache', '--report': 'report' };
   for (let i = 0; i < argv.length; i++) {
     const [name, inline] = argv[i].includes('=') ? [argv[i].slice(0, argv[i].indexOf('=')), argv[i].slice(argv[i].indexOf('=') + 1)] : [argv[i], null];
     if (name === '--help' || name === '-h') { console.log(USAGE); process.exit(0); }
@@ -3303,6 +3303,10 @@ function validateAll(f) {
 // ===== main =====================================================================================
 
 async function main() {
+  if (OPTS.importSkinsFrom) {
+    const { importSkins } = await import('./assets/import-skins.mjs');
+    return importSkins(OPTS.importSkinsFrom, ROOT);
+  }
   const t0 = Date.now();
   const ctx = await loadContext();
   log('building…');

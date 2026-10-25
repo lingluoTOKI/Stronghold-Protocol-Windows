@@ -1,5 +1,22 @@
 # 干员皮肤 (Operator skins)
 
+## 改编版安装级皮肤迁移（2026-10-25）
+
+维护者要求将契约服本地已有皮肤迁入主服。此安装级迁移是对下文上游“仅插件供应”方案的明确扩展：
+通过 `node tools/build-data.mjs --import-skins-from <源项目目录>` 生成清单，并复制已有素材；不提供玩家触发的下载或安装接口。
+只迁移目标素材目录已收录的干员，不覆盖原干员、敌人、音效和战斗数据。资源独立放在
+`public/assets/migrated-skins/`（不提交 Git），元数据保存在 `tools/assets/migrated-skins.json`；后续
+`fetch-assets.mjs` 重建会重新应用此目录，避免皮肤被覆盖丢失。
+
+本轮源项目为本地 `卫v1.0-0.31/Stronghold-Protocol`。源目录324套中，主服匹配174位干员、276套皮肤，
+包括274套模型皮肤和2套图片皮肤；其余48套未匹配到主服干员，不混入目录。2178个资源引用均存在，
+543个前后向骨骼文件解析通过；实际目录选择、渲染路径和恢复默认检查通过。
+
+进入干员调配或局内自己的干员详情可选择时装。图片皮肤明确标注“仅更换头像与立绘”，战斗模型沿用默认。
+继续使用原有按需加载、导入缓存及皮肤同步机制，不预加载全部皮肤。发布时须携带上述资源目录并刷新数据版本缓存；
+仅推送 Git 不会包含素材。本轮没有部署、没有重启，没有完成真机实战视觉验证。
+
+
 An operator's Spine model and its pictures can be replaced by one of its official alternative outfits (时装). This
 document is the normative reference for that feature; the art itself is **never** downloaded or written by the server —
 it comes from a **cosmetic plugin's overlay** (docs/PLUGINS.md §9), which the server's owner installs in `plugins/` and

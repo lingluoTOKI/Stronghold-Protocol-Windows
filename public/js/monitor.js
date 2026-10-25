@@ -1,5 +1,11 @@
+async function monitorRead(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try { return await fetch(url, { ...options, signal: controller.signal }); }
+  finally { clearTimeout(timer); }
+}
 // 主服（上海 3000）/ 3001 独立部署 / 备用服（杭州）：域名访问走同源 HTTPS 反代（/alliance、/backup），否则直连 IP:端口。
-const onDomain = location.hostname === 'game.lingluotoki.dpdns.org';
+const onDomain = ['game.lingluotoki.dpdns.org', 'game.lingluo-toki.top'].includes(location.hostname);
 const MAIN_BASE = onDomain ? location.origin : 'http://101.132.104.41:3000';
 const ALLIANCE_BASE = onDomain ? location.origin + '/alliance' : 'http://101.132.104.41:3001';
 const BACKUP_BASE = onDomain ? location.origin + '/backup' : 'http://116.62.39.28:3000';
@@ -217,9 +223,10 @@ async function fetchHealth(svr){
   const el = svr.el;
   const t0 = performance.now();
   try{
-    const r = await fetch(svr.base+'/healthz', {cache:'no-store'});
+    const r = await monitorRead(svr.base+'/healthz', {cache:'no-store'});
     if(!r.ok) throw new Error(r.status);
     const j = await r.json();
+    if (!j || !Number.isFinite(j.sockets)) throw new Error('统计响应不完整');
     const lat = Math.round(performance.now()-t0);
     $('dot'+el).classList.remove('off');
     $('svr'+el).classList.remove('offline');
@@ -239,7 +246,7 @@ async function fetchHealth(svr){
   }catch(e){
     $('dot'+el).classList.add('off');
     $('svr'+el).classList.add('offline');
-    $('lat'+el).textContent = '';
+    $('lat'+el).textContent = e.name === 'AbortError' ? '请求超时' : '数据不可用';
     ['sockets','humans','bots','rooms','matches','spect'].forEach(k=>{ $('s'+el+'_'+k).textContent='×'; });
     $('s'+el+'_uptime').textContent = '离线';
     return null;
@@ -277,7 +284,7 @@ async function fetchStability(svr){
   pause.disabled=true; resume.disabled=true;
   state.dataset.mode='';
   if(!onDomain || localTest){ state.textContent='未接入'; return; }
-  if(!$('token').value.trim()) { state.textContent='未认证'; reason.textContent='输入管理 token 查看保护状态'; return; }
+  if(!$('token').value.trim()) { state.textContent='未认证'; reason.textContent='请在页面顶部保存管理 token；人数统计无需认证'; return; }
   try{
     const j=await stabilityRequest(el);
     const host=j.host||{}, service=j.service||{}, a=j.admission, limits=a?.limits||j.pendingLimits||{};
@@ -367,7 +374,7 @@ async function fetchRooms(svr){
   const d = roomData[el];
   if(!token){ d.rooms=null; renderCombined(el); return; }
   try{
-    const r = await fetch(`${svr.base}/api/admin/rooms?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    const r = await monitorRead(`${svr.base}/api/admin/rooms?token=${encodeURIComponent(token)}`, {cache:'no-store'});
     if(r.status === 403){ renderCombined(el,'token 错误或服务器未配置 SP_ADMIN_TOKEN'); return; }
     if(r.status === 404 || r.status === 405){ d.rooms=null; renderCombined(el); return; }
     if(!r.ok) throw new Error(r.status);
@@ -383,7 +390,7 @@ async function fetchPlayers(svr){
   const d = roomData[el];
   if(!token){ d.groups=new Map(); d.lobby=[]; renderCombined(el); return; }
   try{
-    const r = await fetch(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    const r = await monitorRead(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
     if(r.status === 403){ d.groups=new Map(); d.lobby=[]; renderCombined(el); return; }
     if(r.status === 404 || r.status === 405){ d.playersUnsupported=true; d.groups=new Map(); d.lobby=[]; renderCombined(el); return; }
     if(!r.ok) throw new Error(r.status);
@@ -531,7 +538,7 @@ async function doKickRoom(el, roomCode){
   const svr = SRVS[+el];
   const token = $('token').value.trim();
   try{
-    const r = await fetch(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    const r = await monitorRead(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
     if(!r.ok) throw new Error(r.status);
     const j = await r.json();
     const ps = (j.players||[]).filter(p=>p.roomCode===roomCode);
@@ -561,23 +568,27 @@ function renderSvrChips(healthArr){
   chipBox.innerHTML = html;
 }
 
+let tickBusy = false;
 async function tick(){
   if(document.hidden){ lastUpdated = null; return; }
   const act = activeSrvs();
+  if (tickBusy) return;
+  tickBusy = true;
+  try {
   const health = await Promise.all(act.map(fetchHealth));
-  await Promise.all(act.map(fetchRooms));
-  await Promise.all(act.map(fetchPlayers));
-  await Promise.all(act.map(fetchStability));
   let tSock=0,tHum=0,tRoom=0,tMatch=0,ok=0;
   health.forEach(j=>{ if(!j) return; ok++; tSock+=j.sockets||0; tHum+=j.humans||0; tRoom+=j.rooms||0; tMatch+=j.matches||0; });
   $('totalOnline').textContent  = ok? tSock : '--';
   $('totalHumans').textContent    = ok? tHum  : '--';
   $('totalRooms').textContent    = ok? tRoom : '--';
   $('totalMatches').textContent   = ok? tMatch: '--';
+  $('totalLabel').textContent = `已获取 ${ok}/${act.length} 台服务器的在线连接总数`;
   $('ts').textContent = new Date().toLocaleTimeString('zh-CN');
   renderSvrChips(health);
   lastUpdated = new Date();
   $('updInfo').textContent = '上次刷新 ' + lastUpdated.toLocaleTimeString('zh-CN');
+  await Promise.allSettled(act.flatMap(s => [fetchRooms(s), fetchPlayers(s), fetchStability(s)]));
+  } finally { tickBusy = false; }
 }
 
 // 性能优化：页面隐藏时暂停轮询（避免对服务器产生无效请求），恢复可见时立即刷新一次

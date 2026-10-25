@@ -536,6 +536,20 @@ async function main() {
     };
     files(body);
   }
+  // Fork-installed skins are an installation overlay, not a gameplay/data plugin.
+  const skinsPath = join(ROOT, 'tools/assets/migrated-skins.json');
+  if (existsSync(skinsPath)) {
+    const installed = JSON.parse(await readFile(skinsPath, 'utf8'));
+    const track = value => {
+      if (typeof value === 'string' && value.startsWith('/assets/')) resolved.files.add(value.slice(8));
+      else if (value && typeof value === 'object') Object.values(value).forEach(track);
+    };
+    for (const [id, entry] of Object.entries(installed)) {
+      if (!body.chars[id]) continue;
+      body.chars[id].skins = { ...body.chars[id].skins, ...entry.skins };
+      track(entry.skins);
+    }
+  }
   const bytes = totalBytes(ASSETS, resolved.files);
   const manifest = {
     version: MANIFEST_VERSION,

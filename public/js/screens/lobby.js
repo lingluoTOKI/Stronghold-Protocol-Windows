@@ -365,7 +365,7 @@ function ProtoFit() {
  * co-op card's long/short pair, or the solo card's single line. `timeShort` replaces the phone line; absent, the phone
  * keeps points[0] (「1 名博士」).
  */
-export function HubEntry({ card, onOpen, timePoint = null, timeShort = null }) {
+export function HubEntry({ card, onOpen, timePoint = null, timeShort = null, quickMatch = null }) {
   const line = timePoint
     ? html`<span class="hub-entry__long">${t(card.points[0], card.pointParams)} · ${t(timePoint)}</span><span class="hub-entry__short">${timeShort ? t(timeShort) : t(card.points[0], card.pointParams)}</span>`
     : card.pointShort
@@ -380,6 +380,7 @@ export function HubEntry({ card, onOpen, timePoint = null, timeShort = null }) {
       <span class="hub-entry__name">${t(card.name)}</span>
       <span class="hub-entry__corner" aria-hidden="true"></span>
     </button>
+    ${quickMatch}
   </div>`;
 }
 
@@ -995,7 +996,6 @@ export function LobbyScreen() {
         </div>
       </div>
       <div class="topbar__right">
-        ${version === DEFAULT_VERSION ? html`<${Button} variant="secondary" size="sm" disabled=${!online || matching} onClick=${startMatch}>${t('快速匹配')}<//>` : null}
         <${VersionSwitch} />
         <${ResumeMatchButton} />
       </div>
@@ -1018,7 +1018,8 @@ export function LobbyScreen() {
           const timedCard = c.id === 'solo';
           const timePoint = timedCard ? soloTimeMsgid('card', { timed: soloTimed, unlimited: soloFree }) : '';
           const timeShort = timedCard ? soloTimeMsgid('short', { timed: soloTimed, unlimited: soloFree }) : '';
-          return html`<${HubEntry} key=${c.id} card=${c} onOpen=${openMode} timePoint=${timePoint || null} timeShort=${timeShort || null} />`;
+          return html`<${HubEntry} key=${c.id} card=${c} onOpen=${openMode} timePoint=${timePoint || null} timeShort=${timeShort || null}
+            quickMatch=${c.id === 'coop' && version === DEFAULT_VERSION ? html`<${Button} class="hub-quick-match" variant="secondary" disabled=${!online || matching} onClick=${startMatch}><${Icon} name="users" />${t('快速匹配')}<//>` : null} />`;
         })}
       </section>
     </main>

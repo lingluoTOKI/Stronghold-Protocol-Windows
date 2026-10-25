@@ -1372,3 +1372,12 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 /* Preserve the fork's locally saved background beneath the new upstream hub. */
 .app-root.has-custom-bg .lobby-hub { background: transparent; }
 .app-root.has-custom-bg .lobby-hub > .hub-bg { visibility: hidden; }
+
+/* Matchmaking belongs with co-op entry, not global settings/version controls. */
+.hub-quick-match {
+  width: 100%;
+  min-height: 44px;
+  gap: .08rem;
+  font-size: calc(.16 * var(--t));
+  flex-shrink: 0;
+}

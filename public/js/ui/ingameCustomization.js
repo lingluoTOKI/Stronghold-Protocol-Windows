@@ -27,6 +27,6 @@ export function IngameCustomization({ chess, loadout, canLoadout = false, canSki
   return html`<section class="dsec ingame-customization">
     ${canLoadout && options.skillOptions.length > 1 ? html`<h4>${t('技能')}</h4><div class="ingame-picks">${options.skillOptions.map(s => html`<${Button} size="sm" disabled=${busy} variant=${s.index === currentSkill ? 'primary' : 'ghost'} onClick=${() => pick(s.index)}>${s.elite?.name || s.normal?.name || `S${s.index + 1}`}<//>`)}</div>` : null}
     ${canLoadout && chess.isGolden && options.moduleOptions.length > 1 ? html`<h4>${t('模组')}</h4><div class="ingame-picks">${options.moduleOptions.map(m => html`<${Button} size="sm" disabled=${busy} variant=${m.id === currentModule ? 'primary' : 'ghost'} onClick=${() => pick(currentSkill, m.id)}>${m.id === MODULE_NONE ? t('不装备模组') : m.rec?.name || m.id}<//>`)}</div>` : null}
-    ${skins.length ? html`<h4>${t('时装')}</h4><div class="ingame-picks">${skins.map(s => html`<${Button} size="sm" variant=${(s.own ? !selected : s.id === selected) ? 'primary' : 'ghost'} onClick=${() => s.own ? clearSkin(chess.charId) : setSkin(chess.charId, s.id)}>${s.own ? t('默认') : s.name}<//>`)}</div>` : null}
+    ${skins.length ? html`<h4>${t('时装')}</h4><div class="ingame-picks">${skins.map(s => html`<${Button} size="sm" variant=${(s.own ? !selected : s.id === selected) ? 'primary' : 'ghost'} onClick=${() => s.own ? clearSkin(chess.charId) : setSkin(chess.charId, s.id)}>${s.own ? t('默认') : s.name}${s.pictureOnly ? ` · ${t('仅更换头像与立绘')}` : ''}<//>`)}</div>` : null}
   </section>`;
 }
