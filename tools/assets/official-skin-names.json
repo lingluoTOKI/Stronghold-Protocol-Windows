@@ -1,0 +1,117 @@
+{
+  "source": "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/skin_table.json",
+  "skins": {
+    "char_109_fmout@epoque#2": {
+      "name": "未知的旅行",
+      "group": "时代/II"
+    },
+    "char_017_huang@witch#5": {
+      "name": "易爆蓝焰",
+      "group": "巫异盛宴/V"
+    },
+    "char_017_huang@as#1": {
+      "name": "爆裂菲林",
+      "group": "音律联觉"
+    },
+    "char_198_blackd@as#1": {
+      "name": "无言狂响",
+      "group": "音律联觉"
+    },
+    "char_198_blackd@winter#1": {
+      "name": "新航线",
+      "group": "寒武纪/I"
+    },
+    "char_133_mm@summer#20": {
+      "name": "夏卉 FA054",
+      "group": "珊瑚海岸/XX"
+    },
+    "char_218_cuttle@epoque#12": {
+      "name": "暗矢",
+      "group": "时代/XII"
+    },
+    "char_215_mantic@epoque#19": {
+      "name": "面纱之下",
+      "group": "时代/XX"
+    },
+    "char_215_mantic@epoque#4": {
+      "name": "无形悼挽",
+      "group": "时代/IV"
+    },
+    "char_253_greyy@epoque#515": {
+      "name": "都会送报员",
+      "group": "时代/LI"
+    },
+    "char_253_greyy@epoque#8": {
+      "name": "八音蛋匠人",
+      "group": "时代/VIII"
+    },
+    "char_1042_phatm2@sightseer#4": {
+      "name": "真我自扼",
+      "group": "错位巡礼/IV"
+    },
+    "char_230_savage@sale#17": {
+      "name": "又一年秋季",
+      "group": "忒斯特收藏/XIX"
+    },
+    "char_4204_mantra@sightseer#4": {
+      "name": "万籁俱寂",
+      "group": "错位巡礼/IV"
+    },
+    "char_243_waaifu@whirlwind#2": {
+      "name": "街道狂花",
+      "group": "0011/飙系列/II"
+    },
+    "char_271_spikes@winter#2": {
+      "name": "随性",
+      "group": "寒武纪/II"
+    },
+    "char_271_spikes@unveiling#1": {
+      "name": "危险邀约",
+      "group": "待予花冠/I"
+    },
+    "char_355_ethan@epoque#7": {
+      "name": "渗透",
+      "group": "时代/VII"
+    },
+    "char_304_zebra@wild#6": {
+      "name": "幽苔",
+      "group": "生命之地/VI"
+    },
+    "char_345_folnic@wild#4": {
+      "name": "残葛",
+      "group": "生命之地/IV"
+    },
+    "char_4119_wanqin@epoque#41": {
+      "name": "万顷阳光",
+      "group": "时代/XL"
+    },
+    "char_4045_heidi@epoque#24": {
+      "name": "书信零落",
+      "group": "时代/XXIV"
+    },
+    "char_4004_pudd@snow#5": {
+      "name": "火树灵",
+      "group": "冰原信使/V"
+    },
+    "char_422_aurora@boc#4": {
+      "name": "极昼捕手",
+      "group": "斗争血脉/IV"
+    },
+    "char_449_glider@nian#10": {
+      "name": "洇灵雨",
+      "group": "0011制造/IX"
+    },
+    "char_449_glider@epoque#17": {
+      "name": "荒野之后",
+      "group": "时代/XVII"
+    },
+    "char_473_mberry@nian#9": {
+      "name": "照冰轮",
+      "group": "0011制造/VIII"
+    },
+    "char_473_mberry@epoque#14": {
+      "name": "植药",
+      "group": "时代/XIV"
+    }
+  }
+}

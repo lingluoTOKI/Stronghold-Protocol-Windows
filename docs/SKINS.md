@@ -294,3 +294,5 @@ The extractor emits `tools/assets/official-skins.json` and an audit with source 
 ### 契约服模型补齐
 
 升华、红女爵的前向骨骼、图集和纹理已从契约服本地目录补齐，独立保存为 `tools/assets/contract-skin-models.json`，官方提取器在未提取到模型时复用。当前299套官方皮肤均有模型引用；其中2套模型来源为契约服，不应声称全部来自本次官方提取。上传准备包在 `dist/skins-ready-20261026`，包含全部304套皮肤文件及校验清单，不包含全游戏基础素材。
+
+2026-10-26 补充：28套新增皮肤的中文名称与系列已按游戏 skin_table 的精确 skinId 全部匹配，覆盖此前“名称待核实”状态；对应表在 tools/assets/official-skin-names.json，提取器会自动复用。

@@ -85,6 +85,11 @@ if fallback_path.exists():
   skin=chars.get(sid.split('@')[0],{}).get('skins',{}).get(sid)
   if skin is not None and not skin.get('spine',{}).get('front'):
    skin['spine']=model
+names_path=root/'tools/assets/official-skin-names.json'
+if names_path.exists():
+ for sid,labels in json.loads(names_path.read_text(encoding='utf-8'))['skins'].items():
+  skin=chars.get(sid.split('@')[0],{}).get('skins',{}).get(sid)
+  if skin is not None:skin.update(labels)
 report={'operators':len(chars),'skins':sum(len(c['skins']) for c in chars.values()),'errors':errors,'provenance':provenance}
 (root/'tools/assets/official-skins.json').write_text(json.dumps(chars,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 r=root/'output/official-skins-audit.json';r.parent.mkdir(exist_ok=True);r.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')

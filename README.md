@@ -472,3 +472,5 @@ An **unofficial, non-commercial fan remake** of Arknights' seasonal auto-chess t
 - 覆盖文件不等于运行进程更新。服务端及包装器变更需要维护重启；本轮未授权中断当前对局，不自动重启。
 - 自动清理问题尚未复现；近期日志存在 checkpoint unsupported state class，属于存档失败，不能把取消房间上限当作恢复/清理修复。
 - 皮肤资源不进入Git，部署逐文件写入素材目录，禁止解包替换public/assets软链接；runtime数据不覆盖。
+
+2026-10-26 补充：28套新增皮肤的中文名称与系列已按游戏 skin_table 的精确 skinId 全部匹配，覆盖此前“名称待核实”状态；对应表在 tools/assets/official-skin-names.json，提取器会自动复用。
