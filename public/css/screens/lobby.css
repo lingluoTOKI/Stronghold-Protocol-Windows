@@ -736,7 +736,7 @@
 @media (max-width: 720px) {
   .create-box__test { font-size: 16px; }
   .create-box__test input { width: 32px; height: 32px; }
-  .create-box__test em { font-size: 14px; }
+  .create-box__test em { font-size: max(14px, calc(.18 * var(--t))); }
 }
 .proto-hint { display: flex; align-items: center; gap: .08rem; min-height: .24rem; margin: 0; font-size: calc(.14 * var(--t)); color: #858b89; }
 .proto-hint .icon { flex: none; width: 1.1em; height: 1.1em; }
@@ -1394,4 +1394,37 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .lobby-hub .hub-plate--ach { display: none; }
   .hub-center { grid-column: 2; }
   .hub-side .tips { display: none; }
+}
+
+/* Keep navigation reachable in short windows; collapse only the optional tips. */
+.hub-tips-compact { display: none; }
+@media (max-height: 520px) {
+  .lobby-hub .hub-stage {
+    grid-template-columns: clamp(150px, 21vw, 210px) minmax(0, 1fr) clamp(250px, 30vw, 310px);
+    grid-template-rows: minmax(160px, 1fr) auto;
+    grid-template-areas: "side center right" "side center entries";
+    overflow-y: auto;
+    align-items: start;
+    gap: 12px;
+    padding: 8px 16px 16px;
+  }
+  .lobby-hub .hub-side { display: flex; gap: 8px; padding-top: 0; overflow: visible; }
+  .lobby-hub .hub-center { grid-area: center; min-width: 0; align-self: center; padding: 0 8px; }
+  .lobby-hub .hub-center__title { font-size: clamp(18px, calc(.38 * var(--t)), 28px); }
+  .lobby-hub .hub-center__en { font-size: max(9px, calc(.13 * var(--t))); letter-spacing: .12em; }
+  .lobby-hub .hub-right { padding-top: 0; gap: 6px; }
+  .lobby-hub .hub-right .hub-plate { min-height: 40px; padding: 6px 10px; font-size: max(14px, calc(.18 * var(--t))); }
+  .lobby-hub .hub-collections .hub-plate { font-size: max(13px, calc(.17 * var(--t))); gap: 5px; }
+  .lobby-hub .hub-collections .hub-plate__glyph { flex-basis: 18px; width: 18px; height: 18px; }
+  .lobby-hub .hub-entry-wrap { flex: 1 1 0; }
+  .lobby-hub .hub-entry { width: 100%; }
+  .lobby-hub .hub-ach__scene { height: 48px; min-height: 0; }
+  .lobby-hub .hub-ach__label, .lobby-hub .hub-tile--key { min-height: 44px; }
+  .lobby-hub .hub-plate--ach, .hub-tips-full { display: none; }
+  .hub-tips-compact { display: block; background: rgba(8, 14, 13, .6); border-top: 1px solid rgba(78, 216, 175, .2); }
+  .hub-tips-compact > summary { cursor: pointer; min-height: 44px; padding: 12px; font-size: max(14px, calc(.18 * var(--t))); }
+  .lobby-hub .hub-tips-compact .tips { display: block; }
+}
+@media (max-height: 520px) and (max-width: 640px) {
+  .lobby-hub .hub-stage { grid-template-columns: minmax(0, 1fr); grid-template-areas: "side" "right" "center" "entries"; }
 }

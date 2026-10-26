@@ -1095,3 +1095,5 @@ Name-card selection includes real preset operators (including hidden records) pl
 ### Fork: shop card types after special refresh (2026-10-26)
 
 Occupied shop slots render using their actual `kind`, including operators placed in former equipment positions by special refresh effects. Layout determines empty-slot placement only. Filtering retains the original server purchase index. This changes presentation only, not promotion rewards or refresh rules.
+
+小屏大厅补充（2026-10-26）：高度不超过520px时保留左侧成就与密钥加入入口，名片图缩至48px，作战提示改为可展开区域；空间不足允许滚动，宽度不超过440px时使用单列，不再隐藏整块导航。

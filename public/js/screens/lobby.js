@@ -1006,7 +1006,8 @@ export function LobbyScreen() {
       <aside class="hub-side">
         <${AchievementCard} onOpen=${() => setAchOpen(true)} />
         <${HubTile} icon="key" label=${t('密钥加入')} en="JOIN WITH KEY" class="hub-tile--key" onClick=${() => setAllyOpen(true)} />
-        <${TipsPanel} />
+        <div class="hub-tips-full"><${TipsPanel} /></div>
+        <details class="hub-tips-compact"><summary>${t('作战提示')}</summary><${TipsPanel} /></details>
       </aside>
       <aside class="hub-right">
         <${SweepPlate} onClick=${() => setSweepOpen(true)} />
