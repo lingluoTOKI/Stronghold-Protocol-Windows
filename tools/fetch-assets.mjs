@@ -537,7 +537,8 @@ async function main() {
     files(body);
   }
   // Fork-installed skins are an installation overlay, not a gameplay/data plugin.
-  const skinsPath = join(ROOT, 'tools/assets/migrated-skins.json');
+  for (const overlay of ['migrated-skins.json', 'official-skins.json']) {
+  const skinsPath = join(ROOT, 'tools/assets', overlay);
   if (existsSync(skinsPath)) {
     const installed = JSON.parse(await readFile(skinsPath, 'utf8'));
     const track = value => {
@@ -549,6 +550,7 @@ async function main() {
       body.chars[id].skins = { ...body.chars[id].skins, ...entry.skins };
       track(entry.skins);
     }
+  }
   }
   const bytes = totalBytes(ASSETS, resolved.files);
   const manifest = {

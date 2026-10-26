@@ -516,11 +516,11 @@ export function LobbyMediaDialog({ onClose }) {
 }
 
 /** The lobby's entry: a square button that opens the dialog. */
-export function LobbyMediaButton({ class: cls = '' }) {
+export function LobbyMediaButton({ class: cls = '', label = null }) {
   const [open, setOpen] = useState(false);
   return html`<${Tooltip} text=${t('大厅背景与音乐')} placement="bottom">
-      <${Button} variant="secondary" size="sm" square=${true} icon="image" class=${`lobby-media ${cls}`.trim()} data-testid="lobby-media"
-        onClick=${() => setOpen(true)} aria-label=${t('大厅背景与音乐')} />
+      <${Button} variant="secondary" size="sm" square=${!label} icon="image" class=${`lobby-media ${cls}`.trim()} data-testid="lobby-media"
+        onClick=${() => setOpen(true)} aria-label=${t('大厅背景与音乐')}>${label}<//>
     <//>
     ${open ? html`<${LobbyMediaDialog} onClose=${() => setOpen(false)} />` : null}`;
 }

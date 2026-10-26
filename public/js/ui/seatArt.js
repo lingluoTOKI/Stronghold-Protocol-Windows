@@ -46,16 +46,21 @@ function hash32(s) {
 
 /**
  * The operators a seat card can show — the server's room.card whitelist (server/lobby.js chessCharIds): one record per
- * charId of the visible, non-自选 chess records (the elite form, for its E2 art), 6★ first, then by name.
+ * charId of real chess records (including hidden operators), excluding slot placeholders (the elite form, for its E2 art), 6★ first, then by name.
  * @param {any[]} chessList chess.json records
  * @returns {any[]}
  */
-export function cardOperators(chessList) {
+export function cardOperators(chessList, backups = null) {
   const by = new Map();
   for (const c of Array.isArray(chessList) ? chessList : []) {
-    if (!c || c.isDiy || c.visible === false || typeof c.charId !== 'string') continue;
+    if (!c || c.isDiy || c.charId === 'char_616_pithst' || typeof c.charId !== 'string') continue;
     const prev = by.get(c.charId);
     if (!prev || (c.isGolden && !prev.isGolden)) by.set(c.charId, c);
+  }
+  // Cosmetic selection includes the DIY owned roster, not stand-ins or slot placeholders.
+  for (const id of backups?.diy?.ownedPool || []) {
+    const c = backups?.units?.[id];
+    if (!by.has(id) && c?.charId === id) by.set(id, { ...c, isGolden: true });
   }
   return [...by.values()].sort((a, b) => ((b.rarity ?? 0) - (a.rarity ?? 0)) || String(a.name).localeCompare(String(b.name), 'zh'));
 }

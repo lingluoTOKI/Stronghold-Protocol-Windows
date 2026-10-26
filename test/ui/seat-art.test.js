@@ -21,7 +21,7 @@ test('the pickable operators: one per visible, non-自选 charId, the elite form
   const list = cardOperators(CHESS);
   const ids = list.map((c) => c.charId);
   assert.equal(new Set(ids).size, ids.length, 'one record per charId');
-  const visible = new Set(CHESS.filter((c) => !c.isDiy && c.visible !== false && typeof c.charId === 'string').map((c) => c.charId));
+  const visible = new Set(CHESS.filter((c) => !c.isDiy && c.charId !== 'char_616_pithst' && typeof c.charId === 'string').map((c) => c.charId));
   assert.deepEqual(new Set(ids), visible);
   assert.ok(!ids.includes('char_616_pithst'), 'a hidden preset is not offered');
   for (const c of list) {

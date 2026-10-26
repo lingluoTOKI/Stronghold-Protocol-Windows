@@ -202,3 +202,16 @@ export function readyShopFold(prev, cur) {
   if (!isObj(prev) || !isObj(cur) || prev.round !== cur.round || !!prev.ready === !!cur.ready) return null;
   return cur.ready ? 'fold' : 'unfold';
 }
+
+/** Actual goods determine their card type; layout only locates empty slots.
+ * Keep original indices: purchases must address the server slot, not the filtered column.
+ */
+export function partitionShopSlots(slots, layout = null) {
+  const chessSlots = [], itemSlots = [];
+  for (const [i, s] of slots.entries()) {
+    const item = s?.kind === 'item' ? true : s?.kind === 'chess' ? false
+      : !!layout && i >= layout.chess && i < layout.chess + layout.item;
+    (item ? itemSlots : chessSlots).push({ s, i });
+  }
+  return { chessSlots, itemSlots };
+}

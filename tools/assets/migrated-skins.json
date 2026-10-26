@@ -5845,7 +5845,7 @@
             }
           }
         },
-        "portrait": "/assets/migrated-skins/char/portrait/char_1035_wisdel_game_9.png"
+        "portrait": "/assets/verified-skins/char_1035_wisdel_game_9.png"
       }
     }
   },
@@ -38871,7 +38871,7 @@
             }
           }
         },
-        "portrait": "/assets/migrated-skins/char/portrait/char_4132_ascln_iteration_4.png"
+        "portrait": "/assets/verified-skins/char_4132_ascln_iteration_4.png"
       }
     }
   },

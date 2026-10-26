@@ -1381,3 +1381,17 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   font-size: calc(.16 * var(--t));
   flex-shrink: 0;
 }
+
+/* Fork collections remain direct entries at every viewport size. */
+.hub-collections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .08rem; }
+.lobby-hub .hub-collections .hub-plate { min-height: 44px; flex-wrap: nowrap; gap: 8px; padding: 8px 12px; font-size: clamp(14px, calc(.2 * var(--t)), 20px); }
+.hub-collections .hub-plate__glyph { flex: 0 0 22px; width: 22px; height: 22px; }
+.bgset__media { margin-bottom: .12rem; }
+/* Wide but short desktop windows retain the left navigation in a compact form. */
+@media (min-width: 960px) and (max-height: 520px) {
+  .hub-stage { grid-template-columns: minmax(160px, 23%) minmax(0, 1fr) minmax(280px, 34%); grid-template-areas: "side center right" "side entries entries"; }
+  .hub-side { display: flex; padding-top: .1rem; gap: .08rem; overflow-y: auto; }
+  .lobby-hub .hub-plate--ach { display: none; }
+  .hub-center { grid-column: 2; }
+  .hub-side .tips { display: none; }
+}

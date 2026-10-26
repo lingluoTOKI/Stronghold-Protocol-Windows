@@ -299,6 +299,18 @@ const noopLog = { info() {}, warn() {}, error() {}, debug() {} };
  * @typedef {{ charId: string, skillIndex: number, uniEquipId: string|null }} DiyLoadout
  */
 
+/** Cosmetic roster: visible chess plus real operators in the DIY owned pool. */
+function cardCharIds(data) {
+  const ids = new Set();
+  for (const c of Object.values(data?.chess || {})) {
+    if (c && !c.isDiy && typeof c.charId === 'string' && c.charId !== 'char_616_pithst') ids.add(c.charId);
+  }
+  for (const id of data?.backups?.diy?.ownedPool || []) {
+    if (data.backups.units?.[id]?.charId === id) ids.add(id);
+  }
+  return ids;
+}
+
 /** Deep-frozen copy of a checked loadout (shared by the session, the seat and the match's PlayerState). */
 function freezeLoadout(loadout) {
   const out = {};
@@ -2004,7 +2016,7 @@ export class Lobby {
    */
   card(session, { charId }) {
     const room = this.roomOf(session);
-    if (charId && !chessCharIds(this.dataFor(room)).has(charId)) return fail(ERR.BAD_MSG, 'unknown operator');
+    if (charId && !cardCharIds(this.dataFor(room)).has(charId)) return fail(ERR.BAD_MSG, 'unknown operator');
     session.card = charId || null;
     const seat = room ? room.seatOf(session.playerId) : null;
     if (seat && seat.card !== session.card) {
@@ -2603,7 +2615,7 @@ export class Lobby {
    * @returns {Seat}
    */
   humanSeat(idx, session, room) {
-    const card = session.card && chessCharIds(this.dataFor(room)).has(session.card) ? session.card : null;
+    const card = session.card && cardCharIds(this.dataFor(room)).has(session.card) ? session.card : null;
     return {
       seat: idx, playerId: session.playerId, name: session.name, isBot: false, ready: false, connected: session.connected, left: false,
       loadout: session.loadout || null,

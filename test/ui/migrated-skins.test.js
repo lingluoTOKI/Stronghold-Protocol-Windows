@@ -11,7 +11,7 @@ test('migrated installation skins can be selected and cleared through the real p
     let count = 0;
     for (const [id, c] of Object.entries(manifest.chars)) {
       for (const [key, skin] of Object.entries(c.skins || {})) {
-        if (!JSON.stringify(skin).includes('/assets/migrated-skins/')) continue;
+        if (!JSON.stringify(skin).includes('/assets/migrated-skins/') && !JSON.stringify(skin).includes('/assets/local/official-skins/')) continue;
         assert.ok(availableSkins(id).some(s => s.id === key && s.playable), key);
         setSkin(id, key);
         assert.equal(chosenSkin(id), key);
@@ -22,6 +22,6 @@ test('migrated installation skins can be selected and cleared through the real p
         count++;
       }
     }
-    assert.equal(count, 276);
+    assert.equal(count, 304);
   } finally { data.setContent(null); }
 });

@@ -788,6 +788,7 @@ function BackgroundButton() {
         ${photoUrl ? html`<${Button} variant="ghost" size="sm" disabled=${busy} onClick=${remove}>${t('移除图片')}<//>` : null}
       `}>
       <div class="bgset">
+        <div class="bgset__media"><${LobbyMediaButton} label=${t('大厅背景与音乐')} /></div>
         <div class="bgset__hint">${t('建议使用横版图片，仅保存在本浏览器，不会上传。')}</div>
         ${photoUrl ? html`
           <label class="bgset__slider">
@@ -990,7 +991,6 @@ export function LobbyScreen() {
           <${NoticesButton} />
           <${SettingsButton} class="lobby-settings" variant="secondary" square=${true} />
           <${GuideButton} class="lobby-guide" variant="secondary" square=${true} />
-          <${LobbyMediaButton} />
           <${PwaInstallButton} class="lobby-pwa" square=${true} />
           <${BackgroundButton} />
         </div>
@@ -1012,6 +1012,10 @@ export function LobbyScreen() {
         <${SweepPlate} onClick=${() => setSweepOpen(true)} />
         <${LoadoutButton} from="lobby" size="lg" class="hub-plate hub-plate--loadout lobby-loadout" label=${t('干员调配')} />
         <${AchievementPlate} onOpen=${() => setAchOpen(true)} />
+        <div class="hub-collections">
+          <button type="button" class="hub-plate" onClick=${() => openStats('achievements')}><span class="hub-plate__glyph"><${AchBadge} /></span><span class="hub-plate__label">${t('永久成就')}</span></button>
+          <button type="button" class="hub-plate" onClick=${() => openStats('daily')}><span class="hub-plate__glyph"><${SweepGlyph} /></span><span class="hub-plate__label">${t('每日挑战')}</span></button>
+        </div>
       </aside>
       <section class="hub-entries" aria-label=${t('模拟方式')}>
         ${MODE_CARDS.map((c) => {

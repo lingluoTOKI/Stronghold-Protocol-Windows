@@ -292,17 +292,17 @@ async function fetchStability(svr){
     const load=Array.isArray(host.load)?host.load.map(v=>Number(v).toFixed(2)).join(' / '):'--';
     $('guard'+el+'_available').textContent=(host.availableMB??'—')+' MB';
     $('guard'+el+'_rss').textContent=Number.isFinite(rss)?Math.round(rss/1048576)+' MB':'—';
-    $('guard'+el+'_capacity').textContent=(a?.matches??service.health?.matches??'—')+' / '+(limits.maxMatches??'—');
+    $('guard'+el+'_capacity').textContent=(a?.matches??service.health?.matches??'—')+' / '+(limits.maxMatches === 0 ? '不限' : (limits.maxMatches??'—'));
     $('guard'+el+'_away').textContent=service.awayRooms??'—';
-    $('guard'+el+'_detail').textContent=`swap ${host.swapUsedMB??'—'} MB · 负载 ${load} · 房间 ${a?.rooms??service.health?.rooms??'—'}/${limits.maxRooms??'—'} · 采样 ${j.observationAgeSec??'—'} 秒前`+(a?` · 事件循环 ${Number(a.lagMs||0).toFixed(0)} ms`:'');
+    $('guard'+el+'_detail').textContent=`swap ${host.swapUsedMB??'—'} MB · 负载 ${load} · 房间 ${a?.rooms??service.health?.rooms??'—'}/${limits.maxRooms === 0 ? '不限' : (limits.maxRooms??'—')} · 采样 ${j.observationAgeSec??'—'} 秒前`+(a?` · 事件循环 ${Number(a.lagMs||0).toFixed(0)} ms`:'');
     if(j.observationStale){state.textContent='数据过期';state.dataset.mode='warn';reason.textContent='监测超过两分钟未更新';return;}
     if(!j.active){
       state.textContent='待启用';state.dataset.mode='warn';
       reason.textContent='监测正常 · 开局保护等待维护启用';
       return;
     }
-    const full=a.matches>=limits.maxMatches;
-    const roomsFull=a.rooms>=limits.maxRooms;
+    const full=limits.maxMatches>0 && a.matches>=limits.maxMatches;
+    const roomsFull=limits.maxRooms>0 && a.rooms>=limits.maxRooms;
     state.textContent=a.manualPaused?'已暂停':a.pressure?'资源保护':full?'对局已满':roomsFull?'房间已满':'自动保护';
     state.dataset.mode=a.manualPaused||a.pressure||full||roomsFull?'warn':'ok';
     reason.textContent=a.manualPaused?'新开局已暂停 · 已有对局继续':a.pressure?'资源紧张 · 暂缓新开局':full?'等待已有对局结束后恢复':roomsFull?'已有房间可继续开局':'运行正常 · 已有对局与重连优先';

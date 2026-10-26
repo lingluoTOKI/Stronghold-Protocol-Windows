@@ -96,10 +96,10 @@ test('card sync: a pick the shown data does not list goes out as 默认 (\'\'), 
   h.content.set({ cs: 'c'.repeat(64), status: 'ready' });
   await h.timers.advance(50);
   assert.deepEqual(h.net.sent.at(-1), { t: 'room.card', charId: 'char_x_plugin' });
-  // a hidden preset is no seat card either (the server's whitelist: visible, non-自选)
+  // Hidden real operators are valid cosmetic name-card choices.
   h.target.set({ [CARD_KEY]: 'char_3_h' });
   await h.timers.advance(SYNC_DEBOUNCE_MS);
-  assert.deepEqual(h.net.sent.at(-1), { t: 'room.card', charId: '' });
+  assert.deepEqual(h.net.sent.at(-1), { t: 'room.card', charId: 'char_3_h' });
   // 默认 needs no data at all
   h.target.set({ [CARD_KEY]: '' });
   await h.timers.advance(SYNC_DEBOUNCE_MS);

@@ -560,7 +560,10 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
  */
 export function installLoadoutSync({ net, getChessReady, getBackupsReady, lookupChess, operatorIds, timers, target = loadoutStore, notify, matchState = () => store.get(),
   content = appContentSet, app = store, gate = null } = {}) {
-  const ready = getChessReady || (() => data.load('chess'));
+  const ready = getChessReady || (async () => {
+    const values = await Promise.all([data.load('chess'), data.load('backups')]);
+    return values.every((v) => v != null) ? values : null;
+  });
   const readyBackups = getBackupsReady || (() => data.load('backups'));
   const lookup = lookupChess || ((id) => data.lookup('chess', id));
   // the operators a 潜能 / 练度 may name (shared/protocol.js cultivationCharIds: the roster + the 自选 owned pool)
@@ -673,7 +676,10 @@ export function installSkinsSync({ net, timers, target = skinsStore, notify, con
  *   getChessReady?: () => Promise<any>, listChess?: () => any[], notify?: (text: string) => void, content?: any }} deps
  */
 export function installCardSync({ net, timers, target = cardStore, getChessReady, listChess, notify, content = appContentSet, app = store, gate = null } = {}) {
-  const ready = getChessReady || (() => data.load('chess'));
+  const ready = getChessReady || (async () => {
+    const values = await Promise.all([data.load('chess'), data.load('backups')]);
+    return values.every((v) => v != null) ? values : null;
+  });
   const list = listChess || (() => data.list('chess'));
   return installPrefSync({
     net, timers, target, notify, key: CARD_KEY, stateKey: CARD_SYNC_KEY, msgType: 'room.card', field: null, tag: 'card',
@@ -683,7 +689,7 @@ export function installCardSync({ net, timers, target = cardStore, getChessReady
       const want = target.get()[CARD_KEY];
       if (!want) return { charId: '' };
       if (await ready() == null) return null;
-      return { charId: cardOperators(list()).some((c) => c.charId === want) ? want : '' };
+      return { charId: cardOperators(list(), listChess ? null : data.get('backups')).some((c) => c.charId === want) ? want : '' };
     },
   });
 }

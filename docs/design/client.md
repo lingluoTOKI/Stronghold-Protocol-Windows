@@ -1087,3 +1087,11 @@ window is [ASSUMED]; damage, attack timing and targeting are unchanged.
 Skill model fallback (#786, §35.90): when facing up, a skill with an authored Front clip and only an attack fallback
 on Back uses Front through the skill clip and ending. Back-authored skills keep Back. [ASSUMED] This model choice
 is presentation inferred from the available animation roles; simulation facing and targeting do not change.
+
+### Fork: name-card DIY roster (2026-10-26)
+
+Name-card selection includes real preset operators (including hidden records) plus `backups.diy.ownedPool` real operators. Slot placeholders, the special char_616_pithst auxiliary entry and stand-in bodies remain excluded. This is cosmetic only; it does not change shop pools or gameplay eligibility. Client picker, preference sync, room cards and server validation use the same roster.
+
+### Fork: shop card types after special refresh (2026-10-26)
+
+Occupied shop slots render using their actual `kind`, including operators placed in former equipment positions by special refresh effects. Layout determines empty-slot placement only. Filtering retains the original server purchase index. This changes presentation only, not promotion rewards or refresh rules.

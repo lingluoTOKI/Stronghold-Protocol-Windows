@@ -276,3 +276,21 @@ exists) gets no section rather than an empty grid.
 - **A 自选 slot's own record has `charId: null`**, so it wears its **pick's** operator's skin — the slot has no body of
   its own. The picker offers the appearance while picking that operator, and the choice is kept per operator, so
   changing the slot's operator changes the appearance with it.
+
+## Fork: verified official PC resource overlay (2026-10-26)
+
+`tools/local-extract/official_skins.py <AB/Windows> --root .` reads the owner's local client without modifying it. Exact named sprites from `spritepack/char_portrait_*` and `ui_char_avatar_*` supply images; skin-specific battle prefabs supply front/back skeletons and their referenced atlas textures. Only operators already in the asset manifest are included. Exported game art stays ignored under `public/assets/local/official-skins/`.
+
+The extractor emits `tools/assets/official-skins.json` and an audit with source bundle, sprite/prefab identity and image hashes in `output/official-skins-audit.json`. Apply via `node tools/build-data.mjs --apply-official-skins`. Normal asset rebuilds also apply this overlay after the older migrated overlay. A missing model uses the default model; a missing official entry is not certified by this audit. Names absent from installed metadata retain the exact official skin code rather than a guessed translation. This is cosmetic only, not an operator or gameplay expansion.
+
+### 本地完整核对结果（2026-10-26）
+
+- 现有干员范围内，官方资源提取299套（193名干员）；全部有头像和名片立绘，297套含战斗模型，2套仅图片并沿用默认模型。
+- 合并后304套，保留5套此次官方安装中未匹配的旧资源：char_1015_aglna2@aglna2#1, char_1015_aglna2@aglna2#2, char_1033_swire2@nlc#1, char_1040_blaze2@nlc#1, char_2025_shu@nlc#1。
+- 新增28套暂无可核实中文名称，显示资源编号，不猜测名称。
+- 全量路径、模型解析与选择同步等28项针对性检查通过；不等同于逐套实机动画验收。预览：`output/official-skins-review/index.html`。
+- 当前仅本地修改；素材未提交Git、未上传线上，未重启服务。
+
+### 契约服模型补齐
+
+升华、红女爵的前向骨骼、图集和纹理已从契约服本地目录补齐，独立保存为 `tools/assets/contract-skin-models.json`，官方提取器在未提取到模型时复用。当前299套官方皮肤均有模型引用；其中2套模型来源为契约服，不应声称全部来自本次官方提取。上传准备包在 `dist/skins-ready-20261026`，包含全部304套皮肤文件及校验清单，不包含全游戏基础素材。

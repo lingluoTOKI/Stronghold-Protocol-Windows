@@ -491,7 +491,7 @@
 .cardpick__op:hover { border-color: var(--line-3); color: var(--text-hi); }
 .cardpick__op.is-on { border-color: var(--mint-400); box-shadow: 0 0 0 1px var(--mint-400); color: var(--text-hi); }
 .cardpick__img { display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; background: linear-gradient(180deg, #2a302d, #151917); }
-.cardpick__img img { width: 100%; height: 100%; object-fit: cover; }
+.cardpick__img img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
 .cardpick__img .icon { width: 45%; height: 45%; color: var(--mint-400); }
 .cardpick__glyph { font-size: calc(.36 * var(--t)); font-weight: 900; color: rgba(255, 255, 255, .3); }
 .cardpick__name { text-align: center; font-size: calc(.14 * var(--t)); line-height: 1.15; }

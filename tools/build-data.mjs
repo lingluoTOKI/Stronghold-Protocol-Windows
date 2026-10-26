@@ -71,7 +71,7 @@ function parseArgs(argv) {
     refresh: false, offline: false, quiet: false, noResearch: false, force: false,
     out: null, cache: join(ROOT, '.cache', 'gamedata'), report: null, version: null,
   };
-  const flags = { '--refresh': 'refresh', '--offline': 'offline', '--quiet': 'quiet', '--no-research': 'noResearch', '--force': 'force' };
+  const flags = { '--apply-official-skins': 'applyOfficialSkins', '--refresh': 'refresh', '--offline': 'offline', '--quiet': 'quiet', '--no-research': 'noResearch', '--force': 'force' };
   const dirs = { '--import-skins-from': 'importSkinsFrom', '--out': 'out', '--cache': 'cache', '--report': 'report' };
   for (let i = 0; i < argv.length; i++) {
     const [name, inline] = argv[i].includes('=') ? [argv[i].slice(0, argv[i].indexOf('=')), argv[i].slice(argv[i].indexOf('=') + 1)] : [argv[i], null];
@@ -3303,6 +3303,10 @@ function validateAll(f) {
 // ===== main =====================================================================================
 
 async function main() {
+  if (OPTS.applyOfficialSkins) {
+    const { applyOfficialSkins } = await import('./assets/apply-official-skins.mjs');
+    return applyOfficialSkins(ROOT);
+  }
   if (OPTS.importSkinsFrom) {
     const { importSkins } = await import('./assets/import-skins.mjs');
     return importSkins(OPTS.importSkinsFrom, ROOT);

@@ -192,10 +192,11 @@ export function inviteLink(code) {
 export { copyText };
 
 /** A picker tile's avatar; the name's first character when the art pack has none or it fails to load. */
-function CardThumb({ src, name }) {
-  const [bad, setBad] = useState(false);
-  return html`<span class="cardpick__img">${src && !bad
-    ? html`<img src=${src} alt="" loading="lazy" draggable=${false} onError=${() => setBad(true)} />`
+function CardThumb({ src, fallback, name }) {
+  const [failed, setFailed] = useState([]);
+  const shown = seatArtSrc([src, fallback], failed);
+  return html`<span class="cardpick__img">${shown
+    ? html`<img src=${shown} alt="" loading="lazy" draggable=${false} onError=${() => setFailed((prev) => [...prev, shown])} />`
     : html`<span class="cardpick__glyph">${[...(name || '?')][0]}</span>`}</span>`;
 }
 
@@ -228,11 +229,11 @@ function CardPicker({ current, list, m, localSkins = {}, onPick, onClose }) {
         <span class="cardpick__img"><${Icon} name="refresh" /></span><span class="cardpick__name">${t('默认')}</span>
       </button>
       ${shown.map((c) => {
-        const src = chessAvatarUrl(m, c, { skin: ownerSkin(c.charId, { localSkins }) });
+        const src = chessPortraitUrl(m, c, { skin: ownerSkin(c.charId, { localSkins }) });
         const on = known && c.charId === current;
         return html`<button key=${c.charId} type="button" class=${`cardpick__op r${c.rarity}${on ? ' is-on' : ''}`} aria-pressed=${on ? 'true' : 'false'}
             data-char=${c.charId} data-autofocus=${on ? '' : undefined} title=${c.name} onClick=${() => onPick(c.charId)}>
-          <${CardThumb} src=${src} name=${c.name} />
+          <${CardThumb} src=${src} fallback=${chessPortraitUrl(m, c)} name=${c.name} />
           <span class="cardpick__name">${c.name}</span>${c.rarity ? html`<span class="cardpick__star num">${c.rarity}★</span>` : null}
         </button>`;
       })}
@@ -490,9 +491,9 @@ export function RoomScreen() {
   // 名片干员: the operators a seat card can show and the default pool (ui/seatArt.js), one's own pick (a pref the sync
   // engine sends: ui/loadoutSync.js installCardSync), and the outfits the cards wear — this browser's choices and the
   // 「显示其他玩家的皮肤」 switch (docs/SKINS.md)
-  useData('chess', 'assets', 'config');
+  useData('chess', 'assets', 'config', 'backups');
   const chess = data.get('chess');
-  const cardList = useMemo(() => cardOperators(data.list('chess')), [chess]);
+  const cardList = useMemo(() => cardOperators(data.list('chess'), data.get('backups')), [chess, data.get('backups')]);
   const cards = useMemo(() => cardContext(cardList), [cardList]);
   const myCard = useStore((s) => s[CARD_KEY], Object.is, cardStore);
   const localSkins = useStore((s) => s[SKINS_KEY], Object.is, skinsStore);

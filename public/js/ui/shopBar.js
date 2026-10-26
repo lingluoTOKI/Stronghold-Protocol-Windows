@@ -1,3 +1,4 @@
+import { partitionShopSlots } from './gameLogic/shop.js';
 // Bottom shop bar (research 06 §11.2 / D3): LEVEL card (upgrade price hex, 升级), 3–5 operator cards
 // (tier chip, price hex with discount/markup colours, portrait, bonds — a bond the mode never activates struck through,
 // 本局禁用 — class, frozen overlay, sold state,
@@ -307,9 +308,7 @@ export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onColl
   // to keep it in the equipment column. [ASSUMED] Older saved frames / mocks infer kinds from their cards;
   // their null slots carry no information from which to recover the old equipment position.
   const layout = Number.isInteger(shop.layout?.chess) && Number.isInteger(shop.layout?.item) ? shop.layout : null;
-  const indexed = slots.map((s, i) => ({ s, i }));
-  const chessSlots = indexed.filter(({ s, i }) => layout ? i < layout.chess : !s || s.kind !== 'item');
-  const itemSlots = indexed.filter(({ s, i }) => layout ? i >= layout.chess && i < layout.chess + layout.item : s && s.kind === 'item');
+  const { chessSlots, itemSlots } = partitionShopSlots(slots, layout);
   const frozen = !!shop.frozen;
   const funds = Number(priv?.funds) || 0;
   const remaining = Math.max(0, (priv?.deployCap ?? 8) - (priv?.deployCount ?? 0));
