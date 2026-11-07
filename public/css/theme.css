@@ -401,3 +401,19 @@ h1, h2, h3, h4, p { margin: 0; }
     transition-duration: 1ms !important;
   }
 }
+
+/* ios-mobile-fix: iOS Safari 通用修复 */
+* { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: default; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { overscroll-behavior-y: none; -webkit-font-smoothing: antialiased; }
+button { cursor: pointer; -webkit-appearance: none; appearance: none; touch-action: manipulation; }
+input, textarea { -webkit-appearance: none; appearance: none; border-radius: 0; }
+@supports (-webkit-backdrop-filter: blur(10px)) {
+  .toast, .modal__box { -webkit-backdrop-filter: blur(12px); }
+}
+/* 横屏时 safe-area 横向 inset */
+@media (orientation: landscape) {
+  :root { --sa-t: env(safe-area-inset-top, 0px); --sa-b: env(safe-area-inset-bottom, 0px); }
+}
+/* 防止双击缩放 */
+html { touch-action: manipulation; }

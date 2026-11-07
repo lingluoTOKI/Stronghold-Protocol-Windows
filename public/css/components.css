@@ -1254,3 +1254,61 @@
   .verpick__badge { font-size: calc(.2 * var(--t)); }
   .verpick__period, .verpick__note { font-size: calc(.21 * var(--t)); }
 }
+
+/* QQ 账号弹窗：内容直接排在 modal__body 里，不再套第二层内边距 */
+.acc-form { display: grid; gap: .16rem; }
+.acc-form p { margin: 0; font-size: calc(.14 * var(--t)); line-height: 1.55; color: var(--text-lo); }
+.acc-form .acc-actions { display: flex; flex-wrap: wrap; gap: .08rem; }
+.acc-form details { font-size: calc(.14 * var(--t)); color: var(--text-lo); }
+.acc-form summary { cursor: pointer; color: var(--mint-500); line-height: 1.5; }
+.acc-form details > * + * { margin-top: .1rem; }
+
+/* mobile-acc-tweak: 手机端账号面板放宽间距与点击区域 */
+@media (max-width: 640px) {
+  .acc-form { gap: .28rem !important; }
+  .acc-form p { font-size: calc(.16rem * var(--t, 1)); line-height: 1.7; margin: .04rem 0; }
+  .acc-form label, .acc-form .field-label { font-size: calc(.15rem * var(--t, 1)) !important; margin-bottom: .06rem; }
+  .acc-form input, .acc-form .field-input { min-height: .56rem !important; padding: .12rem .16rem !important; font-size: calc(.17rem * var(--t, 1)) !important; }
+  .acc-form .acc-actions { gap: .14rem !important; }
+  .acc-form .acc-actions button { min-height: .5rem !important; padding: .14rem .22rem !important; font-size: calc(.16rem * var(--t, 1)) !important; width: 100%; }
+  .acc-form details { margin-top: .12rem; }
+  .acc-form summary { font-size: calc(.16rem * var(--t, 1)); padding: .08rem 0; }
+  .modal__box.acc-modal, .modal__box:has(.acc-form) { width: min(94vw, 6rem) !important; padding: .32rem .28rem !important; }
+}
+
+/* acc-form-mobile: 账号弹窗手机适配 */
+@media (max-width: 640px) {
+  .acc-form { gap: .22rem !important; }
+  .acc-form > p { font-size: calc(.14rem * var(--t,1)) !important; line-height: 1.55 !important; margin: 0 !important; }
+  .acc-form .field { margin-bottom: .08rem !important; }
+  .acc-form .field__label { font-size: calc(.13rem * var(--t,1)) !important; margin-bottom: .05rem !important; }
+  .acc-form .field__box { height: .52rem !important; min-height: .52rem !important; }
+  .acc-form .field__box .field__input { height: .52rem !important; min-height: .52rem !important; font-size: calc(.16rem * var(--t,1)) !important; padding: .06rem .12rem !important; }
+  .acc-form .field__hint { font-size: calc(.11rem * var(--t,1)) !important; margin-top: .04rem !important; }
+  .acc-form .acc-actions { display: flex !important; gap: .12rem !important; margin: .04rem 0 !important; width: 100% !important; }
+  .acc-form .acc-actions .btn { flex: 1 !important; width: auto !important; height: .5rem !important; min-height: .5rem !important; font-size: calc(.15rem * var(--t,1)) !important; padding: .1rem .12rem !important; white-space: normal !important; line-height: 1.2 !important; }
+  .acc-form details { margin-top: .1rem !important; }
+  .acc-form summary { font-size: calc(.14rem * var(--t,1)) !important; padding: .12rem .1rem !important; min-height: .44rem !important; display: flex !important; align-items: center !important; cursor: pointer !important; touch-action: manipulation !important; }
+  .modal__box:has(.acc-form) { width: min(92vw, 6.5rem) !important; padding: .28rem .3rem !important; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .acc-form { gap: .12rem !important; }
+  .acc-form > p { font-size: calc(.12rem * var(--t,1)) !important; line-height: 1.4 !important; }
+  .acc-form .field__box { height: .38rem !important; min-height: .38rem !important; }
+  .acc-form .field__box .field__input { height: .38rem !important; min-height: .38rem !important; font-size: calc(.13rem * var(--t,1)) !important; }
+  .acc-form .acc-actions { display: flex !important; gap: .1rem !important; width: 100% !important; }
+  .acc-form .acc-actions .btn { flex: 1 !important; width: auto !important; height: .38rem !important; min-height: .38rem !important; font-size: calc(.12rem * var(--t,1)) !important; padding: .06rem .1rem !important; }
+  .modal__box:has(.acc-form) { padding: .14rem .18rem !important; }
+}
+
+  /* 已登录状态：全 secondary 按钮纵向全宽堆叠 */
+  .acc-form .acc-actions:not(:has(.btn--primary)) { flex-direction: column !important; gap: .1rem !important; }
+  .acc-form .acc-actions:not(:has(.btn--primary)) .btn { flex: none !important; width: 100% !important; }
+  /* 说明文字分组：p 之间加间距 */
+  .acc-form > p:not(:first-child) { margin-top: .12rem !important; color: rgba(255,255,255,.55) !important; }
+  .acc-form .field + p, .acc-form .acc-actions + p { margin-top: .15rem !important; }
+  /* details 内的 summary 触控区 */
+  .acc-form details > summary { min-height: .44rem !important; padding: .1rem !important; display: flex !important; align-items: center !important; cursor: pointer !important; }
+  /* details 内说明文字 */
+  .acc-form details > p { margin: .08rem 0 !important; color: rgba(255,255,255,.5) !important; }
+/* acc-form-mobile end */

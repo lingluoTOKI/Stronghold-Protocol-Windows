@@ -405,3 +405,74 @@ html[data-script="alphabetic"] .title-login .btn--xl { letter-spacing: .3em; }
 .notice-card__meta { margin: 0; font-size: calc(.13 * var(--t)); color: var(--text-dim); overflow-wrap: anywhere; }
 .notice-card__title { margin: .02rem 0; font-size: calc(.16 * var(--t)); color: var(--text-hi); overflow-wrap: anywhere; }
 .notice-card__body { margin: 0; font-size: calc(.15 * var(--t)); color: var(--text-md); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+
+/* 登录框状态行里的 QQ 绑定入口：与「玩法说明」同排，不再单独占一行 */
+.title-qqlink {
+  flex: 0 0 auto; white-space: nowrap; cursor: pointer; display: inline-flex;
+  align-items: center; padding: 2px 10px 2px 18px; border-radius: 999px;
+  border: 1px solid var(--mint-500);
+  background-color: rgba(255, 255, 255, .04);
+  background-color: color-mix(in srgb, var(--mint-500) 16%, transparent);
+  background-image: radial-gradient(circle at center, var(--mint-500) 0 2.5px, transparent 3px);
+  background-repeat: no-repeat; background-size: 7px 7px; background-position: 8px 50%;
+  color: var(--mint-500); font: inherit; font-weight: 700; letter-spacing: .02em;
+  text-decoration: none; transition: background-color .15s;
+}
+.title-qqlink:hover { background-color: color-mix(in srgb, var(--mint-500) 26%, transparent); }
+.title-conn { flex-wrap: wrap; row-gap: .04rem; }
+
+/* 登录框的 backdrop-filter 会形成包含块/层叠上下文，把弹窗困在登录框内（3001 实测）
+   弹窗打开时临时关掉模糊，恢复「固定全屏遮罩 + 顶层显示」；关闭后自动恢复 */
+.title-login:has(.modal) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* 登录框底部：左侧连接状态、右侧操作；玩法说明单独一行右对齐 */
+.title-conn { flex-wrap: nowrap; gap: .06rem; }
+.title-conn__status { display: flex; align-items: center; gap: .06rem; white-space: nowrap; min-width: 0; }
+.title-conn__acts { display: flex; align-items: center; gap: .06rem; margin-left: auto; flex: 0 0 auto; }
+.title-conn__guide { display: flex; align-items: center; justify-content: flex-start; margin-top: .02rem; }
+.title-conn__guide .title-guide { margin-left: auto; }
+.title-conn__guide .title-guide {
+  border: 0; background: none; padding: 0 .02rem; min-height: 0;
+  color: var(--text-lo); font-size: inherit;
+}
+.title-conn__guide .title-guide:hover { color: var(--text-hi); }
+.title-qqlink { padding: 3px 10px 3px 16px; letter-spacing: 0; }
+
+/* mobile-title-assets: 手机端标题页底部按钮放大，避免点不到 */
+@media (max-width: 640px) {
+  .title-assets { gap: .16rem !important; margin-top: .2rem !important; width: 100% !important; padding: 0 .1rem; }
+  .title-assets__item > .btn { min-height: .5rem !important; padding-top: .1rem !important; padding-bottom: .1rem !important; font-size: calc(.16rem * var(--t, 1)) !important; line-height: 1.3 !important; }
+  .title-assets__item > small { font-size: calc(.13rem * var(--t, 1)) !important; line-height: 1.45 !important; margin-top: .08rem !important; }
+  .title-login .btn--xl { min-height: .46rem !important; font-size: calc(.22rem * var(--t, 1)) !important; letter-spacing: .15em !important; padding-left: calc(.2rem + .1em) !important; padding-top: .06rem !important; padding-bottom: .06rem !important; }
+}
+
+/* landscape-title-tweak: 横屏矮高度完整方案 */
+@media (max-height: 500px) and (orientation: landscape) {
+  /* 1. 标题区压缩 */
+  .title-logo, .title-logo__icon { transform: scale(.6); margin: 0 !important; }
+  .title-tagline, .title-subtitle { display: none !important; }
+  .title h1 { font-size: calc(.45rem * var(--t,1)) !important; line-height: 1.05 !important; margin: .04rem 0 !important; }
+  .title h2 { font-size: calc(.22rem * var(--t,1)) !important; margin: .02rem 0 !important; }
+
+  /* 2. 登录卡片收紧 */
+  .title-login { padding: .12rem .18rem !important; gap: .08rem !important; }
+  .title-login .field-label { font-size: calc(.11rem * var(--t,1)) !important; margin-bottom: .02rem !important; }
+  .title-login .field__box { height: .5rem !important; min-height: .5rem !important; } .title-login .field__box .field__input { height: .5rem !important; min-height: .5rem !important; padding: .06rem .1rem !important; }
+  .title-login .btn--xl { height: .5rem !important; min-height: .5rem !important; font-size: calc(.18rem * var(--t,1)) !important; letter-spacing: .2em !important; padding-left: calc(.2rem + .1em) !important; padding-top: .08rem !important; padding-bottom: .08rem !important; }
+
+  /* 3. 连接状态行收紧 */
+  .title-conn { gap: .06rem !important; font-size: calc(.11rem * var(--t,1)) !important; min-height: .24rem !important; }
+
+  /* 4. 素材包按钮：缩小，下面小字隐藏 */
+  .title-assets { margin-top: .06rem !important; gap: .06rem !important; }
+  .title-assets__item > .btn { min-height: .34rem !important; padding: .04rem .08rem !important; font-size: calc(.12rem * var(--t,1)) !important; }
+  .title-assets__item > small { display: none !important; }
+
+  /* 5. 顶部导航缩小 */
+  .title-corner { font-size: calc(.1rem * var(--t,1)) !important; line-height: 1.3 !important; }
+  .bulletin-btn, .title-lang { font-size: calc(.11rem * var(--t,1)) !important; }
+}
+/* landscape-title-tweak end */
