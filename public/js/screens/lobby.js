@@ -1,3 +1,4 @@
+import { GameAccountButton } from '../ui/gameAccount.js';
 // Lobby screen, laid out like the event's entry (PR #643 split 6, PR #812): the official entry backdrop (assets
 // `entry/entry_bkg_01` / `entry_bkg_02`, a plain dark field without the art pack; their position, size and opacity in
 // css/screens/lobby.css are eyeballed from the event video [ASSUMED]), the emblem in radar rings and the title in the
@@ -987,7 +988,8 @@ export function LobbyScreen() {
         </div>
         <span class="topbar__sep" aria-hidden="true"></span>
         <div class="topbar__tools">
-          <${Button} variant="secondary" size="sm" onClick=${() => openStats('achievements')}>${t('统计')}<//>
+          <${GameAccountButton} />
+          
           <${NoticesButton} />
           <${SettingsButton} class="lobby-settings" variant="secondary" square=${true} />
           <${GuideButton} class="lobby-guide" variant="secondary" square=${true} />
