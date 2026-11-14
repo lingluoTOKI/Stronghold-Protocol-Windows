@@ -124,9 +124,89 @@
 
 ---
 
+## 附零：本次同步记录（2026-11-14，已完成）
+
+这一轮把上游 `dev`（0.3.4 未发布，第三期「规程·序列Ⅰ」）合进了改编版，**33 个冲突文件全部手工解决，独有功能零丢失**。下面这份记录是下次同步的参照：哪些文件会反复冲突、上次是怎么取舍的、哪些结论是实测过的、哪些还留着口子。
+
+### 结果总览
+
+| 项目 | 值 |
+|---|---|
+| 工作分支 | `sync/upstream-0.3.4` |
+| merge 提交 | `22b23d02`（`merge: 上游 dev 0.3.4（第三期规程·序列Ⅰ）合入改编版`） |
+| i18n / 文案修复提交 | `cdd652c4` |
+| 合入的上游 | `upstream/dev` = `fb55b8c0`（`package.json` 仍写 0.3.3，内容是 0.3.4） |
+| 冲突文件 | **33**，`git diff --name-only --diff-filter=U` 已为空，无残留冲突标记 |
+| merge 前的干净基线 | tag `pre-merge-0.3.4` → `2b7a41d1` |
+| 上一轮基线（阶段一推送点） | `sync/upstream-20261025` = `7f49814a` |
+| 账号子系统分支 | `local/account-binding` = `fcfdb83a`（保持独立、不被 sync 污染） |
+
+### 33 个冲突文件怎么解的
+
+**总原则**：UI 外观与数据层跟随上游（含 `.hub-bg` 红黑废墟，2026-11-14 用户已放开这条限制）；改编版独有功能、补丁、守卫一律保留。几处关键的是**精细合并**而非取边。
+
+| 文件 | 处理 |
+|---|---|
+| `data/assets.json` | 取上游 |
+| `docs/AI-STRATEGY.md`、`docs/ASSETS.md` | 取上游 |
+| `docs/design/client.md`、`public/css/{components,lobby,room,title}.css` | 两边都留 |
+| `public/i18n/{en,ja,ko,zh-TW}.json` | 三方合并（ours 为底、theirs 覆盖） |
+| `public/js/screens/title.js` | 上游 `ResourceManagerButton`（替代旧的下载/导入两个按钮）+ 本地 `GameAccountButton`；渲染处改成 `<${ResourceManagerButton} />` |
+| `public/js/battle/hud.js` | 上游新 `gtop__clock` 结构（含 `pf.countdown` / `RegCountdown` 规程倒计时），本地 `SpeedButton` / `SkipButton` 插回时钟之后 |
+| `public/js/screens/room.js` | 三块：`CardThumb` 保本地 `fallback=${chessPortraitUrl(m,c)}` + 用上游 `longWord` 长名类；`cardList/cards` 取上游（新增 `backups` / `pending`）；**`info` 块合并为 `room.modeId ? modeInfo(room.modeId) : difficultyInfo(room.mode, room.difficulty, facts.occupied.length)`**，保住六人房 BAN 估算的第 3 参 |
+| `public/js/screens/lobby.js` | 保留本地 55 行公共匹配队列（`clearMatch/leaveMatch/startMatch/topUp/startNow/waitMore`、`match.status`、`api/online` 5s 轮询），只把上游 `pickMode`（规程等级）插在 `pickDifficulty` 之后；`difficultyInfo(roomMode, difficulty, playerCount = null)` 的第 3 参**必须留**（上游原版删了它） |
+| `public/js/choiceOverlay.js` | 上游「收起」按钮 + 本地 `spov__grid--many`（>6 卡布局） |
+| `public/js/ui/detailPanel.js` | 本地 `canLoadout = false, canSkin = false` + 上游 `unitItemProgress = null` 与 `ItemProgress` 组件 |
+| `public/js/ui/assetDownload.js`、`assetImport.js`、`bandDraft.js`、`loadoutSync.js`、`seatArt.js` | 取上游（`assetImport.js` 随后补回群引导，见下） |
+| `public/js/settingsStore.js`、`shared/gameLogic/settings.js` | 取本地（`bgm: 0`） |
+| `public/js/screens/main.js`、`public/js/game.js` | import 两边都留（`ChatDock` + `EmoteWheel`/`BandCommand`） |
+| `public/js/data/builtinMeta.js` | 取本地（六人房 R14 信标立即发放优先，失败退回上游下回合重试） |
+| `tools/build-data.mjs` | 取本地（`pinnedUrl` + `--import-skins-from`） |
+| `shared/protocol.js` | import 合并三常量 `CHAT_MAX_LEN, BOSS_HP_OPTIONS, REHEARSAL_MAX_CANDIDATES` |
+| `server/lobby.js` | 四块合并：`destroy()` 里 `peerRelay.dispose()` + `matchTimers`；房间快照里 `bossHp: room.bossHp ?? BOSS_HP_DEFAULT` + 上游 `modeId`；`matchBroadcast` 保本地 `dailyBoard` 的 `m.result` 结算块 + 用上游 `afterReconcile(this, room, reconcileAiTakeover(this, room))`；`disposeRoom` 里 `recovery?.abandon(...)` + `peerRelay.clear(room)` |
+| `test/fixtures/versions-default-guard.json` | `default: true` 归 **`act3autochess@V3_1`**（不是 `DEFAULT_VERSION` 常量那个 act2autochess——踩过一次坑） |
+| `test/lobby-card.test.js` | 取上游（改成全列表遍历，比本地单条断言覆盖更强） |
+
+**合并时修掉的自动合并副作用**：`server/lobby.js` 里旧版 `cardCharIds`（含 `char_616_pithst` 硬过滤）与上游新版（WeakMap 缓存 + `visible !== false`）同名重复声明，`node --check` 报 `Identifier 'cardCharIds' has already been declared`。删旧版、留上游新版。
+
+### 决策 2 / 3 / 5 的实测结论：都不用改代码
+
+- **决策 5（BOSS_HP 3.25 倍叠规程新基准）**：`server/match/gamedata.js:196-203` 的 `bossPoolShare()` 本来就是 `sixPlayerHp * bossHpScale * bossPoolShareOf(...)`，3.25 倍乘在**上游算完的最终值**之上，正是「叠上游最终值」。
+- **决策 3（六人房在规程房间开）**：`MAX_SEATS = 6`；上游 5 个版本（含规程）的 `roomModes` 全是 `['solo','coop']`；`server/versions.js` 只校验 `roomModes.includes(roomMode)`、不按版本限座位 → 规程 coop 可开 5/6 座，团体模式即入口。
+- **决策 2（第 8 行 5 格装备区与 R10/R12/R14 信标共存）**：`SIX_PLAYER_BEACON_ROUNDS = new Set([10, 12, 14])`（`server/match/match/phases.js:19`）+ 每回合 1 枚 = **全程只有 3 枚信标**，5 格装备区绰绰有余，不需要把 `tempSize` 改成 6。顺带查清 `TEMP_SIZE` 是前后端共享的硬布局常量（`GEO.TEMP_SIZE = 5`，注释「slot idx 0..4 = cols 4..8」），`shared/protocol.js:502` 的 idx 校验、`public/js/render/app.js:850`（「Hidden overflow waits for a visible slot」）、`drag.js`、`placement.js`、`shop.js`、`fallbackField.js`、`underframe.js` 全都依赖它，改它牵动前端网格；`PARTNER_COL_OFFSET: 8` 只有定义、无任何使用。
+
+### 合完之后补的两处
+
+1. **QQ 群引导文案**：`assetImport.js` 取上游后，原来那句「素材包在游戏交流群 1104628970 的群文件，读取本机 zip，美术不占服务器流量。」丢了。已作为第三条 `<p class="t-lo">` 加回 `AssetImportPanel`；`en.json` 里原有该 key 的英文译文可直接命中，`zh-TW/ja/ko` 三语各补 1 条。
+2. **i18n 静态检查（既有问题，非本次 merge 引入）**：`test/i18n.test.js` 第 9 项扫描 `public/js`、`public/studio`、`shared`、`server`（跳过 `node_modules|vendor|assets|fonts|dev`，以及 `server/sim/`），要求所有中文字面量包 `t()` / `N_()`、且 msgid 都在 `en.json`。这次补齐了：
+   - `shared/challengeCovenants.js` 的 `bondName` 23 处包 `N_()`（`N_ = (s) => s` 零开销标记，`bondName` 仅用于显示、前端走 `tName()`，行为不变）；
+   - `public/js/ui/gameAccount.js` 的 toast innerHTML 改模板串并包 `t()`；
+   - `server/accounts/http.js` 的指令模板 `${N_('绑定游戏')} ${realm} ${code}`（**不能翻译**，QQ 群机器人只认中文指令）；
+   - `en.json` 补 23 个盟约分类名（Yan / Sargon / Victoria / Kjerag / Laterano / Ægir / Siracusa / Kazimierz / Precise / Swift / Skillful / Arcane / Steadfast / Assist / Visionary / Miracle / Investor / Raid / Indomitable / Harmony / Support operator / Solo / Ultimate）+ 3 条群验证文案。
+   结果：`node --test test/i18n.test.js` **11/11 通过**。
+
+### 验证结果（本轮实测）
+
+| 检查 | 结果 |
+|---|---|
+| `node tools/verify-local-patches.mjs` | **47 通过 + 8 跳过 + 0 失败**（8 项跳过全是账号子系统，预期；在 `local/account-binding` 上应为 55 全绿） |
+| `npm run golden` | roster 49 / bonds 46 / fields 22 / matches 21 / standins 10 / diy 143 —— 全部 match，退出码 0 |
+| `node --test test/i18n.test.js` | 11 / 11 |
+| 信标 + 首领血量（`beacon-diy` / `boss-hp-scaling` / `bosshp` / `bosshp_stacking`） | 18 / 18 |
+| 六人房与规程（`content/choices` / `bot-strategy-seats` / `lobby-card` / `versions-default-guard` / `versions-regulation`） | 50 / 50 |
+| 起服冒烟（`PORT=3199`、`SP_NO_BROWSER=1`） | `/healthz` 200 `{"ok":true}`、`/api/online` 200、首页 200；`versions.default = act3autochess@V3_1` |
+
+### 还留着口子的三件事
+
+1. merge 提交推送前，`sync/upstream-0.3.4` 尚未 push 到 origin。
+2. `sync/upstream-0.3.4` 还没合回 `local/account-binding`（合回后校验器应从 47+8SKIP 恢复到 55 全绿）。
+3. 五个大厅入口的人工点击（版本切换 / 公共匹配 / 团体模式六人房 / 公告栏信封 / 监控入口）**由用户本人跑**，助手不做浏览器自动化验证。
+
+---
+
 ## 附：当前基线快照（AI 核对用，会随版本过期，以实际 fetch 为准）
 
-### 一、当前状态（2026-11-14 实测，这是唯一有效的基线）
+### 一、同步前基线（2026-11-14 实测；同步完成后的实际状态见上方「附零：本次同步记录」）
 
 | 项目 | 值 |
 |---|---|
