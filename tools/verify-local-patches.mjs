@@ -16,6 +16,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+/** 账号子系统的锚点文件：它不在时整组标 SKIP（账号代码在 local/account-binding） */
+const ACCOUNT_ANCHOR = 'server/accounts/client.js';
+
 /** 读取文件内容；不存在返回 null */
 function read(rel) {
   const abs = join(ROOT, rel);
@@ -98,18 +101,23 @@ const CHECKS = [
   { group: '补丁', label: 'BGM 默认值 = 0', file: 'public/js/ui/gameLogic/settings.js', pattern: /bgm\s*:\s*0/ },
   { group: '补丁', label: 'IMMUTABLE_JSON（/data/ 长缓存）', file: 'server/http/static.js', pattern: /IMMUTABLE_JSON/ },
 
-  // ── 未提交：账号绑定子系统（半成品，必须整体保留）──────────
-  { group: '账号', label: 'challenges.js', file: 'server/accounts/challenges.js', pattern: /.+/ },
-  { group: '账号', label: 'client.js', file: 'server/accounts/client.js', pattern: /.+/ },
-  { group: '账号', label: 'store.js', file: 'server/accounts/store.js', pattern: /.+/ },
-  { group: '账号', label: 'worker.js', file: 'server/accounts/worker.js', pattern: /.+/ },
-  { group: '账号', label: 'http.js（已入库）', file: 'server/accounts/http.js', pattern: /createAccounts|createAccountStore/ },
-  { group: '账号', label: 'index.js 接线 createAccounts', file: 'server/index.js', pattern: /createAccounts/ },
-  { group: '账号', label: 'ACCOUNT-BINDING-PLAN.md', file: 'docs/ACCOUNT-BINDING-PLAN.md', pattern: /.+/ },
-  { group: '账号', label: '5 个 account 测试', files: [
+  // ── 账号绑定子系统（2026-11-14 移入独立分支 local/account-binding）──
+  // 这一组代码已提交在 local/account-binding（fcfdb83a），同步分支上有意不含它。
+  // 所以用 optional 锚点：锚点文件不在本分支时整组标 SKIP，不算失败。
+  // 合回账号分支后锚点存在，整组自动恢复逐项校验。
+  { group: '账号', optional: ACCOUNT_ANCHOR, label: 'challenges.js', file: 'server/accounts/challenges.js', pattern: /.+/ },
+  { group: '账号', optional: ACCOUNT_ANCHOR, label: 'client.js', file: 'server/accounts/client.js', pattern: /.+/ },
+  { group: '账号', optional: ACCOUNT_ANCHOR, label: 'store.js', file: 'server/accounts/store.js', pattern: /.+/ },
+  { group: '账号', optional: ACCOUNT_ANCHOR, label: 'worker.js', file: 'server/accounts/worker.js', pattern: /.+/ },
+  // http.js 早就随 718ee7f4 进了同步分支，所以它不带锚点、单独校验
+  { group: '账号', label: 'http.js createAccounts', file: 'server/accounts/http.js', pattern: /createAccounts|createAccountStore/ },
+  { group: '账号', optional: ACCOUNT_ANCHOR, label: 'index.js 接线 createAccounts', file: 'server/index.js', pattern: /createAccounts/ },
+  { group: '账号', optional: ACCOUNT_ANCHOR, label: 'ACCOUNT-BINDING-PLAN.md', file: 'docs/ACCOUNT-BINDING-PLAN.md', pattern: /.+/ },
+  { group: '账号', optional: ACCOUNT_ANCHOR, label: '5 个 account 测试', files: [
     'test/account-browser-e2e.test.js', 'test/account-challenges.test.js',
     'test/account-e2e-live.test.js', 'test/account-http.test.js', 'test/account-store.test.js',
   ] },
+  { group: '账号', optional: ACCOUNT_ANCHOR, label: 'test/bot/ 账号桥接脚本', file: 'test/bot/README.md', pattern: /.+/ },
 
   // ── 未提交：其他新增 ────────────────────────────────────────
   { group: '新增', label: 'dailyChallenges.js', file: 'server/dailyChallenges.js', pattern: /.+/ },
@@ -118,10 +126,14 @@ const CHECKS = [
   { group: '新增', label: 'funReport.js', file: 'public/js/ui/funReport.js', pattern: /.+/ },
   { group: '新增', label: 'localActivities.js', file: 'public/js/ui/localActivities.js', pattern: /.+/ },
   { group: '新增', label: 'assetImport.js', file: 'public/js/ui/assetImport.js', pattern: /.+/ },
-  { group: '新增', label: 'test/bot/ 存在', file: 'test/bot/README.md', pattern: /.+/ },
 ];
 
 function runOne(c) {
+  // 条件分组：锚点文件不在本分支 → 整组跳过（不算失败）
+  if (c.optional && !existsSync(join(ROOT, c.optional))) {
+    return { skip: true, note: '未合入本分支（已提交在 local/account-binding）' };
+  }
+
   // 多文件存在性
   if (c.files) {
     const missing = c.files.filter((f) => !existsSync(join(ROOT, f)));
@@ -158,10 +170,12 @@ function runOne(c) {
 // ── 执行 ──────────────────────────────────────────────────────
 const rows = [];
 let failed = 0;
+let skipped = 0;
 
 for (const c of CHECKS) {
   const r = runOne(c);
-  if (!r.ok) failed++;
+  if (r.skip) skipped++;
+  else if (!r.ok) failed++;
   rows.push({ ...c, ...r });
 }
 
@@ -175,18 +189,22 @@ console.log('='.repeat(78));
 for (const g of groups) {
   console.log('\n【' + g + '】');
   for (const r of rows.filter((x) => x.group === g)) {
-    const mark = r.ok ? 'PASS' : 'FAIL';
+    const mark = r.skip ? 'SKIP' : r.ok ? 'PASS' : 'FAIL';
     console.log(
       `  ${mark}  ${r.label.padEnd(width)}  ${(r.file || (r.files || []).join(', '))}` +
-      (r.ok ? '' : `   ← ${r.note}`)
+      (r.skip || !r.ok ? `   ← ${r.note}` : '')
     );
   }
 }
 
 console.log('\n' + '='.repeat(78));
-console.log(`合计 ${rows.length} 项：通过 ${rows.length - failed}，失败 ${failed}`);
+console.log(`合计 ${rows.length} 项：通过 ${rows.length - failed - skipped}，跳过 ${skipped}，失败 ${failed}`);
 if (failed) {
   console.log('\n有独有资产缺失，先别提交/部署。对照 docs/1UPSTREAM-SYNC-PROMPT.md 第五节逐项修回。');
   process.exit(1);
+}
+if (skipped) {
+  console.log(`\n跳过 ${skipped} 项：账号子系统未合入当前分支（已在 local/account-binding 的 fcfdb83a 提交）。`);
+  console.log('合回账号分支后这些会逐项恢复校验；在 local/account-binding 上跑可确认它们仍在。');
 }
 console.log('\n全部保留。');
