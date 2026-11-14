@@ -42,7 +42,13 @@ const readJson = (rel) => JSON.parse(readFileSync(path.join(ROOT, rel), 'utf8'))
 const SLUGS = ['enemy_1305_mhslim', 'enemy_1305_mhslim_2'];
 const EARLIER = ['enemy_1201_sfzhi', 'enemy_1249_lysdb', 'enemy_1254_lypa', 'enemy_1275_dwlock',
   'enemy_1373_ltnhor_2', 'enemy_1376_ltndru'];
-const LOCAL_ENEMIES = [...SLUGS, ...EARLIER].sort();
+// 规程·序列Ⅰ 新增的 17 个：prefab 引用能直接命名的走 refs/arts/enm_art_30.ab，
+// 带 _2 后缀的两个只在 battle/enm_pfb_36/37.ab 的 prefab 引用里出现（extract.py 会从引用反查）。
+const LATER = ['enemy_9024_acsgnt', 'enemy_9025_aclts', 'enemy_9026_acltm', 'enemy_9027_acfnca',
+  'enemy_9028_acfncb', 'enemy_9029_acfnc', 'enemy_9029_acfnc_2', 'enemy_9030_acpara', 'enemy_9031_acrefd',
+  'enemy_9034_acblk', 'enemy_9035_acspider', 'enemy_9035_acspider_2', 'enemy_9037_aceel',
+  'enemy_9037_aceel_2', 'enemy_9038_achest', 'enemy_9039_acrefm', 'enemy_9040_accrit'];
+const LOCAL_ENEMIES = [...SLUGS, ...EARLIER, ...LATER].sort();
 const COMMITTED = readJson(LOCAL_ENEMY_SPINES_FILE).models;
 const MANIFEST = readJson('data/assets.json');
 

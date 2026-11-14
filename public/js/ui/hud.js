@@ -546,9 +546,10 @@ export function SkipButton({ onSkip, ready = true }) {
  * 显示以基准 2× 为刻度的对局剩余秒 = (游戏总时长 − 已进行游戏时间) / 2。
  * 因为读的是模拟游戏时间而非真实时钟：进场时无论已经是几倍速、中途如何切换，数字都连续不跳变，
  * 且 2× 每秒减 1、4× 每秒减 2、1× 每两秒减 1，与战斗进程严格同步、零漂移。
+ * total 返回同一刻度的总秒，交给 Countdown 的比例条：阶段自身的 total 与战斗时长不是一回事，混用会让条一直不满。
  * speed 为 null（Boss 关 / 联防 / 观战 / 休整商店 / 暂停 PAUSED 覆盖）时返回 null，交回服务器实时 deadline。
  * @param {{ show:boolean, clock?: () => ({time:number, timeLimit:number}|null) }|null} speed
- * @returns {number|null} 剩余整数秒（ceil）；null 表示不接管、沿用服务器 deadline
+ * @returns {{ secs: number, total: number }|null} 剩余整数秒（ceil）与同刻度总秒；null 表示不接管、沿用服务器 deadline
  */
 function useBattleCountdown(speed) {
   const active = !!speed?.show && typeof speed.clock === 'function';
@@ -557,7 +558,8 @@ function useBattleCountdown(speed) {
   let c = null;
   try { c = speed.clock(); } catch { c = null; }
   if (!c || !(Number(c.timeLimit) > 0)) return null;
-  return Math.max(0, Math.ceil((Number(c.timeLimit) - Number(c.time)) / BATTLE_BASE_SPEED));
+  const secs = Math.max(0, Math.ceil((Number(c.timeLimit) - Number(c.time)) / BATTLE_BASE_SPEED));
+  return { secs, total: Math.max(1, Math.ceil(Number(c.timeLimit) / BATTLE_BASE_SPEED)) };
 }
 
 /**
@@ -600,7 +602,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   const otLive = boss && Number(pub?.overtimeAt) > 0;
   useTicker(otLive && frozenAt == null ? 250 : 0);
   // 自己可控的普通战斗场：顶部是一条连续对局时钟，切倍速只改流逝速率、数字不跳变（见 useBattleCountdown）。
-  const battleSecs = useBattleCountdown(speed);
+  const battleClock = useBattleCountdown(speed);
   const now = Number.isFinite(frozenAt) ? frozenAt : serverNow();
   const ot = otLive ? overtimeState(pub, now, { perSec: overtimeDrainPerSec(config) }) : null;
   const draining = ot?.state === 'drain';
@@ -686,7 +688,9 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
             </div>` : null)
           : frozenSecs != null
             ? html`<${Countdown} seconds=${frozenSecs} total=${total ?? undefined} size="md" label="PAUSED" />`
-            : html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />`}
+            : battleClock
+              ? html`<${Countdown} seconds=${battleClock.secs} total=${battleClock.total} size="md" />`
+              : html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />`}
         ${speed?.show
           ? html`<${SpeedButton} value=${speed.value} onCycle=${speed.onCycle} />`
           : isCombatPhase(pub?.phase) && !spectator

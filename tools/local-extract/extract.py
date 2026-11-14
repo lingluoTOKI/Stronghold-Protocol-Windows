@@ -307,7 +307,15 @@ JOBS = [
 # when the group lists every file of data/assets.json enemies[id].spineLocal (whose metadata
 # tools/assets/local-enemy-spines.json keeps: `node tools/fetch-assets.mjs --local-spines` after a game update).
 ENEMY_SPINES = ['enemy_1201_sfzhi', 'enemy_1249_lysdb', 'enemy_1254_lypa', 'enemy_1275_dwlock',
-                'enemy_1305_mhslim', 'enemy_1305_mhslim_2', 'enemy_1373_ltnhor_2', 'enemy_1376_ltndru']
+                'enemy_1305_mhslim', 'enemy_1305_mhslim_2', 'enemy_1373_ltnhor_2', 'enemy_1376_ltndru',
+                # 规程·序列Ⅰ (act3autochess V3_1): the season's own enemies (90xx) plus the ones its bosses stand on
+                # (boss_11–16 → enemy_9029_acfnc/_2, enemy_9035_acspider/_2, enemy_9037_aceel/_2). No community dump
+                # carries them either; coverage reports both the enemy `model` and the boss `model` out of one extract.
+                'enemy_9024_acsgnt', 'enemy_9025_aclts', 'enemy_9026_acltm', 'enemy_9027_acfnca',
+                'enemy_9028_acfncb', 'enemy_9029_acfnc', 'enemy_9029_acfnc_2', 'enemy_9030_acpara',
+                'enemy_9031_acrefd', 'enemy_9034_acblk', 'enemy_9035_acspider', 'enemy_9035_acspider_2',
+                'enemy_9037_aceel', 'enemy_9037_aceel_2', 'enemy_9038_achest', 'enemy_9039_acrefm',
+                'enemy_9040_accrit']
 ENEMY_ART = 'refs/arts/enm_art_*.ab'
 ENEMY_SPINE_SUB = 'spine/enemy'
 
@@ -336,6 +344,9 @@ TOKEN_SPINES = [
     'token_10057_svash2_eagle1', 'token_10057_svash2_eagle2', 'token_10057_svash2_eagle3', 'token_10059_nasti_nstdef',
     'token_10060_nasti_nstchr', 'token_10061_nasti_nstbld', 'token_10064_wang_stone1', 'token_10066_closur_ourbase',
     'token_10068_kalts2_mtship', 'token_10069_mcnist_mcgraf', 'token_10070_aphris_pc',
+    # 规程·序列Ⅰ (act3autochess V3_1): the two summons whose battle prefab draws its own Spine and that neither
+    # community dump carries (coverage's `model` gap); the rest of the season's summons draw an effect or a diamond.
+    'token_10018_robrta_mach', 'token_10037_mitm_trshrb',
 ]
 TOKEN_PACKS = 'pkgrps/btl_pfb_tokens_*.ab'
 TOKEN_SPINE_SUB = 'spine/token'

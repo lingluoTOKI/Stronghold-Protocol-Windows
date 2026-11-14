@@ -66,7 +66,11 @@ for cid,c in chars.items():
 for file in list((out/'official-skins').rglob('*')):
  if not file.is_file():continue
  if file.suffix=='.atlas':file.write_text(file.read_text(encoding='utf-8').replace('#','_'),encoding='utf-8')
- if '#' in file.name:file.rename(file.with_name(file.name.replace('#','_')))
+ if '#' in file.name:
+  dest=file.with_name(file.name.replace('#','_'))
+  # Windows os.rename refuses an existing target: a re-run finds the previous run's already-renamed copy (same bytes).
+  if dest.exists():dest.unlink()
+  file.rename(dest)
 def clean_urls(v):
  if isinstance(v,str) and v.startswith('/assets/'):return v.replace('#','_')
  if isinstance(v,dict):return {k:clean_urls(x) for k,x in v.items()}

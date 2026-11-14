@@ -134,6 +134,14 @@ export class MatchProxy {
    */
   acceptAiHandover(botId, name) { return this._request('acceptAiHandover', [botId, name]); }
   setLoadout(playerId, loadout, ops) { return this._request('setLoadout', [playerId, loadout, ops]); }
+  /**
+   * Match half of 干员皮肤 (docs/SKINS.md): any phase, no gate — a skin is cosmetic and public, so the running match takes
+   * it at once (Match.setSkins / PlayerState.setSkins). Without this line the lobby's `typeof match.setSkins !== 'function'`
+   * guard falls through to ROOM_STARTED ('stored for the next match') and the client shows 「这台服务器不接受皮肤选择」.
+   * @param {string} playerId @param {Record<string, string>|null} skins
+   * @returns {Promise<{ ok?: boolean, error?: string, detail?: string }>}
+   */
+  setSkins(playerId, skins) { return this._request('setSkins', [playerId, skins]); }
   requestSetupReroll(playerId, revision) { return this._request('requestSetupReroll', [playerId, revision]); }
   cancelSetupReroll(playerId, voteId) { return this._request('cancelSetupReroll', [playerId, voteId]); }
   onDisconnect(playerId) { this._notify('onDisconnect', [playerId]); }
