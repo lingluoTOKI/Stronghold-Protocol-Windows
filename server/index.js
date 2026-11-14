@@ -1,3 +1,5 @@
+import { clientAddress } from './net.js';
+import { createAccounts } from './accounts/http.js';
 import { openRecoveryStore } from './recovery/store.js';
 import { createRecoveryService, recoveryCompatibility } from './recovery/service.js';
 // server/index.js — process entry & boot (DESIGN §1, §2). Plain node:http + ws, no framework: startServer() below
@@ -260,7 +262,18 @@ export async function startServer(opts = {}) {
   })();
 
   const traffic = createTrafficCounter();
-  const server = http.createServer(createRequestHandler({
+  const accounts = process.env.SP_ACCOUNT_DB ? createAccounts({
+    file: process.env.SP_ACCOUNT_DB, realm: '3000', origin: process.env.SP_ACCOUNT_ORIGIN,
+    bridgeKey: process.env.SP_ACCOUNT_BRIDGE_KEY, namespace: process.env.SP_ACCOUNT_BOT_NAMESPACE,
+    address: req => clientAddress(req, network.opts.trustProxy).key,
+    board: dailyBoard, registry,
+  }) : null;
+  const previousSessionHook = network.sessionHook;
+  if (accounts) network.sessionHook = (session, req) => {
+    previousSessionHook?.(session, req);
+    accounts.bindSession(session, req).catch(() => {});
+  };
+  const server = http.createServer(createRequestHandler({ accounts,
     serveStatic,
     csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir),
     health: { startedAt, network, registry, lobby, content, traffic, assetIndex, views, trusted: trustedRuntime?.health, versions, versionHosts },
@@ -347,6 +360,7 @@ export async function startServer(opts = {}) {
       eventLoop?.close();
       network.close();
       await dailyBoard?.flush();
+      await accounts?.close();
       assetIndex?.close();
       studio?.close();
       await trustedRuntime?.close();
