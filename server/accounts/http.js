@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { N_ } from '../../shared/i18n.js';
 import { createAccountStore } from './client.js';
 import { createAccountChallenges } from './challenges.js';
 
@@ -117,7 +118,7 @@ export function createAccounts({ file, realm, origin, bridgeKey, namespace, boar
           // Profile fields stay in the private cookie. They are validated again by the store.
           const value = Buffer.from(JSON.stringify({ ...challenge, qq:data.qq,nickname:data.nickname })).toString('base64url');
           setCookie(res,pendingCookie,value,300);
-          return send({ code:challenge.code, command:`绑定游戏 ${realm} ${challenge.code}`, expires:challenge.expires });
+          return send({ code:challenge.code, command:`${N_('绑定游戏')} ${realm} ${challenge.code}`, expires:challenge.expires });
         }
         if (key === 'status' || key === 'confirm') {
           const pending = JSON.parse(Buffer.from(cookies(req)[pendingCookie] || '', 'base64url').toString());

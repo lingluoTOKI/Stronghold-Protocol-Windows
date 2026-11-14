@@ -145,7 +145,7 @@ export function GameAccountButton({ plain = false, label = null, class: cls = ''
       setMessage(t('授权码已复制到剪贴板，直接到群里粘贴发送'));
       // 居中 toast 弹窗，2秒后消失
       const toast = document.createElement('div');
-      toast.innerHTML = '<span style="margin-right:6px;">✓</span>授权码已复制到剪贴板';
+      toast.innerHTML = `<span style="margin-right:6px;">✓</span>${t('授权码已复制到剪贴板')}`;
       toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-20px);background:rgba(20,32,30,.92);backdrop-filter:blur(8px);color:#4ed8af;padding:10px 20px;border-radius:20px;font-size:13px;z-index:99999;border:1px solid rgba(78,216,175,.3);box-shadow:0 4px 20px rgba(0,0,0,.4);opacity:0;transition:all .3s ease;pointer-events:none;white-space:nowrap;';
       document.body.appendChild(toast);
       requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(-50%) translateY(0)'; });

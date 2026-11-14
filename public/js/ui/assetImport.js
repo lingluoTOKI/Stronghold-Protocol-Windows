@@ -177,6 +177,7 @@ export function AssetImportPanel() {
 
   return html`<section class="asset-import-dialog">
       <p class="t-lo">${t('从素材包 zip、完整包 zip 或自己的 public/assets 文件夹导入。只收下和服务器清单哈希一致的文件，不上传任何内容。')}</p>
+      <p class="t-lo">${t('素材包在游戏交流群 1104628970 的群文件，读取本机 zip，美术不占服务器流量。')}</p>
       <p class="t-lo">${t('导入只从服务器读取素材清单，美术文件不走网络；没有导入的素材仍在用到时从服务器加载。')}</p>
       ${support.ok ? html`
         <div class="asset-import__row">
