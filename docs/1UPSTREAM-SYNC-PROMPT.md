@@ -346,6 +346,18 @@
 #### 实施顺序建议（2026-11-14 维护者决定：账号系统走独立分支）
 
 > **前提说明**：`sync/upstream-20261025` 上已经有两个**已推送**的提交（`718ee7f4` 账号 UI + `http.js`、`eac47d28` 移除统计按钮）。所以「让 sync 分支保持干净」只能做到**不再往它上面加新的账号提交**——已有的半成品已经进了它的历史，除非 force push 改写历史（不做）。
+>
+> **阶段一已完成（2026-11-14）**：
+> | 内容 | 落点 | 提交 | 状态 |
+> |---|---|---|---|
+> | 账号系统补齐（4 模块 + 5 测试 + `test/bot` + `index.js` 接线 + PLAN） | `local/account-binding` | `fcfdb83a` | 已推送 |
+> | 每日挑战积分、在线人数修复、监控页、i18n、同步文档 | `sync/upstream-20261025` | `7b99223f` | 已推送 |
+> | 校验器支持账号组条件跳过 | `sync/upstream-20261025` | `2b7a41d1` | 已推送 |
+> | 落袋标记 | tag `pre-merge-0.3.4` | → `2b7a41d1` | 已推送 |
+>
+> 校验器现状：`sync` 分支 47 PASS + 8 SKIP（账号组）0 FAIL；`local/account-binding` 55 全绿。工作区已跟踪文件干净。
+>
+> **遗留（不阻塞 merge，但要知道）**：`sync` 分支上的 `server/accounts/http.js`（`718ee7f4` 带进来的）仍缺 `client.js`/`challenges.js`。因为 `server/index.js` 未接线（且接线本身用 `SP_ACCOUNT_DB` 默认关闭），服务器照常能起、`healthz` 200。这个断链会在第 8 步合回 `local/account-binding` 后自然补齐。
 
 1. **从当前 HEAD 切出 `local/account-binding`**，把剩下的账号代码整体提交上去：
    `server/accounts/{challenges,client,store,worker}.js`、`server/index.js` 的 `createAccounts` 接线、`docs/ACCOUNT-BINDING-PLAN.md`、`test/account-*.test.js` ×5、`test/bot/` ×4。
