@@ -8,6 +8,7 @@ import { MedalBoard } from './medalBoard.js';
 import { ChallengeMedal } from './challengeMedal.js';
 import { ChallengeIdentity } from './challengeIdentity.js';
 import { CovenantRequirement } from './covenantRequirement.js';
+import { scoreText } from '../../../shared/constants.js';
 const LEVELS = [N_('基础挑战'), N_('进阶挑战'), N_('高阶挑战')];
 export function DailyActivities() {
   const [showBoard, setShowBoard] = useState(false);
@@ -51,10 +52,10 @@ export function DailyActivities() {
       <${Button} class="medal-showcase-entry" variant="secondary" aria-haspopup="dialog" onClick=${() => setShowBoard(true)}>${t('奖章背景板')}<//>
     </div>
     ${showBoard ? html`<${MedalBoard} data=${collection} division=${division} daily=${true} failed=${failed} onClose=${() => setShowBoard(false)} />` : null}
-    <p><strong>${t('入榜要求：终极模拟、官方 1 倍首领血量、全程无 AI 队友及 AI 托管。')}</strong></p>
+    <p><strong>${t('入榜要求：终极模拟、首领血量 1× 或 3.25×（3.25× 每项目标记 3.25 分）、全程无 AI 队友及 AI 托管。')}</strong></p>
     <div class="permanent-tools"><details class="medal-preview"><summary>${t('获得规则与计次说明')}</summary>
-      <p>${t('积分长期累计，每天每项目标首次完成加 1 分，每榜每天最多 3 分；七天轮换重复后仍可获取新一天的积分。单人、多人分榜，同分并列。')}</p>
-      <p>${t('21 个目标分成七天，每天三项，周内目标不重复，第八天重复第一天。每项 1 分，每榜每天最多 3 分，同分并列。')}</p>
+      <p>${t('积分长期累计，每天每项目标首次完成加 1 分；3.25 倍首领血量的对局该项记 3.25 分，每榜每天最多 9.75 分。七天轮换重复后仍可获取新一天的积分。单人、多人分榜，同分并列。')}</p>
+      <p>${t('21 个目标分成七天，每天三项，周内目标不重复，第八天重复第一天。每项 1 分（3.25 倍记 3.25 分），同分并列。')}</p>
       <p>${t('单人榜仅收独立模拟；多人榜仅收开局 2–6 名真人的同盟模拟。开局人数决定分组，不按结算剩余人数改组。')}</p>
       <p>${t('任意队友开启过 AI 托管，整局不计分，关闭托管也不恢复资格；普通掉线重连不会直接取消资格。')}</p>
       <p>${t('开局锁定当天目标，跨零点仍计入开局日期；超过 8 天的对局不补入已清理的日榜。已获得的每日章永久收藏。')}</p>
@@ -69,8 +70,8 @@ export function DailyActivities() {
       <h3>${t(c.name)}</h3><p>${t(c.goal)}</p><${CovenantRequirement} covenant=${c.covenant} />
       <strong class="local-activities__state">${completed.has(c.id) ? t('已完成') : t('待挑战')}</strong>
     </article>`)}</div>
-    <p>${t('本榜累计积分：{n}', { n: board?.self?.totalPoints || 0 })}</p>
-    <p>${t('本榜今日积分：{n} / 3', { n: board?.self?.points || 0 })} ${completed.size === 3 ? '✓' : ''}</p>
+    <p>${t('本榜累计积分：{n}', { n: scoreText(board?.self?.totalPoints) })}</p>
+    <p>${t('本榜今日积分：{n} 分（{done}/3 个目标）', { n: scoreText(board?.self?.points), done: completed.size })} ${completed.size === 3 ? '✓' : ''}</p>
     ${board?.preview ? html`<details class="medal-preview"><summary>${t('未来七天目标')}</summary>${board.preview.map(p => html`<p key=${p.day}><strong>${p.day}</strong> · ${p.challenges.map(c => `${t(c.name)}${c.covenant ? ' · ' + tName(c.covenant.bondName) : ''}`).join(' / ')}</p>`)}</details>` : null}
     <details class="medal-preview" onToggle=${e => setShowCollection(e.currentTarget.open)}><summary>${t('每日章收藏')}</summary>
       ${showCollection && collection?.legacyDaily?.[division]?.collection ? html`<div class="daily-collection"><${ChallengeMedal} kind="legacy-collection" earned=${true} label=${t('协约履行章')} /><p>${t('协约履行章')} · ${t('旧章')} · ${t('已获得')}</p></div>` : null}
@@ -83,7 +84,7 @@ export function DailyActivities() {
     <${Button} variant="secondary" onClick=${() => setRanking(v => !v)}>${ranking ? t('收起排行榜') : t('查看排行榜')}<//>
     ${ranking ? html`<${Button} variant="secondary" disabled=${now - lastRefresh < 15000} onClick=${refresh}>${t('刷新榜单')}<//>
       <p>${t('本服累计榜 · 展示前 100 条，个人名次单独显示 · 同分并列')}</p>
-      ${board?.self?.rank ? html`<p>${t('我的名次：{rank} · 积分：{points}', { rank: board.self.rank, points: board.self.totalPoints || 0 })}</p>` : null}
-      ${board?.rows?.length ? html`<table><thead><tr><th>${t('名次')}</th><th>${t('博士代号')}</th><th>${t('积分')}</th></tr></thead><tbody>${board.rows.map((r,i) => html`<tr key=${i} class=${r.mine ? 'is-self' : ''}><td>${r.rank}</td><td>${r.name}</td><td>${r.points}</td></tr>`)}</tbody></table>` : html`<p>${t('暂无累计积分记录。')}</p>`}` : null}
+      ${board?.self?.rank ? html`<p>${t('我的名次：{rank} · 积分：{points}', { rank: board.self.rank, points: scoreText(board.self.totalPoints) })}</p>` : null}
+      ${board?.rows?.length ? html`<table><thead><tr><th>${t('名次')}</th><th>${t('博士代号')}</th><th>${t('积分')}</th></tr></thead><tbody>${board.rows.map((r,i) => html`<tr key=${i} class=${r.mine ? 'is-self' : ''}><td>${r.rank}</td><td>${r.name}</td><td>${scoreText(r.points)}</td></tr>`)}</tbody></table>` : html`<p>${t('暂无累计积分记录。')}</p>`}` : null}
   </section></div>`;
 }

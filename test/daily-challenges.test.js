@@ -53,7 +53,7 @@ test('server-owned settlements award each challenge only once, ties share rank',
   award(f, settlement(['a', 'b']));
   award(f, settlement(['a', 'b']));
   await f.board.flush();
-  assert.deepEqual(f.board.snapshot('coop').rows.map(r => [r.rank, r.points]), [[1, 3], [1, 3]]);
+  assert.deepEqual(f.board.snapshot('coop').rows.map(r => [r.rank, r.points]), [[1, 300], [1, 300]]);
   assert.equal(f.board.snapshot('solo').rows.length, 0);
   const persisted = await fs.readFile(f.file, 'utf8');
   assert.ok(!persisted.includes(f.sessions.get('a').token), 'never persist reconnect tokens');
@@ -64,7 +64,7 @@ test('same browser cookie survives restart and multiple sessions cannot create e
   assert.equal(f.board.snapshot('coop').rows.length, 1);
   const reopened = await createDailyChallengeBoard({ file: f.file, now: () => time });
   const res = response();await reopened.handle({ method: 'GET', url: '/?division=coop', headers: { cookie } }, res, f.registry);
-  assert.equal(JSON.parse(res.body).self.points, 3);
+  assert.equal(JSON.parse(res.body).self.points, 300);
   assert.equal(res.headers['Set-Cookie'], undefined);
 });
 test('training, funny, test, modded, bot, left and spectator rows cannot score', async t => {
@@ -90,28 +90,73 @@ test('corrupt primary recovers its backup; two corrupt copies fail closed', asyn
   await fs.writeFile(f.file, 'corrupt');
   const recovered = await createDailyChallengeBoard({ file: f.file, now: () => time, log: { error() {} } });
   assert.equal(recovered.snapshot().ok, true);
-  assert.equal(recovered.snapshot().rows[0].points, 3);
+  assert.equal(recovered.snapshot().rows[0].points, 300);
   await fs.writeFile(f.file, 'corrupt');await fs.writeFile(f.file + '.backup', 'corrupt');
   const board = await createDailyChallengeBoard({ file: f.file, now: () => time, log: { error() {} } });
   assert.equal(board.snapshot().ok, false);
   assert.equal(await fs.readFile(f.file, 'utf8'), 'corrupt');
 });
 
-test('solo and multiplayer scores and medals stay separate; fixed profile rejects AI, non-1x and missing proof', async t => {
+test('solo and multiplayer scores and medals stay separate; fixed profile rejects AI, unsupported boss hp and missing proof', async t => {
   const f = await fixture(t);await f.bind('a');await f.bind('b');
-  for (const extra of [{ bossHp: 3.25 }, { usedAI: true }, { mode: 'coop' }, { mode: 'unknown' }, { difficulty: 'NORMAL' }]) {
+  // 3.25× 自 2026-11-01 起按倍率计分，所以只有白名单外的挡位才被拒。
+  for (const extra of [{ bossHp: 5 }, { usedAI: true }, { mode: 'coop' }, { mode: 'unknown' }, { difficulty: 'NORMAL' }]) {
     award(f, settlement(['a']), f.room, extra);
   }
   f.board.record(f.room, settlement(['a']), f.registry);
   assert.equal(f.board.snapshot('solo').rows.length, 0);
   award(f, settlement(['a']));await f.board.flush();
-  assert.equal(f.board.snapshot('solo').rows[0].points, 3);
+  assert.equal(f.board.snapshot('solo').rows[0].points, 300);
   assert.equal(f.board.snapshot('coop').rows.length, 0);
   award(f, settlement(['a', 'b']));await f.board.flush();
-  assert.equal(f.board.snapshot('solo').rows[0].points, 3);
+  assert.equal(f.board.snapshot('solo').rows[0].points, 300);
   assert.equal(f.board.snapshot('coop').rows.length, 2);
   const bad = response();await f.board.handle({ method: 'GET', url: '/?division=invalid', headers: {} }, bad, f.registry);
   assert.equal(bad.statusCode, 400);
+});
+
+test('3.25x boss hp pays 3.25 per target and shares the same cumulative board as 1x', async t => {
+  const f = await fixture(t);const cookie = await f.bind('a');await f.bind('b');
+  // snapshot() 不带 cookie 时 self 恒为 null，这里走带身份的读取拿今日/累计分
+  const self = async () => {
+    const res = response();
+    await f.board.handle({ method: 'GET', headers: { cookie } }, res, f.registry);
+    return JSON.parse(res.body).self;
+  };
+  // 3.25× 一局：首日 3 个基础目标全过 → 3 × 3.25 分 = 975
+  award(f, settlement(['a']), f.room, { bossHp: 3.25 });await f.board.flush();
+  const first = await self();
+  assert.deepEqual([first.points, first.totalPoints], [975, 975]);
+  // 同一天再用 3.25× 打同一批目标：已完成的目标不重复加分
+  award(f, settlement(['a']), f.room, { bossHp: 3.25 });await f.board.flush();
+  assert.equal((await self()).totalPoints, 975, 'repeat completions never re-score');
+  // 次日轮换取到 Y1，settlement 只满足其中 1 个目标；1× 仍按每目标 1 分
+  f.setTime(time + 86400000);
+  award(f, settlement(['a']));await f.board.flush();
+  const after = await self();
+  assert.equal(after.points, 100, '1x still pays 1 per target');
+  assert.equal(after.totalPoints, 1075, 'both weights accumulate on one board');
+  // 1× 玩家与高倍玩家同榜按加权分排名
+  award(f, settlement(['b']));await f.board.flush();
+  assert.deepEqual(f.board.snapshot('solo').rows.map(r => [r.rank, r.points]), [[1, 1075], [2, 100]]);
+});
+
+test('v3 score store migrates once to the weighted scale and keeps old points', async t => {
+  const f = await fixture(t);await f.bind('a');award(f, settlement(['a']));await f.board.flush();
+  const prior = JSON.parse(await fs.readFile(f.file, 'utf8'));
+  // 构造一份 v3 存档：积分是「目标个数」，日榜没有加权分字段
+  prior.version = 3;
+  for (const rows of Object.values(prior.totals)) for (const row of Object.values(rows)) row.points = 3;
+  for (const divisions of Object.values(prior.days)) for (const rows of Object.values(divisions)) for (const row of Object.values(rows)) delete row.w;
+  await fs.writeFile(f.file, JSON.stringify(prior));
+  const migrated = await createDailyChallengeBoard({ file: f.file, now: () => time });
+  const saved = JSON.parse(await fs.readFile(f.file, 'utf8'));
+  assert.equal(saved.version, 4);
+  const totalRows = Object.values(saved.totals).flatMap(r => Object.values(r));
+  assert.deepEqual(totalRows.map(r => r.points), [300], 'v3 counts become the 1/100 point scale');
+  const dayRows = Object.values(saved.days).flatMap(d => Object.values(d)).flatMap(r => Object.values(r));
+  assert.equal(dayRows[0].w, 300, 'daily receipts gain the weighted field');
+  assert.equal(migrated.snapshot('solo').rows[0].points, 300);
 });
 
 test('real match keeps AI usage latched after autoplay is disabled; ordinary reconnect does not mark AI', t => {
@@ -144,7 +189,7 @@ test('daily boundary retains cumulative scores while trimming daily history', as
   f.setTime(time + 86400000);
   assert.equal(f.board.snapshot().rows[0].points, initialPoints);
   award(f, settlement(['a']));await f.board.flush();
-  assert.equal(f.board.snapshot().rows[0].points, initialPoints + 1, 'new day adds points to the cumulative board');
+  assert.equal(f.board.snapshot().rows[0].points, initialPoints + 100, 'new day adds points to the cumulative board');
   f.setTime(time + 9 * 86400000);
   award(f, settlement(['a']));await f.board.flush();
   const saved = JSON.parse(await fs.readFile(f.file, 'utf8'));
@@ -196,7 +241,7 @@ test('adding permanent schema preserves existing daily scores and signing identi
   await fs.writeFile(f.file, JSON.stringify(prior));
   const migrated = await createDailyChallengeBoard({ file: f.file, now: () => time });
   const daily = response();await migrated.handle({ method: 'GET', headers: { cookie } }, daily, f.registry);
-  assert.equal(JSON.parse(daily.body).self.points, 3);assert.equal(daily.headers['Set-Cookie'], undefined);
+  assert.equal(JSON.parse(daily.body).self.points, 300);assert.equal(daily.headers['Set-Cookie'], undefined);
   const collection = response();migrated.collection({ method: 'GET', headers: { cookie } }, collection, f.registry);
   assert.deepEqual(JSON.parse(collection.body).unlocked, { solo: {}, coop: {} });
   assert.equal(JSON.parse(await fs.readFile(f.file, 'utf8')).secret, prior.secret);
@@ -210,7 +255,7 @@ test('counter milestones separate divisions, unlock exactly at 10 and keep the f
     f.setTime(time + i * 1000);const run = settlement(['a']);run.players[0].stats.leaks = 0;
     const added = award(f, run);
     assert.deepEqual(added.a?.map(a => a.id) || [], i === 10 ? ['flawless-clear', 'hidden-core'] : i === 9 ? ['clear-ten'] : []);
-    assert.equal(f.board.snapshot().rows[0].points, 3, 'permanent progress never adds daily points');
+    assert.equal(f.board.snapshot().rows[0].points, 300, 'permanent progress never adds daily points');
   }
   const coop = award(f, settlement(['a', 'b']));assert.equal(coop.a.length, 1);
   const res = response();f.board.collection({ method: 'GET', headers: { cookie } }, res, f.registry);
@@ -241,7 +286,7 @@ test('designated covenant clears count the player’s active final tier only, an
 
 test('permanent counters reject ineligible profiles and never borrow another player’s covenant', async t => {
   const f = await fixture(t);const cookie = await f.bind('a');await f.bind('b');
-  for (const extra of [{ usedAI: true }, { bossHp: 3.25 }, { runId: 'client' }, { mode: 'coop' },
+  for (const extra of [{ usedAI: true }, { bossHp: 5 }, { runId: 'client' }, { mode: 'coop' },
     { participants: [{ playerId: 'a', isBot: true }] }]) award(f, settlement(['a']), f.room, extra);
   const before = response();f.board.collection({ method: 'GET', headers: { cookie } }, before, f.registry);
   assert.deepEqual(JSON.parse(before.body).progress, { solo: {}, coop: {} });
@@ -317,7 +362,7 @@ test('real HTTP and lobby settlement hook: only server results score; POST is re
     server.lobby.onMatchEnd(room, ctx, settlement([welcome.playerId]));
   } finally { server.lobby.disposeMatchCtx = originalDispose;server.lobby.disposeRoom = originalRoomDispose; }
   const board = await (await fetch(url, { headers: { cookie } })).json();
-  assert.equal(board.self.points, 3);
+  assert.equal(board.self.points, 300);
   assert.equal(board.rows.length, 1);
   assert.equal(board.rows[0].name, 'DailyDoctor');
   const exportResponse = await fetch(url + '/identity', { headers: { cookie } });
@@ -328,7 +373,7 @@ test('real HTTP and lobby settlement hook: only server results score; POST is re
   assert.equal(restored.status, 200);
   const restoredCookie = restored.headers.get('set-cookie').split(';')[0];
   const recovered = await (await fetch(url, { headers: { cookie: restoredCookie } })).json();
-  assert.equal(recovered.self.points, 3);
+  assert.equal(recovered.self.points, 300);
   const collection = await (await fetch(server.url + '/api/achievements', { headers: { cookie: restoredCookie } })).json();
   assert.deepEqual(Object.keys(collection.unlocked.solo), ['ultimate-clear']);
   assert.equal(collection.progress.solo['hidden-core'], 1);
@@ -397,7 +442,7 @@ test('rules-3 migration preserves identity, scores, dates, unfinished counts, de
   assert.equal(after.progress['clear-ten'],5);assert.equal(after.progress['clear-thirty'],5);
   assert.equal(after.progress['bond-yan-nine'], undefined);assert.ok(after.daily.victory);assert.equal(after.legacyDaily.collection, '2026-10-20');
   const res = response();await migrated.handle({ method:'GET',headers:{cookie} },res,f.registry);
-  assert.equal(JSON.parse(res.body).self.points,3);
+  assert.equal(JSON.parse(res.body).self.points,300);
   assert.deepEqual(JSON.parse(await fs.readFile(f.file + '.pre-rotation','utf8')),old);
   const reopened = await createDailyChallengeBoard({ file:f.file, now:()=>time });await reopened.flush();
   assert.deepEqual(JSON.parse(await fs.readFile(f.file,'utf8')),next,'migration is idempotent');
@@ -410,7 +455,7 @@ test('cross-midnight settlement uses server start day, stores daily medals and t
   const saved = JSON.parse(await fs.readFile(f.file,'utf8'));
   assert.equal(Object.keys(saved.days)[0], '2026-10-21');
   assert.equal(Object.values(saved.days['2026-10-21'].solo)[0].completed.length,3);
-  assert.equal(f.board.snapshot().rows[0].points,3, 'cross-midnight points remain on the cumulative board');
+  assert.equal(f.board.snapshot().rows[0].points,300, 'cross-midnight points remain on the cumulative board');
   assert.ok(Object.values(saved.achievements)[0].solo.daily['core-yanShip']);
   const res=response();await f.board.handle({ method:'GET',url:'/?ranking=0',headers:{cookie} },res,f.registry);
   const body=JSON.parse(res.body);assert.deepEqual(body.rows,[]);assert.equal(body.preview.length,7);

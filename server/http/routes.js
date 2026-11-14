@@ -73,7 +73,14 @@ export function healthReport({ startedAt, network, registry, lobby, content = nu
     // it has, when it has some (a page's title screen says so; P1a)
     ...(lobby?.recovery ? { recovery: { enabled: true, pending: lobby.recovery.status().pending, failures: lobby.recovery.status().failures.length } } : {}),
     ...(content ? { content: { vanilla: content.cs, sets: contentSets(lobby), ...pluginCount(lobby) } } : {}),
-    sockets: network.connectionCount, sessions: registry.size, ...lobby.stats(),
+    sockets: network.connectionCount, sessions: registry.size,
+    ...(() => {
+      const s = lobby.stats();
+      // 大厅（未进房）也算真人：此前只统计房内座位，大屏会出现「8 人在线 / 0 真人」。
+      let lobbyHumans = 0;
+      try { for (const sess of registry.byPlayerId.values()) if (sess.connected && !sess.roomCode) lobbyHumans++; } catch { /* 统计失败按房内人数 */ }
+      return { ...s, humans: s.humans + lobbyHumans, lobbyHumans };
+    })(),
   };
   if (trusted && Object.keys(trusted).length) report.plugins = trusted;
   // the official versions (DESIGN §35.23): only when another one than 第二期下半 is enabled
@@ -103,12 +110,19 @@ const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.tes
  *   plugin studio (server/studio/index.js), or none
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null, announcements = null, announcePublish = null, announceClear = null, proxy = null, dailyBoard = null }) {
+export function createRequestHandler({ accounts = null, serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null, announcements = null, announcePublish = null, announceClear = null, proxy = null, dailyBoard = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
     const parts = splitUrl(url);
     if (!parts) { sendError(req, res, 400, '请求地址无效 · Bad request'); return; }
+    if (parts.rawPath.startsWith('/api/account/')) {
+      if (proxy) { proxy.proxyHttp(req, res); return; }
+      if (accounts) { await accounts.handle(req, res, parts.rawPath); return; }
+      res.setHeader('Cache-Control', 'no-store');
+      sendJson(req, res, 503, { enabled: false, error: 'ACCOUNTS_DISABLED' });
+      return;
+    }
     if (parts.rawPath === '/api/daily-challenges/identity') {
       if (proxy) { proxy.proxyHttp(req, res);return; }
       if (dailyBoard) { await dailyBoard.identity(req, res, health.registry);return; }
@@ -143,6 +157,8 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
 
     if (parts.rawPath === '/api/admin/players') {
       if (!adminAuthorized()) { sendError(req, res, 403, '拒绝 · Forbidden'); return; }
+      let accountStatus = new Map();
+      if (accounts) { try { accountStatus = await accounts.monitor([...health.registry.byPlayerId.values()]); } catch { /* keep game monitoring available */ } }
       const inMatchByCode = new Map();
       for (const [code, r] of health.lobby.rooms) inMatchByCode.set(code, !!r.match);
       const list = [];
@@ -150,6 +166,7 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
         if (!s.connected) continue;
         list.push({
           playerId: s.playerId, name: s.name, roomCode: s.roomCode || null,
+          account: accountStatus.get(s.gameAccountId) || null,
           inMatch: s.roomCode ? !!inMatchByCode.get(s.roomCode) : false,
           addr: s.addr || '?', lastSeenAgoSec: s.lastSeen ? Math.round((Date.now() - s.lastSeen) / 1000) : null,
         });

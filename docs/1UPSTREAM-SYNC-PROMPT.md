@@ -1,6 +1,13 @@
 # 上游同步提示词（每次上游更新时，把本文件全文发给 AI）
 
-> **2026-10-20 基线补充**：主项目已在 `sync/upstream-20261020` 合入上游 `c9d804f470b8d7422ae04eb66faf671cef21ad52`（相对 `d905c146` 补齐 8 个提交）。本次只更新安装检查与跨平台工具/测试；唯一冲突 `tools/local-extract/fx.py` 保留本地已兼容旧 Python 的日志预计算写法。版本字段仍为 0.3.1。详情及验证见 [SYNC-20261020.md](SYNC-20261020.md)；下方 10月18日快照为历史记录。此次发布已获维护者明确授权提交 GitHub、部署及必要时重启。
+> **2026-11-14 基线补充（本次核对结论，务必先读）**：本文件已按本地实际状态全面校正，旧版的「上游 master / 日常分支 `clean/vanilla-0.2.3-plus` / 基线 0.3.1」全部作废。
+>
+> - 当前活跃分支是 `sync/upstream-20261025`（本地 HEAD，`package.json` = **0.3.3**）；`clean/vanilla-0.2.3-plus` 已落后它 **531 个提交**，不要再去 checkout 那个分支。
+> - 上游**必须拉 `dev`，不是 `master`**：`master`（`f07b8965`，0.3.3 hotfix）不含任何第三期内容；`dev`（`fb55b8c0`）比 master 多 **380 个提交**，正是「卫戍协议·规程·序列Ⅰ」的全部实现。拉 master 会一条都拿不到。
+> - 冲突面已重算：本地改动 **331** 个文件、上游改动 **817** 个文件，**双方都动过 103 个**（旧文档的「41 个交叠 / 14 个真冲突」是 0.3.0→0.3.1 的旧数据）。分级清单见「附：当前基线快照」。
+> - 动手前有**两个硬阻塞**：① 工作区有 **144 个未提交改动**，其中 `server/accounts/**` 整套账号绑定子系统尚未入库，直接 merge 会被踩掉；② `.playwright-cli/`、`output/`、`data/assets.json` **实际并不在 `.gitignore` 里**（旧文档说在，是错的）。
+>
+> 原来的 10 月 18 日快照已降级为「附：当前基线快照」的第四节历史记录，不要再按它判断当前状态。
 
 > 用途：官服上游 `sganggs/Stronghold-Protocol` 发布新版本后，让 AI 把上游更新**完整同步**进本改编版，同时**一个不丢地保留**下列独有功能。直接复制下方分隔线之间的内容发送即可。
 >
@@ -11,7 +18,7 @@
 > 4. **附四：服务器架构速记** —— `/opt` 运维层、重连窗口、**插件 vs 房间设置**、
 >    **带宽 / gzip / `/data/` 长缓存**、素材包守卫
 >
-> 最后更新：2026-10-18（同步上游 0.3.1 之后，另加当天的带宽治理、素材守卫与机变界面修复）。服务器运维的完整交接见仓库外的 `交接文档-卫戍协议服务器.md`。
+> 最后更新：**2026-11-14**（按本地实测校正上游分支、当前基线与冲突面；上一次实质同步是 2026-10-25 合入 0.3.3）。服务器运维的完整交接见仓库外的 `交接文档-卫戍协议服务器.md`。
 >
 > **如果只想知道「最近改了什么」，直接跳到「附四」** —— 那里有当天的全部结论：gzip 省 90%、
 > `/data/` 加 `?v=` 长缓存、BGM 启动时强制关、公告轮询 60 秒、没导入素材不让建房、
@@ -27,15 +34,26 @@
 我在维护《卫戍协议：盟约》（明日方舟同人网页联机自走棋，Node 原生 http/WebSocket + Preact + PixiJS/Spine/three.js）的**个人改编版**。现在官服上游发布了新版本，请你帮我把上游更新同步进来，要求如下。
 
 **仓库与路径**
-- 改编版工作目录（就在这里改）：`F:\github\Stronghold-Protocol\sp-clean-Stronghold-Protocol`，日常分支 `clean/vanilla-0.2.3-plus`（**不要直接在它上面动**，见执行流程第 2 步）
-- 官服上游：`https://github.com/sganggs/Stronghold-Protocol`（master 分支）
+- 改编版工作目录（就在这里改）：`F:\github\Stronghold-Protocol\sp-clean-Stronghold-Protocol`，**当前活跃分支 `sync/upstream-20261025`**（`package.json` = 0.3.3；`clean/vanilla-0.2.3-plus` 已落后 531 个提交，是 0.2.3 时代的分支，别用）。**不要直接在活跃分支上动**，见执行流程第 2 步。
+- 官服上游：`https://github.com/sganggs/Stronghold-Protocol`，**`dev` 分支**（`master` 是 0.3.3 hotfix，不含第三期；`dev` 领先 master 380 个提交，是本文件的同步目标）。
 - 我的远程 origin：`https://github.com/lingluoTOKI/Stronghold-Protocol-Windows.git`
-- 本机 GitHub 直连不通，必须走镜像：`git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git master`（ghfast.top 不通就换 gh-proxy.com）；用 curl 下载加 `--ssl-no-revoke`。
+- **GitHub 直连情况（2026-11-14 实测）**：仓库已配好双远程 —— `origin` = `https://github.com/lingluoTOKI/Stronghold-Protocol-Windows.git`，`upstream` = `https://github.com/sganggs/Stronghold-Protocol.git`，**`git fetch upstream dev` 直连成功，不需要镜像**。直连失败时才退回镜像：`git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git dev`（ghfast.top 不通就换 gh-proxy.com）；用 curl 下载加 `--ssl-no-revoke`。
 - Node ≥ 22（本机实测 v24.x），包管理 npm，ESM（`"type":"module"`）。
 - **别把 `data/config.json` 整份 print 出来**：上游把它压成单行 JSON，`Select-String`/`cat` 会吐出几万字符淹没上下文。要核对锁定值请用正则直接抽字段（见文末「常用命令」的 deployCap/BAN 一行式）。
 
+**动手前的前置条件（2026-11-14 新增，不满足就别 merge）**
+- **A. 先把未提交的代码落袋**：工作区实测有 **144 个未提交改动**（22 个已跟踪修改 + 123 个未跟踪）。其中 `server/accounts/{challenges,client,store,worker}.js` 是一整套**尚未入库的账号绑定子系统**，另有 `test/account-*.test.js` 5 个、`docs/ACCOUNT-BINDING-PLAN.md`、`server/dailyChallenges.js`、`server/recovery/service.js`、`public/js/ui/{achievementCollection,funReport,localActivities,monitor}.js`。**直接在脏工作区上建分支或 merge，这套代码会被覆盖或丢失。** 必须先提交到一个独立分支（或至少 `git stash` + 记下路径），且其中 10 个文件与上游改动重叠：4 个 `public/i18n/*.json`、`public/js/screens/title.js`、`public/js/ui/assetImport.js`、`public/js/ui/components.js`、`server/index.js`、`server/lobby.js`、`shared/constants.js`。
+  - **⚠️ 账号子系统是半成品，绝不能只提一半**：`server/accounts/http.js` **已入库**，但它 `import` 的 `client.js` / `challenges.js` 以及 `store.js` / `worker.js` **都不在库里**。HEAD 版 `server/index.js` 尚未接线 `createAccounts`（所以已提交的版本本身能跑）；工作区版 `index.js` 已接线。这 5 个模块 + `index.js` 的接线 + 5 个测试必须**作为一次提交整体落袋**。
+  - **2026-11-14 已完成的保护动作（快照，不是解决方案）**：
+    - `git tag pre-sync-0.3.4` → HEAD `eac47d28`（保住已提交的 331 个本地改动）
+    - `git tag backup-dirty-20261114` → `2b0bbe79`（`git stash create` 生成，含全部 22 个已跟踪未提交修改；**不含未跟踪文件**）
+    - 未跟踪的 16 个文件已物理备份到 `F:\github\Stronghold-Protocol\_backup-20261114\`（`server/accounts/` 全部、5 个 account 测试、`test/bot/`、`ACCOUNT-BINDING-PLAN.md`、`.tmp-server-assetImport.js`）
+    - 新增校验器 `tools/verify-local-patches.mjs`（55 项，合并后跑一遍即可验收）
+    - **但工作区依然是脏的**——标签和备份只是「丢不掉」，不等于「已提交」。正式同步前仍然要先落袋。
+- **B. 先修 `.gitignore`**：实测 `.playwright-cli/`（71 个残留）、`output/`（40 个产物）、`data/assets.json` **都没有被忽略**，且 `data/assets.json` 是被 git **跟踪**的。旧文档说「在 .gitignore 内」是错的。不补的话 `git add -A` 会把产物混进提交（坑 B、坑 D 的成因）。
+
 **最高原则（冲突时的取舍顺序）**
-1. **上游内容必须全量同步、零遗漏**：上游 master 的每一个 commit、每一处机制/数据/渲染/修复都要合进来。战斗模拟（`server/sim/**`）、数据构建（`tools/build-data.mjs`、`data/**`）、官方渲染（`public/js/render/**`）一律**以上游为准**，不得用我的旧实现覆盖上游新逻辑。
+1. **上游内容必须全量同步、零遗漏**：上游 **`dev`** 的每一个 commit、每一处机制/数据/渲染/修复都要合进来。战斗模拟（`server/sim/**`）、数据构建（`tools/build-data.mjs`、`data/**`）、官方渲染（`public/js/render/**`）一律**以上游为准**，不得用我的旧实现覆盖上游新逻辑。
 2. **我的独有功能一个都不能丢、不能被改坏**（清单见下，共 10 项）。这些是以外挂/补丁方式叠在上游上的，合并冲突时要把它们的"钩子调用点"重新接回上游新代码，而不是直接删掉。
 3. **零莱茵生命资料片**：本版是纯净官服 + 独有联机功能，**不要**带回任何莱茵生命盟约/干员/装置、`data/vanilla` 双档案分流、`dataProfile/rhineEnabled` 之类的东西（历史上已彻底剥离）。
 4. **锁定的平衡数值不要动**：每人部署位 `data/config.json -> economy.deployCap = 8`（六人房只扩玩家座位到 6，不砍个人部署位）；开局 BAN 用官服基础值（FUNNY 0/1，NORMAL/HARD/ABYSS 3/4，TRAINING 0/0），仅五人核心少 1、六人核心少 2（见 `shared/openingBans.js`，训练不减、最低 0）。
@@ -73,21 +91,29 @@
     - **⚠️ 监听地址铁律（曾经手滑改坏过）**：`scripts/launch.mjs` 必须保持 `host: process.env.HOST || '::'`，服务端 `server/http/config.js` 的 `DEFAULT_BIND_HOST = '::'`。**`'::'` 是双栈**，改成 `'0.0.0.0'` 会只收 IPv4、**IPv6 玩家连不上本机开的服**。合并后务必用 `Select-String scripts\launch.mjs -Pattern "env\.HOST \|\|"` 确认仍是 `'::'`。
 
 **执行流程（一步步来，每步给我看结果）**
-1. `git fetch` 上游 master（走镜像），记录上游最新 commit；用 `git merge-base --is-ancestor <上游最新> HEAD` 和 `git log --oneline HEAD..<上游最新>` 确认**哪些是上游新 commit**（同步前先告诉我数量和标题）。
+0. **先满足上面「动手前的前置条件」A、B 两项**（未提交代码落袋 + `.gitignore` 修正），并确认工作区干净（`git status --porcelain` 只剩被忽略项）。
+1. `git fetch` 上游 **dev**（走镜像），记录上游最新 commit；用 `git merge-base --is-ancestor <上游最新> HEAD` 和 `git log --oneline HEAD..<上游最新>` 确认**哪些是上游新 commit**（同步前先告诉我数量和标题）。**不要拉 master**——它不含第三期。
 2. 从当前分支新建同步分支（如 `sync/upstream-<版本号>`），不要直接在主分支上动。
 3. 合入上游（merge 或按 commit cherry-pick）。**先打备份标签**（`git tag -f pre-sync-<版本> HEAD`）再动手，方便随时回退。建议 `git merge --no-commit --no-ff <上游最新>` 后先看冲突面。逐文件解决冲突：
    - `server/sim/**`、`tools/**`、`public/js/render/**`、官方数据 → 采用上游版本，再把我独有功能的调用钩子重新接上；
    - 独有文件（chat.js、openingBans.js、monitor.html、announcements*、`server/http/proxy.js`、launcher/打包脚本、3 个 bat、`改编版-*.md`、`docs/RHINE-REMOVAL.md`）→ 保留我的；
-   - 交叠文件（lobby.js、Match.js、choices.js、gamedata.js、phases.js、intents.js、runner.js、hud.js、game.js、title.js、routes.js、index.js、constants.js、protocol.js）→ 以上游新逻辑为底，把 10 项独有补丁重新合入，保证上游新改动不被覆盖。
+   - 交叠文件：**当前实测 103 个**（不是旧文档的「41 交叠 / 14 真冲突」），分级清单见本文档「附：当前基线快照」第二节（A 类 18 个高危 / B 类约 35 个 / C 类约 50 个）。原则是以上游新逻辑为底，把 10 项独有补丁重新合入。
+     - **变化点（2026-11-14）**：旧文档点名的 `server/match/choices.js`、`server/http/routes.js`、`scripts/launch.mjs`、`public/css/screens/result.css` 这四个，**这次不在交集内**（双方没有同时改），但**仍要 grep 确认补丁还在**——不在交集只代表 git 不会报冲突，不代表没被别的改动间接影响。
+     - **新增高危交叠（旧文档完全没提，务必盯住）**：`server/http/static.js`（`/data/ ?v=` 长缓存）、`public/js/ui/settings.js`（BGM 启动强制关）、`public/js/screens/room.js` + `public/css/screens/room.css`（`BossHpPicker`）、`public/js/assetPack.js`、`public/js/screens/{settle,stats,bandDraft}.js`、`server/net.js`、`tools/build-data.mjs`。
    - 实操提示：冲突多半是**双方各自新增**（如 `.gitignore` 两边各加一条、`protocol.js` 两边各加消息名），这种**两边都保留**即可，不要二选一。
    - **解决完必须全局搜残留标记**：`git grep -n -E "^(<<<<<<<|>>>>>>>)"`（应为空）。注意：**只 `git add` 不等于解干净**，标记还在文件里就会进提交。
    - **自动合并 ≠ 没被吞**：两边改同一文件但不同区域时 Git 会静默合并，可能把钩子挤掉。合完要对每个交叠文件人工确认「上游新逻辑」和「我的钩子」都在（例如 `gamedata.js` 里我的 BAN 与上游新增方法应并存、`phases.js` 里我的信标与上游新 `bossPairs` 应并存）。
 4. 若上游改了数据结构/字段（例如 config 新增字段），运行 `node tools/build-data.mjs` 重建 `data/**`，再确认独有数值（deployCap=8、BAN）仍在。**重建后若 `git status` 无 diff，说明上游数据结构没变，不必提交 data**；另注意 `data/**` 应与上游逐字节一致（`git diff --stat <上游最新> HEAD -- data/` 应为空）。
-5. **美术资源不入库**：`public/assets/**`、`public/fonts/**`、`data/assets.json`、`data/local-assets.json`、`data/local-fx.json` 在 `.gitignore` 内，属于部署/本地资源，不要提交、不要删；3D 棋盘靠 `data/local-assets.json` + `public/assets/local/`；0.3.0 起官方战斗特效靠 `data/local-fx.json` + `public/assets/local/fx/`（缺失会静默回退 2D/原版特效、没有橙色栏杆）。
+5. **美术资源不入库**：`public/assets/**`、`public/fonts/**`、`public/vendor/**`、`data/local-assets.json`、`data/local-fx.json`、`runtime/` 在 `.gitignore` 内，属于部署/本地资源，不要提交、不要删。
+   - **⚠️ `data/assets.json` 是例外（旧文档写错了）**：实测它**不在 `.gitignore` 里、而且已被 git 跟踪**。它同时是本次 103 个冲突候选之一，merge 时按上游版本处理，但**不要 `git rm --cached` 把它脱管**——`server/http/static.js` 的 assetViews 分支要用它。
+   - 3D 棋盘靠 `data/local-assets.json` + `public/assets/local/`；0.3.0 起官方战斗特效靠 `data/local-fx.json` + `public/assets/local/fx/`（缺失会静默回退 2D/原版特效、没有橙色栏杆）。当前本地已解包 **5338 个文件 / 512.85 MB**（`public/assets/local/`，manifest 1789 条）。
+   - **`.gitignore` 还缺三条**（详见坑 D）：`.playwright-cli/`、`output/` 未忽略（当前分别有 71 / 40 个残留），同步前先补，否则 `git add -A` 会把它们带进提交。
 6. 自检：对改动的 js 跑 `node --check`、`npm run check:imports`；本地 `PORT=31xx SP_ADMIN_TOKEN=test` 起服，curl 冒烟 `/healthz`（版本号应为新版本）、`/api/online`、`/api/announcements`、admin 接口鉴权（无 token 403、`?token=` 正确 200）；浏览器清 Service Worker+caches 硬刷新，巡检标题页/建房页/战场无 404、无 console error。
    - `npm run check:imports` 有 3 条 `server/sim/nodeData.js: node:fs/path/url [sim-node]` 违规是**上游既有的、被上游 `test/check-imports.test.js` 白名单认可的**，退出码 0，不是合并引入的问题。
    - **强烈建议加跑 `npm run golden`**：黄金结果全绿是「上游战斗改动没被我的六人房补丁改坏」的最有力证据。若有场景变动，必须能说清是上游有意改动还是我误伤。
-7. 合并后**重新逐项核对上面 10 项功能**（grep 关键符号都还在），并确认 `git diff --diff-filter=D <上游最新>` 没有删掉任何上游文件、也没有混入任何莱茵/双档案文件。
+7. 合并后**先跑一遍独有资产校验器**：`node tools/verify-local-patches.mjs` —— 它按 10 项功能 + 全部补丁 + 未提交子系统共 **55 项**逐条验收，输出 PASS/FAIL 表格，退出码 0 才算全保住。再把 FAIL 项逐条按「附·第五节」修回，修完重跑直到全 PASS。
+   - 校验器只是**符号级**检查，能确认「钩子还在」，但确认不了「钩子接对了」。所以还要人工确认：`git diff --diff-filter=D upstream/dev HEAD` 没有删掉任何上游文件（当前实测上游删除数 = 0）、也没有混入任何莱茵/双档案文件。
+   - **新增独有功能时，同步往 `tools/verify-local-patches.mjs` 里加一条检查**，否则下次同步就没人替它把关了。
    - **莱茵搜索结果要会甄别**：搜 `rhine` 会大量命中**上游自己的官方干员 kit**（「莱茵生命」是官服 `character_table` 的 groupId，如 `chess_char_6_11-mlyss.js`、`op-slent2.js`、`op-ifrit.js`），这些**不是**要剥离的资料片。真正的判据是搜 `rhineEnabled` / `dataProfile` 这两个**代码符号**，应为零命中。
    - 另确认 `git merge-base --is-ancestor <上游最新> HEAD` 返回 0、`git rev-list --count HEAD..<上游最新>` 为 0（上游零遗漏）。
 8. 给我一份"上游同步了什么 + 冲突怎么解的 + 10 项功能自检结果 + 待我实测清单"的报告，**先不要提交/部署**，等我跑对局验收。报告请顺带说明：本次跑过的自检命令与结果、`npm run ci` 的失败项判定（真失败还是抖动）、以及需要我拍板的事项。
@@ -98,13 +124,168 @@
 
 ---
 
+## 附零：本次同步记录（2026-11-14，已完成）
+
+这一轮把上游 `dev`（0.3.4 未发布，第三期「规程·序列Ⅰ」）合进了改编版，**33 个冲突文件全部手工解决，独有功能零丢失**。下面这份记录是下次同步的参照：哪些文件会反复冲突、上次是怎么取舍的、哪些结论是实测过的、哪些还留着口子。
+
+### 结果总览
+
+| 项目 | 值 |
+|---|---|
+| 工作分支 | `sync/upstream-0.3.4` |
+| merge 提交 | `22b23d02`（`merge: 上游 dev 0.3.4（第三期规程·序列Ⅰ）合入改编版`） |
+| i18n / 文案修复提交 | `cdd652c4` |
+| 合入的上游 | `upstream/dev` = `fb55b8c0`（`package.json` 仍写 0.3.3，内容是 0.3.4） |
+| 冲突文件 | **33**，`git diff --name-only --diff-filter=U` 已为空，无残留冲突标记 |
+| merge 前的干净基线 | tag `pre-merge-0.3.4` → `2b7a41d1` |
+| 上一轮基线（阶段一推送点） | `sync/upstream-20261025` = `7f49814a` |
+| 账号子系统分支 | `local/account-binding` = `fcfdb83a`（保持独立、不被 sync 污染） |
+
+### 33 个冲突文件怎么解的
+
+**总原则**：UI 外观与数据层跟随上游（含 `.hub-bg` 红黑废墟，2026-11-14 用户已放开这条限制）；改编版独有功能、补丁、守卫一律保留。几处关键的是**精细合并**而非取边。
+
+| 文件 | 处理 |
+|---|---|
+| `data/assets.json` | 取上游 |
+| `docs/AI-STRATEGY.md`、`docs/ASSETS.md` | 取上游 |
+| `docs/design/client.md`、`public/css/{components,lobby,room,title}.css` | 两边都留 |
+| `public/i18n/{en,ja,ko,zh-TW}.json` | 三方合并（ours 为底、theirs 覆盖） |
+| `public/js/screens/title.js` | 上游 `ResourceManagerButton`（替代旧的下载/导入两个按钮）+ 本地 `GameAccountButton`；渲染处改成 `<${ResourceManagerButton} />` |
+| `public/js/battle/hud.js` | 上游新 `gtop__clock` 结构（含 `pf.countdown` / `RegCountdown` 规程倒计时），本地 `SpeedButton` / `SkipButton` 插回时钟之后 |
+| `public/js/screens/room.js` | 三块：`CardThumb` 保本地 `fallback=${chessPortraitUrl(m,c)}` + 用上游 `longWord` 长名类；`cardList/cards` 取上游（新增 `backups` / `pending`）；**`info` 块合并为 `room.modeId ? modeInfo(room.modeId) : difficultyInfo(room.mode, room.difficulty, facts.occupied.length)`**，保住六人房 BAN 估算的第 3 参 |
+| `public/js/screens/lobby.js` | 保留本地 55 行公共匹配队列（`clearMatch/leaveMatch/startMatch/topUp/startNow/waitMore`、`match.status`、`api/online` 5s 轮询），只把上游 `pickMode`（规程等级）插在 `pickDifficulty` 之后；`difficultyInfo(roomMode, difficulty, playerCount = null)` 的第 3 参**必须留**（上游原版删了它） |
+| `public/js/choiceOverlay.js` | 上游「收起」按钮 + 本地 `spov__grid--many`（>6 卡布局） |
+| `public/js/ui/detailPanel.js` | 本地 `canLoadout = false, canSkin = false` + 上游 `unitItemProgress = null` 与 `ItemProgress` 组件 |
+| `public/js/ui/assetDownload.js`、`assetImport.js`、`bandDraft.js`、`loadoutSync.js`、`seatArt.js` | 取上游（`assetImport.js` 随后补回群引导，见下） |
+| `public/js/settingsStore.js`、`shared/gameLogic/settings.js` | 取本地（`bgm: 0`） |
+| `public/js/screens/main.js`、`public/js/game.js` | import 两边都留（`ChatDock` + `EmoteWheel`/`BandCommand`） |
+| `public/js/data/builtinMeta.js` | 取本地（六人房 R14 信标立即发放优先，失败退回上游下回合重试） |
+| `tools/build-data.mjs` | 取本地（`pinnedUrl` + `--import-skins-from`） |
+| `shared/protocol.js` | import 合并三常量 `CHAT_MAX_LEN, BOSS_HP_OPTIONS, REHEARSAL_MAX_CANDIDATES` |
+| `server/lobby.js` | 四块合并：`destroy()` 里 `peerRelay.dispose()` + `matchTimers`；房间快照里 `bossHp: room.bossHp ?? BOSS_HP_DEFAULT` + 上游 `modeId`；`matchBroadcast` 保本地 `dailyBoard` 的 `m.result` 结算块 + 用上游 `afterReconcile(this, room, reconcileAiTakeover(this, room))`；`disposeRoom` 里 `recovery?.abandon(...)` + `peerRelay.clear(room)` |
+| `test/fixtures/versions-default-guard.json` | `default: true` 归 **`act3autochess@V3_1`**（不是 `DEFAULT_VERSION` 常量那个 act2autochess——踩过一次坑） |
+| `test/lobby-card.test.js` | 取上游（改成全列表遍历，比本地单条断言覆盖更强） |
+
+**合并时修掉的自动合并副作用**：`server/lobby.js` 里旧版 `cardCharIds`（含 `char_616_pithst` 硬过滤）与上游新版（WeakMap 缓存 + `visible !== false`）同名重复声明，`node --check` 报 `Identifier 'cardCharIds' has already been declared`。删旧版、留上游新版。
+
+### 决策 2 / 3 / 5 的实测结论：都不用改代码
+
+- **决策 5（BOSS_HP 3.25 倍叠规程新基准）**：`server/match/gamedata.js:196-203` 的 `bossPoolShare()` 本来就是 `sixPlayerHp * bossHpScale * bossPoolShareOf(...)`，3.25 倍乘在**上游算完的最终值**之上，正是「叠上游最终值」。
+- **决策 3（六人房在规程房间开）**：`MAX_SEATS = 6`；上游 5 个版本（含规程）的 `roomModes` 全是 `['solo','coop']`；`server/versions.js` 只校验 `roomModes.includes(roomMode)`、不按版本限座位 → 规程 coop 可开 5/6 座，团体模式即入口。
+- **决策 2（第 8 行 5 格装备区与 R10/R12/R14 信标共存）**：`SIX_PLAYER_BEACON_ROUNDS = new Set([10, 12, 14])`（`server/match/match/phases.js:19`）+ 每回合 1 枚 = **全程只有 3 枚信标**，5 格装备区绰绰有余，不需要把 `tempSize` 改成 6。顺带查清 `TEMP_SIZE` 是前后端共享的硬布局常量（`GEO.TEMP_SIZE = 5`，注释「slot idx 0..4 = cols 4..8」），`shared/protocol.js:502` 的 idx 校验、`public/js/render/app.js:850`（「Hidden overflow waits for a visible slot」）、`drag.js`、`placement.js`、`shop.js`、`fallbackField.js`、`underframe.js` 全都依赖它，改它牵动前端网格；`PARTNER_COL_OFFSET: 8` 只有定义、无任何使用。
+
+### 合完之后补的两处
+
+1. **QQ 群引导文案**：`assetImport.js` 取上游后，原来那句「素材包在游戏交流群 1104628970 的群文件，读取本机 zip，美术不占服务器流量。」丢了。已作为第三条 `<p class="t-lo">` 加回 `AssetImportPanel`；`en.json` 里原有该 key 的英文译文可直接命中，`zh-TW/ja/ko` 三语各补 1 条。
+2. **i18n 静态检查（既有问题，非本次 merge 引入）**：`test/i18n.test.js` 第 9 项扫描 `public/js`、`public/studio`、`shared`、`server`（跳过 `node_modules|vendor|assets|fonts|dev`，以及 `server/sim/`），要求所有中文字面量包 `t()` / `N_()`、且 msgid 都在 `en.json`。这次补齐了：
+   - `shared/challengeCovenants.js` 的 `bondName` 23 处包 `N_()`（`N_ = (s) => s` 零开销标记，`bondName` 仅用于显示、前端走 `tName()`，行为不变）；
+   - `public/js/ui/gameAccount.js` 的 toast innerHTML 改模板串并包 `t()`；
+   - `server/accounts/http.js` 的指令模板 `${N_('绑定游戏')} ${realm} ${code}`（**不能翻译**，QQ 群机器人只认中文指令）；
+   - `en.json` 补 23 个盟约分类名（Yan / Sargon / Victoria / Kjerag / Laterano / Ægir / Siracusa / Kazimierz / Precise / Swift / Skillful / Arcane / Steadfast / Assist / Visionary / Miracle / Investor / Raid / Indomitable / Harmony / Support operator / Solo / Ultimate）+ 3 条群验证文案。
+   结果：`node --test test/i18n.test.js` **11/11 通过**。
+
+### 验证结果（本轮实测）
+
+| 检查 | 结果 |
+|---|---|
+| `node tools/verify-local-patches.mjs` | **47 通过 + 8 跳过 + 0 失败**（8 项跳过全是账号子系统，预期；在 `local/account-binding` 上应为 55 全绿） |
+| `npm run golden` | roster 49 / bonds 46 / fields 22 / matches 21 / standins 10 / diy 143 —— 全部 match，退出码 0 |
+| `node --test test/i18n.test.js` | 11 / 11 |
+| 信标 + 首领血量（`beacon-diy` / `boss-hp-scaling` / `bosshp` / `bosshp_stacking`） | 18 / 18 |
+| 六人房与规程（`content/choices` / `bot-strategy-seats` / `lobby-card` / `versions-default-guard` / `versions-regulation`） | 50 / 50 |
+| 起服冒烟（`PORT=3199`、`SP_NO_BROWSER=1`） | `/healthz` 200 `{"ok":true}`、`/api/online` 200、首页 200；`versions.default = act3autochess@V3_1` |
+
+### 还留着口子的三件事
+
+1. merge 提交推送前，`sync/upstream-0.3.4` 尚未 push 到 origin。
+2. `sync/upstream-0.3.4` 还没合回 `local/account-binding`（合回后校验器应从 47+8SKIP 恢复到 55 全绿）。
+3. 五个大厅入口的人工点击（版本切换 / 公共匹配 / 团体模式六人房 / 公告栏信封 / 监控入口）**由用户本人跑**，助手不做浏览器自动化验证。
+
+---
+
 ## 附：当前基线快照（AI 核对用，会随版本过期，以实际 fetch 为准）
 
-- **最近一次同步：2026-10-18；上游 master 最新 = `d905c146`（0.3.1，2026-10-18）**，已合入分支 `sync/upstream-0.3.1`（合并提交 `e9447bb0`，双父 `cd5636e5` + `d905c146`），**已确认是改编版 HEAD 的祖先、上游 commit 零遗漏、零删除文件**。备份标签 `pre-sync-0.3.1`。
-- 更早的同步基点：`c24e17ee`（0.3.0）、`488db49f`（0.2.6）、`cf7a9400`（0.2.5）、`bc50cac0`（0.2.4）、`1db8e510`（0.2.3）。
-- **0.3.1 带来 200 个新 commit / 520 个文件改动**（从 0.3.0 算起），本改编版同区间改了 114 个文件。
-  41 个文件两边都动过，其中 **14 个是真冲突**：
+### 一、同步前基线（2026-11-14 实测；同步完成后的实际状态见上方「附零：本次同步记录」）
 
+| 项目 | 值 |
+|---|---|
+| 本地活跃分支 | `sync/upstream-20261025`（`package.json` = **0.3.3**） |
+| 本地 HEAD 相对 `clean/vanilla-0.2.3-plus` | 领先 **531** 个提交，后者是 0.2.3 时代分支 |
+| 本地 HEAD 相对 `origin/main` | 领先 **2** 个提交 |
+| 共同基点（`f07b8965`） | 就是 `upstream/master` 顶端（0.3.3 hotfix） |
+| 上游同步目标 | **`upstream/dev` = `fb55b8c0`**（`package.json` 也写着 0.3.3，但内容是 0.3.4 未发布） |
+| 上游 `dev` 相对 `master` | 多 **380** 个提交，反向 **0** |
+| 本地独有提交 | **95** 个 |
+| 本地改动文件 | **331** |
+| 上游改动文件 | **817**（+99,706 / −8,355 行，新增 262 个文件） |
+| **双方都动过（冲突候选）** | **103** |
+| 上游删除的文件 | **0**（`--diff-filter=D` 为空） |
+| 工作区未提交 | **144**（21 已跟踪修改 + 123 未跟踪），其中 10 个与上游重叠 |
+
+验证过的锁定值（当前仍成立）：`MAX_SEATS = 6`、`BOSS_HP_OPTIONS = [1, 3.25]`、`config.json` 的 `deployCap = 8`、`launch.mjs` 的 `host: process.env.HOST || '::'`、`monitor.html` 的 `onclick=` 计数 **0**、`routes.js` 的 `api/admin/restart` 计数 **1**、3 个 bat 齐全。10 项独有功能的代码落点全部命中。
+
+### 二、103 个冲突候选的分级（按「会不会丢补丁」排）
+
+**A 类 · 高危 18 个（补丁落点，必须逐行确认双方内容都在）**
+
+| 文件 | 威胁到的独有功能 |
+|---|---|
+| `public/js/screens/lobby.js` | 公共匹配 + 版本选择 + 大厅交互（素材守卫实际在 `title.js`，别找错文件） |
+| `public/js/ui/hud.js` | 倍速 `SpeedButton` / 跳过 `SkipButton` |
+| `public/js/battle/runner.js` | `cycleSpeed` / `skipBattle` / `skipReady` |
+| `public/js/ui/choiceOverlay.js` | 坑 E 的裸变量 `order`、重复 `spov__grid` |
+| `shared/protocol.js` | `g.chat`、`room.setBossHp`、`g.choice` idx≤8 |
+| `shared/constants.js` | `MAX_SEATS`、`BOSS_HP_OPTIONS`、`CHAT_*` |
+| `server/lobby.js` | 匹配队列 `MATCH_TARGET`、`setBossHp` |
+| `server/match/Match.js` | `startingSeatCount`、`opts.bossHp` |
+| `server/match/gamedata.js` | 五六人 BAN、`bossHpOverride` |
+| `server/match/match/phases.js` | `SIX_PLAYER_BEACON_ROUNDS` |
+| `server/match/match/intents.js` | `g.chat` 意图 |
+| `public/js/screens/title.js` | 公告栏 + 轮询 60 秒 |
+| `public/js/main.js` | 公告 `UrgentNoticeHost` import |
+| `public/js/monitor.js` | 监控大屏（**且未提交**） |
+| `public/js/assetPack.js` | 素材包 |
+| `server/http/static.js` | `/data/ ?v=` 长缓存 `IMMUTABLE_JSON` |
+| `public/js/ui/settings.js` | BGM 启动强制关 |
+| `public/js/screens/room.js` + `public/css/screens/room.css` | `BossHpPicker` / `.bosshp` |
+
+**B 类 · 中危约 35 个（人工确认双份内容并存）**
+4 个 `public/i18n/*.json`；`public/js/screens/{game,settle,stats,bandDraft}.js`；`public/js/ui/{components,gameComponents,teamPanel,shopBar,detailPanel,gameActions,loadoutSync,protocolBoot,seatArt,lobbyMedia,assetImport,assetDownload,settingsStore}.js`；`public/js/ui/gameLogic/{settings,shop}.js`；`server/index.js`、`server/net.js`、`server/match/{builtinMeta}.js`、`server/match/match/{prep,platform,views}.js`；`public/index.html`、`public/css/{components,screens/game,screens/game-panels,screens/title}.css`、`public/css/screens/lobby.css`；`tools/{build-data,fetch-assets}.mjs`；`data/assets.json`。
+
+**C 类 · 低危约 50 个（可跟随上游）**
+`docs/*` 8 个、`README.md`、`.gitignore`、`test/*` 约 30 个。
+
+⚠️ 103 是「双方都动过」的文件数，不等于 103 个冲突标记；行级不重叠的会被 git 静默合并。但**静默合并可能把钩子挤掉**，所以这 103 个都要人工过一遍。
+
+### 三、上游 `dev`（0.3.4 未发布）新增的重要机制
+
+**第三期「卫戍协议·规程·序列Ⅰ」——本文件同步的核心目标**
+
+- 版本注册：`shared/versions.js` 新增 `act3autochess@V3_1`，`family: 'regulation'`（新引擎族，与 `covenant` 并列）；`dir: 'versions/act3autochess-v3_1/'`
+- 大厅默认：`export const LOBBY_DEFAULT_VERSION = 'act3autochess@V3_1';`（依据维护者 2026-11-09 决策「规程做完整后就改成默认」）；服务器可用 `SP_VERSION_DEFAULT` 改回
+- 数据：`data/versions/act3autochess-v3_1/` 下 16 个 JSON（`bonds`、`chess`、`config`、`enemies`、`stages`、`waves`、`bosses`、`effects`、`factions`、`items`、`tokens`、`garrisons`、`choices`、`bands`、`backups`、`tuning`）
+- 新 UI：`public/js/ui/regHud.js`、`avatarBadges.js`、`leaderRank.js`、`public/css/screens/game-reghud.css`
+- 新工具：`tools/local-extract/regulation_scenes.py`（把三块官方场景合成 19×21 棋盘，修水面/沙漠底板黑块）、`tools/versions/act3autochess-v3_1.mjs` + `tables/act3autochess-v3_1.mjs`
+
+**规程带来的机制变化（合并时不能覆盖，且可能与本改编版设计冲突——见下）**
+
+- **单人改为官方分级**：极速模拟 + 规程等级 1–20（`#37.100`）；同盟模拟仍是四个难度。**这与本地的单人四难度卡片、`STAGE_POOL` 直接相关**
+- **第 8 行改为 5 格装备区**（`#37.101`）：装备放手牌区，放不下进暂存，休整期结束清掉
+- 37 名新干员、26 个盟约（新增乌萨斯/伊比利亚/莱塔尼亚/聚合）、5 对合成装备、策略指令、新领袖（械/茧/鳍/矩兽）
+- 随机盟约规则：独立模拟开局把核心盟约分两组选一组；同盟险境以上灰一半核心；附加盟约随机灰
+- 「选择自编」（`#37.114`）、装备报告（`#37.132`）、确认本局信息两栏（`#37.129`）
+- 规程自己的官方音乐、战场场景、悬赏/机密商店按官方卡单抽卡（`#37.118`/`#37.131`/`#37.123`）
+- 数据构建适配：官方把 `{i:fmt}` 参数从 bond 行移到 `effectDescParamDataDict[effectId].descParamInfos`，`tools/build-data.mjs` 已跟随（`#37.208`）
+- 插件可声明适用版本，规程房间可用玩法插件（`#37.102`）
+
+**其他来自 0.3.2 / 0.3.3 的既成机制**（本地已合入 0.3.3，此处仅备查）：皮肤系统、异形屏适配、素材存储、悬赏决策改版、S.W.E.E.P. 报告、Forge 导入 U1–U6、内容插件四规则、音效官方音库。
+
+### 四、历史记录（0.3.1 区间，仅作参考，**不是当前冲突面**）
+
+- 同步历史：`sync/upstream-0.3.1`（合并提交 `e9447bb0`，双父 `cd5636e5` + `d905c146`，备份标签 `pre-sync-0.3.1`）→ `sync/upstream-20261020`（`c9d804f4`）→ `sync/upstream-20261025`（0.3.3，当前 HEAD）。
+- 更早基点：`c24e17ee`（0.3.0）、`488db49f`（0.2.6）、`cf7a9400`（0.2.5）、`bc50cac0`（0.2.4）、`1db8e510`（0.2.3）。
+- 0.3.1 区间：上游 200 个新 commit / 520 个文件改动，本地同区间 114 个文件，41 个交叠、**14 个真冲突**：
   | 文件 | 冲突性质 | 解法 |
   |---|---|---|
   | `shared/protocol.js` | 双方各加消息 | 保留我方 `g.choice` idx≤8（六人房九张悬赏）+ 上游 `g.offer` / `g.offerRefresh` |
@@ -119,7 +300,7 @@
   | `test/match/fuzz.test.js` | 两边各加 case | `g.chat` + `g.offer` 并存 |
   | `public/i18n/{en,ja,ko,zh-TW}.json` ×4 | 两边各加键 | 合并为一段，注意前段补逗号 |
 
-- **0.3.1 上游新增的重要机制（合并时必须保留、不要覆盖）**：
+- **0.3.1 上游新增的重要机制（历史记录，本地 0.3.3 已全部包含）**：
   - **官方结算页**：雷达开场、个人战报、同盟页，卫戍认证按官方 60 级表（`#698`）
   - **皮肤系统**：每座位可选干员皮肤，设置里「显示其他玩家的皮肤」默认开（`#686`/`#667`）
   - **异形屏适配**：四个滑块，把界面从挖孔/刘海往里收（`#699`）
@@ -131,16 +312,20 @@
   - **音效改用官方音库**：各音库独立同时播放上限、替换最旧、音高范围、延迟播放
   - 大量官方特效修正（余三技能火墙、缪尔赛思流形、瑕光、野鬃、诅咒娃娃、斯卡蒂海嗣、狼群、归溟幽灵鲨…）
 
+### 五、改编版独有的补丁落点（**当前有效**，合并后必须逐项实测仍在）
+
+> 下列每一条都是本改编版相对上游的净增量。对应文件已在上文「A 类 · 高危 18 个」中逐一点名，merge 完请按这一份逐项 grep 验证。
+
 - **已知待优化（不影响兼容，下次可处理）**：
   - **倍速切换不丝滑**：4× 切 1× 时渲染插值速率骤降，视觉顿挫。reanchor 数学上游戏时间连续不跳，但渲染层插值器没有平滑过渡。改这个需要动渲染层插值器，风险大，暂未处理。
 
-- **改编版在 0.3.1 之上新加的东西（合并时要保住）**：
+- **补丁落点细节（合并时要保住）**：
   - **首领血量挡位**：`shared/constants.js` `BOSS_HP_OPTIONS = [1, 3.25]`、`shared/protocol.js`
     `room.setBossHp`、`server/lobby.js` `setBossHp` + `Room.bossHp` + `room.state.bossHp`、
     `server/match/Match.js` 传 `opts.bossHp`、`server/match/gamedata.js` 构造函数第 4 参数
     `bossHpOverride`（在 `bossPoolShare()` 里乘上去）、`public/js/screens/room.js` `BossHpPicker`
     + `public/css/screens/room.css` `.bosshp`。**这是「房间设置」而不是插件**——理由见附四。
-  - **素材包守卫**：`public/js/screens/lobby.js` `requireAssetPack()`，拦 `create` / `join` / `startMatch`。
+  - **素材包守卫（旧文档写错了位置和规则，2026-11-14 更正）**：真实实现在 `public/js/screens/title.js` 的 `enter()` 里，**不是** `lobby.js` 的 `requireAssetPack()`（全仓无此函数）。规则是：`importSupport().ok`、`countImportedFiles()` 返回 **0（一个素材都没导入）**、且 `/api/online` 的 `humans >= 10` 时，弹窗二选一（去契约服 / 导入素材包）后才放行。**人少时不拦**——这是 2026-10-18 有意定的行为，别当成 bug 修掉。相关代码在 `title.js` 360–405 行。
   - **BGM 启动时强制关**：`public/js/ui/gameLogic/settings.js` `DEFAULT_SETTINGS.bgm = 0`、
     `public/js/audio.js` `this.volumes.bgm = 0`，**以及** `public/js/ui/settings.js` 启动那次
     `audio.setVolumes({ ...settingsStore.get(), bgm: 0 })`（只压启动那一次，订阅回调不动）。
@@ -156,9 +341,114 @@
     `spov__order` 渲染（引用了不存在的 `order`），并合并重复的 `spov__grid` div。
     上游一旦再次改动这个组件，**记得确认这段别被合回来**，见附二坑 E。
 
-- **本次验证结论**：446 个 js/mjs `node --check` 全过；4 个 i18n JSON `JSON.parse` 通过；
+- **0.3.1 同步时的验证结论（历史记录）**：446 个 js/mjs `node --check` 全过；4 个 i18n JSON `JSON.parse` 通过；
   `npm run check:imports` 退出 0；`npm run golden` 全绿（49/46/22/21/10/140 场景）；
   `rhineEnabled`/`dataProfile` 代码内零命中；无删除文件。
+
+### 六、设计级冲突：决策与实施方案（2026-11-14 维护者已拍板）
+
+> 上游规程改的是**引擎层**，有五处与本地独有补丁正面撞车。维护者已定 1、3 要生效；2、4、5 由 AI 给出方案后经维护者确认。
+> 下列每条都标了**事实依据**（已读上游 `dev` 源码/数据核对，不是推测）与**改动点**。
+
+#### 决策 1：六人房的 BAN / boss 血池 / STAGE_POOL 在规程下**要生效**
+
+**事实**：规程 `data/versions/act3autochess-v3_1/config.json` 的 `modes` 里，**等级 1–20 仍然映射到 FUNNY/NORMAL/HARD/ABYSS 四档**（1–4→FUNNY、5–8→NORMAL、9–14→HARD、15–20→ABYSS），coop 的四个难度（标准/险境/绝境/终极）也各占一档。所以本地按 `difficulty` 算的 BAN 与 `STAGE_POOL` **天然适配**，不需要为规程另做一套。
+
+**实施**：六人房补丁不做版本判断，直接对所有 `family` 生效。唯一要改的是 boss 血池（见决策 5）。
+
+#### 决策 2：第 8 行 5 格装备区 与 R10/R12/R14 信标 —— **共存方案：不改信标规则，给六人房扩一格**
+
+**事实**（上游 `dev` `server/match/PlayerState.js:18` 原文）：
+
+> With `config.version.rules.equipHand` (规程), hand holds characters/summons only and **`temp[0..4]` is permanent equipment storage. Hidden `temp[5..]` alone blocks Ready and expires**.
+
+拆开讲：
+- 规程的 `version.rules = { equipHand: true, bondDraw: 'regulation' }`（已核对）
+- `tempSize = 5`（规程 `config.economy.tempSize`，已核对）
+- **`temp[0..4]` 是永久装备存储，休整期结束不清**；真正会被销毁的只有 `temp[5..]` 那个隐藏溢出队列
+- 本地信标走通用 `ps.acquireItem('chess_item_5_04_e_a', { source: 'sixPlayerBeacon' })`，**不写死格子**，所以在规程下会自然落进 `temp[0..4]`
+
+**结论：信标和装备区不冲突**，不需要改 `phases.js` 的信标逻辑，也不需要动第 8 行的布局。
+
+**唯一真正的风险**：玩家把 5 格装满自购装备后，再来信标就只能进 `temp[5..]`，休整期结束被清 → 白拿。
+
+**实施（一处小改动）**：
+- `server/match/gamedata.js` 构造函数增加第 5 参数 `tempSizeOverride`（仿现有 `bossHpOverride` 的写法）
+- `server/match/Match.js` 在 `startingSeatCount >= 5` 时传 `6`，即**六人房 `tempSize` 5→6**
+- 理由：5 格是给 4 人设计的，6 人房每人多一格才放得下「3 枚信标 + 自购装备」
+- 只对 6 人房生效，4 人及以下仍用规程原值 5，**不破坏官方的装备区手感**
+
+#### 决策 3：六人房在规程房间开 —— **用 `coop`（团体模式），不新增 roomMode**
+
+**事实**：上游 `shared/versions.js` 里**所有版本**（含规程）的 `roomModes` 都是 `['solo','coop']`，规程没有专门的"团体"模式 id。所以你说的"团体模式"就是 `coop`。
+
+**实施**：在房间设置里允许 `family: 'regulation'` 的 `coop` 房间选 5/6 座（复用现有六人房逻辑），不新加模式枚举。
+
+#### 决策 4：`LOBBY_DEFAULT_VERSION` —— **方案：跟随默认，但把「团体模式」做成显式入口**
+
+**事实**：上游区分两个常量——
+- `DEFAULT_VERSION = 'act2autochess'`：**数据/房间/回放/日志没标版本时仍按第二期下半**（这个别动）
+- `LOBBY_DEFAULT_VERSION = 'act3autochess@V3_1'`：只是**大厅预选**，且 `SP_VERSION_DEFAULT` 可覆盖
+
+**方案（推荐）**：
+1. 数据层完全跟随上游，不改这两个常量
+2. 大厅 UI 以**规程的赛季外观为底**合并（`public/js/screens/lobby.js` 在 103 个冲突候选内），然后把这三样重新挂上去：**版本切换**、**公共匹配**、**团体模式（六人房）入口**
+3. **UI 外观完全跟随上游（2026-11-14 维护者决定，覆盖旧约束）**：大厅赛季外观、`.hub-bg`（含上游的红黑废墟 `bg.png`）、规程主题、结算页样式，**一律以 `dev` 为准合并，不再强保 0.3.3 的青绿渐变**。
+   - **但「功能入口」不能丢**：版本切换、公共匹配、团体模式（六人房）入口、公告栏信封、监控入口必须在规程大厅里仍然可见可点。外观变了可以，入口消失了就是功能丢失。
+   - 合并后要人工点一遍大厅：这五个入口是否都在视野内、没被规程布局挤到看不见的位置。
+4. 改动风险集中在 `lobby.js`（A 类高危），合并后要人工看一遍入口位置有没有被规程布局挤掉
+
+**保守备选**：如果不想一上来就换大厅，可以先设 `SP_VERSION_DEFAULT=act2autochess` 让大厅停在第二期，等规程大厅验收通过再切默认。数据不受影响。
+
+#### 决策 5：`BOSS_HP_OPTIONS` 的 3.25 —— **方案：叠在「上游算完的最终值」上，不乘死某个档位表**
+
+**事实**（已核对双方 `bosses.json`，`boss_1` 假想敌：胄）：
+
+| 档位 | 本地 covenant | 规程 | 规程/本地 |
+|---|---|---|---|
+| FUNNY | 247,500 | 283,680 | 1.146 |
+| NORMAL | 675,000 | 945,600 | **1.401** |
+| HARD | 1,800,000 | 2,364,000 | 1.313 |
+| ABYSS | 3,600,000 | 3,940,000 | 1.094 |
+
+**结论：规程确实换了基准，且各档不等比例**（不能用一个固定倍率换算）。
+
+更关键的是规程多了一层：`bloodByMode` —— `mode_single_1..20` **每个等级单独一个血量**，不是只按四档取。`bossHpScale.formula` 写的 `bloodPoint[difficulty] × share` 只是 coop 共享血池的算法，solo 各等级走 `bloodByMode`。
+
+**实施**：
+- `bossHpOverride` 的语义从「乘 `bloodPoint[difficulty]`」改为「**在上游 `bossPoolShare()` 算完之后再乘**」，即叠在最终值上
+- 这样 3.25 倍和六人 ×200% 都作用在各版本**自己的**基准上：covenant 用 covenant 的，规程用规程的 `bloodByMode`
+- **不要**把 covenant 的血量按规程的倍率换算（各档不等比例，换不准）
+- 代价：`test/golden` 的 boss 相关场景要重跑确认；covenant 房间的血量数字不变（基准没动，只是乘的时机后移）
+
+**这一条需要你确认**：`bossHpScale.unaffectedByEnemyScale = true` 表示 boss 血量不受敌方强化影响，所以 3.25 是唯一的血量倍率来源，叠在后面是安全的。
+
+#### 实施顺序建议（2026-11-14 维护者决定：账号系统走独立分支）
+
+> **前提说明**：`sync/upstream-20261025` 上已经有两个**已推送**的提交（`718ee7f4` 账号 UI + `http.js`、`eac47d28` 移除统计按钮）。所以「让 sync 分支保持干净」只能做到**不再往它上面加新的账号提交**——已有的半成品已经进了它的历史，除非 force push 改写历史（不做）。
+>
+> **阶段一已完成（2026-11-14）**：
+> | 内容 | 落点 | 提交 | 状态 |
+> |---|---|---|---|
+> | 账号系统补齐（4 模块 + 5 测试 + `test/bot` + `index.js` 接线 + PLAN） | `local/account-binding` | `fcfdb83a` | 已推送 |
+> | 每日挑战积分、在线人数修复、监控页、i18n、同步文档 | `sync/upstream-20261025` | `7b99223f` | 已推送 |
+> | 校验器支持账号组条件跳过 | `sync/upstream-20261025` | `2b7a41d1` | 已推送 |
+> | 落袋标记 | tag `pre-merge-0.3.4` | → `2b7a41d1` | 已推送 |
+>
+> 校验器现状：`sync` 分支 47 PASS + 8 SKIP（账号组）0 FAIL；`local/account-binding` 55 全绿。工作区已跟踪文件干净。
+>
+> **遗留（不阻塞 merge，但要知道）**：`sync` 分支上的 `server/accounts/http.js`（`718ee7f4` 带进来的）仍缺 `client.js`/`challenges.js`。因为 `server/index.js` 未接线（且接线本身用 `SP_ACCOUNT_DB` 默认关闭），服务器照常能起、`healthz` 200。这个断链会在第 8 步合回 `local/account-binding` 后自然补齐。
+
+1. **从当前 HEAD 切出 `local/account-binding`**，把剩下的账号代码整体提交上去：
+   `server/accounts/{challenges,client,store,worker}.js`、`server/index.js` 的 `createAccounts` 接线、`docs/ACCOUNT-BINDING-PLAN.md`、`test/account-*.test.js` ×5、`test/bot/` ×4。
+   提交后跑一遍 `node tools/verify-local-patches.mjs`（应 55 全绿）与 `node --test test/account-*.test.js`。
+2. **切回 `sync/upstream-20261025`，把其余零散修改提交**（i18n ×4、monitor、title、dailyChallenges、recovery、constants、routes、lobby、文档、校验器），让工作区干净。
+3. `git tag -f pre-sync-0.3.4`，新开 `sync/upstream-0.3.4`，`git merge --no-commit --no-ff upstream/dev`，先看冲突面。
+4. 按 A/B 类清单解冲突（**此时本地侧不含账号代码，冲突面最干净**）；C 类可跟随上游。
+5. 落地决策 2（`tempSizeOverride`）与决策 5（`bossHpOverride` 叠最终值）——这两处是**代码改动**，不是纯合并。
+6. 落地决策 3（规程 coop 允 6 座）与决策 4（大厅跟随上游外观，重挂五个功能入口）。
+7. 跑 `node tools/verify-local-patches.mjs`（55 项）+ `npm run golden` + 本地起服冒烟 + 人工点大厅入口。
+8. **验收通过后**，再把 `local/account-binding` 合进同步分支。此时基线已稳定，冲突集中在 `server/index.js`、`server/lobby.js`、`shared/constants.js` 三处的接线点——**所以第 1 步接线时要尽量集中、别散落**，第二次冲突才好解。
 
 ---
 
@@ -230,10 +520,31 @@ grep -c 'onclick=' public/monitor.html   # 应为 0
 
 所有事件统一在 `public/js/monitor.js` 的 `bindUi()` 里用 `addEventListener` 绑定。
 
-### 坑 D：打包产物、日志、测试残留混进提交
+### 坑 D：打包产物、日志、测试残留混进提交（**旧版描述有误，2026-11-14 已按实测更正**）
 
-`.playwright-cli/`、`output/`、`public/assets.zip` 等都在 `.gitignore` 里，
-但如果新增了别的产物目录，记得同步补 `.gitignore`，别靠 `git status` 事后发现。
+旧版这里写「`.playwright-cli/`、`output/`、`public/assets.zip` 等都在 `.gitignore` 里」——
+**实测只有 `public/assets.zip` 在（第 73 行），另外两个都不在**。当前 `.gitignore` 的真实状态：
+
+| 路径 | 是否被忽略 | 备注 |
+|---|---|---|
+| `public/assets/`、`public/fonts/`、`public/vendor/` | 是 | 官方素材，永不入库 |
+| `data/local-assets.json`、`data/local-fx.json` | 是 | 本机解包清单 |
+| `public/assets.zip` | 是 | 第 73 行，坑 B 补的；**该行注释是乱码**（编码被写坏过），顺手可修 |
+| `runtime/` | 是 | 挑战赛分数与签名密钥 |
+| **`.playwright-cli/`** | **否** | 当前 71 个未跟踪残留 |
+| **`output/`** | **否** | 当前 40 个未跟踪产物 |
+| **`data/assets.json`** | **否，且被 git 跟踪** | 注意：它同时是 103 个冲突候选之一 |
+
+所以同步前必须先用 `git status --porcelain` 确认，别指望 `.gitignore` 挡。建议先补三条：
+
+```bash
+# 追加到 .gitignore 末尾
+.playwright-cli/
+/output/
+```
+
+`data/assets.json` 已被跟踪，「加进 .gitignore 也没用」，必须 `git rm --cached` 才能脱管 ——
+**但删它会让 `server/http/static.js` 的 assetViews 分支少一份数据，所以先别动，只记在心里**。
 
 ### 坑 E：冲突解完但**删不干净**，留下裸变量让界面整页崩（★★★ 最隐蔽）
 
@@ -591,27 +902,50 @@ settingsStore.subscribe((s) => { audio.setVolumes(s); });  // 玩家改了就照
 所以这是真省流量，不是静音播放。
 
 
-### 素材包守卫（没导入不让进对局）
+### 素材包守卫（人多且没导入才拦）
 
-`public/js/screens/lobby.js` 的 `requireAssetPack()`，拦住 `create` / `join` / `startMatch` 三个入口，
-没导入就弹窗提示导入方法。
+> **2026-11-14 按代码实测更正**：旧文档说这是 `lobby.js` 的 `requireAssetPack()`、拦 `create`/`join`/`startMatch`、
+> 「没导入不让进对局」——**全部不准确**。全仓搜索 `requireAssetPack` 零命中。
 
-- 用 `countImportedFiles()`（`public/js/assetCache.js`）判断，返回 0 = 没导入
-- **不支持导入的环境要放行**（`importSupport().ok === false`：http 非安全上下文 / 缺 Cache API），
-  否则那些浏览器就完全玩不了
-- **读缓存出错也放行**：宁可放过，不误伤
-- 只拦「进入对局」，大厅本身照常可看，玩家可以回标题页导入再回来
+真实实现在 `public/js/screens/title.js` 的 `enter()` 里（360–405 行），规则是三重条件同时满足才拦：
+
+1. `importSupport().ok === true`（环境支持导入）
+2. `countImportedFiles()` 返回 **0**（一个素材都没导入）
+3. `/api/online` 的 `humans >= 10`（大厅里的真人 ≥ 10 人）
+
+满足时弹二选一：**「去契约服」（跳转 `https://alliance.lingluo-toki.top/`）** / **「导入素材包」（打开本页导入窗口，留在原地）**。
+
+- **人少（< 10）时不拦**：不导入时每局要从服务器拉几十 MB（立绘/Spine/特效/音频），人少服务器扛得住，不该为难玩家。这是 2026-10-18 的有意设计，**别当 bug 修掉**。
+- **拿不到人数按「人多」处理**（`humans` 默认 10）：宁可拦一下，也不放任把上行带宽占满。
+- **不支持导入的环境直接放行**（`importSupport().ok === false`：http 非安全上下文 / 缺 Cache API），否则那些浏览器完全玩不了。
+- **读缓存出错也放行**（`imported` 兜底为 1，即视为已导入）：宁可放过，不误伤。
+- 拦的是「进入大厅之后的那一步」，标题页本身一直可看。
+- `countImportedFiles()` 定义在 `public/js/assetCache.js`。
 
 做过又删掉的：大厅顶部的黄色提示条（维护者只要拦截、不要横幅）。
 
-- 常用命令：
-  - 拉上游：`git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git master`
-  - 查上游新增（数量 + 标题）：`git rev-list --count HEAD..FETCH_HEAD`；`git log --oneline --reverse HEAD..FETCH_HEAD`
-  - 查是否已包含上游：`git merge-base --is-ancestor FETCH_HEAD HEAD`（0 = 已包含，零遗漏）
-  - 查双方交叠文件（冲突候选）：对比 `git diff --name-only <基点> HEAD` 与 `git diff --name-only <基点> FETCH_HEAD` 的交集
+- 常用命令（**2026-11-14 实测版**，分支一律用 `dev`）：
+  - 拉上游：`git fetch upstream dev`（**本机已配 `upstream` 远程，实测直连 GitHub 成功，不用镜像**）；不通时才退回 `git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git dev`
+  - 查上游新增（数量 + 标题）：`git rev-list --count HEAD..upstream/dev`；`git log --oneline --reverse HEAD..upstream/dev`
+  - 查是否已包含上游：`git merge-base --is-ancestor upstream/dev HEAD`（退出码 0 = 已包含，零遗漏）
+  - 查双方交叠文件（冲突候选）——PowerShell 一行式（已实测跑通）：
+    ```powershell
+    $base = "f07b8965061bbc311ad7aa815879b09264a1e47d"
+    $ours   = git diff --name-only $base HEAD
+    $theirs = git diff --name-only $base upstream/dev
+    ($ours | Where-Object { $theirs -contains $_ }) | Set-Content "$env:TEMP\sp-conflict-candidates.txt" -Encoding utf8
+    ```
+    当前该集合 = **103 项**，清单落在 `C:\Users\47449\AppData\Local\Temp\sp-conflict-candidates.txt`。
+  - 查未提交改动是否撞上游（同步前必查）：
+    ```powershell
+    $dirty  = git status --porcelain | ForEach-Object { $_.Substring(3).Trim() }
+    $dirty | Where-Object { $theirs -contains $_ }
+    ```
+    当前 = **10 项**：4 个 i18n、`title.js`、`assetImport.js`、`components.js`、`server/index.js`、`server/lobby.js`、`shared/constants.js`。
   - 查未合并残留：`git diff --name-only --diff-filter=U`；查冲突标记残留：`git grep -n -E "^(<<<<<<<|>>>>>>>)"`
-  - 查相对上游删了哪些文件（应为空）：`git diff --diff-filter=D --name-only FETCH_HEAD`
-  - 查 data 是否与上游一致（应为空）：`git diff --stat FETCH_HEAD HEAD -- data/`
+  - 查相对上游删了哪些文件（应为空）：`git diff --diff-filter=D --name-only upstream/dev`（当前实测 **0**）
+  - 查上游新增了哪些文件：`git diff --diff-filter=A --name-only f07b8965 upstream/dev`（当前 **262** 个）
+  - 查 data 是否与上游一致（应为空）：`git diff --stat upstream/dev HEAD -- data/`（**注意：本地有解包产物，`data/local-*.json` 已被忽略，不会出现在这里**）
   - 核对锁定值（**别整份 print config.json**）：
     - `Select-String data\config.json -Pattern '"deployCap":(\d+)'`
     - `Select-String data\config.json -Pattern '"bans":\{"FUNNY"'`（或直接在 `shared/openingBans.js` 看基础值）

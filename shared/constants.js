@@ -29,6 +29,12 @@ export const MAX_SEATS = 6;
  */
 export const MAX_SPECTATORS = 2;
 /**
+ * The most candidate layouts one bot prep rehearses (server/match/bot.js arrangeSteps): up to 8 of its own plus the
+ * other lineups' (Final Assault damage lineups and spaced plans, co-op alternatives); a delegated rehearsal's answer
+ * names one of them (protocol 'b.rehearsalResult').
+ */
+export const REHEARSAL_MAX_CANDIDATES = 16;
+/**
  * 重刷本局 (PR #860, DESIGN §28.21 [ASSUMED]): each seat may open one setup-reroll vote per this many ms. Shared so the
  * client's refusal toast (ui/toasts.js) names the server's value (server/match/match/setupVote.js).
  */
@@ -46,6 +52,23 @@ export const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
 export const BOSS_HP_OPTIONS = Object.freeze([1, 3.25]);
 /** 缺省挡位：官方原版。 */
 export const BOSS_HP_DEFAULT = 1;
+
+/**
+ * 挑战积分的存储刻度（2026-11-01）：积分一律以 1/100 分为单位存整数，避免浮点误差。
+ * 服务端校验是 Number.isSafeInteger，所以 3.25 分必须记作 325；展示时除以本值。
+ */
+export const SCORE_SCALE = 100;
+/** 每个挑战目标的得分：1× 首领血量 = 1 分，3.25× = 3.25 分（都按存储刻度）。 */
+export const BOSS_HP_SCORE = Object.freeze({ 1: SCORE_SCALE, 3.25: Math.round(3.25 * SCORE_SCALE) });
+/** 该挡位每个目标值几分（存储刻度）；不在白名单的挡位返回 0 = 不计分。 */
+export const bossHpScore = value => BOSS_HP_SCORE[Number(value)] ?? 0;
+/** 存储刻度 → 展示文本：300 → "3"，325 → "3.25"。 */
+export const scoreText = value => {
+  const n = (Number(value) || 0) / SCORE_SCALE;
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+};
+/** 一天三个目标全用最高挡位完成时的上限（存储刻度），用于「今日积分 / 上限」展示。 */
+export const DAILY_SCORE_CAP = 3 * BOSS_HP_SCORE[3.25];
 export const DIFFICULTY_NAMES = { FUNNY: N_('标准模拟'), NORMAL: N_('险境模拟'), HARD: N_('绝境模拟'), ABYSS: N_('终极模拟') };
 export const DIFFICULTY_COLORS = { FUNNY: '#f6a329', NORMAL: '#e85a1a', HARD: '#e73118', ABYSS: '#ff0024' };
 
@@ -57,6 +80,7 @@ export const PHASE = Object.freeze({
   LOBBY: 'LOBBY',
   INFO_CHECK: 'INFO_CHECK',
   BAND_DRAFT: 'BAND_DRAFT',
+  CUSTOM_CHECK: 'CUSTOM_CHECK',
   BATTLE_CHECK: 'BATTLE_CHECK',
   ROUND_START: 'ROUND_START',
   SP_DRAFT: 'SP_DRAFT',
@@ -70,7 +94,7 @@ export const PHASE = Object.freeze({
 });
 
 export const PHASE_NAMES = {
-  LOBBY: N_('等待中'), INFO_CHECK: N_('确认本局信息'), BAND_DRAFT: N_('选择策略'), BATTLE_CHECK: N_('协议启动'),
+  LOBBY: N_('等待中'), INFO_CHECK: N_('确认本局信息'), BAND_DRAFT: N_('选择策略'), CUSTOM_CHECK: N_('选择自编'), BATTLE_CHECK: N_('协议启动'),
   ROUND_START: N_('回合开始'), SP_DRAFT: N_('机变阶段'), PREP: N_('休整期'), COMBAT: N_('作战中'), UNITE: N_('联防阶段'),
   SETTLE: N_('结算'), FINAL_ASSAULT: N_('最终攻势'), HIDDEN_CORE: N_('隐秘核心'), RESULT: N_('模拟结束'),
 };
@@ -116,6 +140,30 @@ export const SKILL_SUMMON_START_DEPLOY = true;
  * per N layers (远见, 奇迹, 维多利亚 …) stop with the count. 0 / Infinity = no cap.
  */
 export const BOND_LAYER_CAP = 999;
+
+/** Preview pen upper zone anchor row ((18,7); the lower anchor is (15,7)) and the client's row offsets. */
+const PEN_UPPER_ROW = 18;
+const PREVIEW_ROW_OFFSET = 6;
+const PREVIEW_ROW_OFFSET_LEADER = 13;
+
+/**
+ * 'upper' | 'lower' preview zone of a route start (client `AutoChessEnemyPreviewManager`, research 08 §4.2) — the
+ * enemy previews (server/match/waves.js) and 鸭爵's lower-lane rule (content/bands/meta.js, GitHub #839): target row =
+ * start row + 6 (leader rounds: + 13); the zone is the Manhattan-nearest anchor among those with anchor row ≤ target
+ * row — (18,7) upper, (15,7) lower — so only a target row ≥ 18 reaches the upper zone: normal fields row 12 (upper
+ * gate (12,10); rows 9–11 lower), boss fields row 5 (rows 2–4 lower: the leaders at (3,x)/(4,x) and the (2,10) gate).
+ * A target below row 15 has no zone (the client picks a random pen tile) and is reported 'lower'.
+ * @param {number[]|null} start [row, col]
+ * @param {boolean} [leader] leader / hidden round (default: a boss-field row, ≤ 8)
+ */
+export function gateOf(start, leader) {
+  const r = Array.isArray(start) ? start[0] : null;
+  if (!Number.isFinite(r)) return 'lower';
+  const lead = typeof leader === 'boolean' ? leader : r <= 8;
+  const target = r + (lead ? PREVIEW_ROW_OFFSET_LEADER : PREVIEW_ROW_OFFSET);
+  // both anchors share col 7, so with target ≥ 18 the upper one is always the nearer; below it only (15,7) qualifies
+  return target >= PEN_UPPER_ROW ? 'upper' : 'lower';
+}
 
 /**
  * The layers a gain of `n` actually adds to a bond holding `before` under BOND_LAYER_CAP: min(n, cap − before), never
@@ -238,7 +286,7 @@ export const ERR_TEXT = {
   TEST_DISABLED: N_('测试模式未开启'),
   TEST_FORBIDDEN: N_('这不是测试房间'),
   VERSION_UNKNOWN: N_('本服务器没有启用该版本'),
-  VERSION_UNSUPPORTED: N_('该版本不能用于当前房间（例如房间开着改变玩法的插件）'),
+  VERSION_UNSUPPORTED: N_('该版本不能用于当前房间，请检查模拟方式与插件支持的版本'),
   VERSION_VOTE: N_('切换版本投票进行中，请等投票结束'),
 };
 
