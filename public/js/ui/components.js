@@ -1001,7 +1001,7 @@ export function placeholderFits(input, text) {
  *   disabled?: boolean, size?: 'md'|'lg'|'code'|string, icon?: string, class?: string, inputRef?: any, name?: string,
  *   ariaLabel?: string, modalFocus?: boolean }} props
  */
-export function TextField({ label, micro, value, onInput, onEnter, placeholder, placeholderShort, maxLength, transform, autoFocus, disabled, size = 'md', icon, class: cls, inputRef, name, hint, invalid, ariaLabel, modalFocus = false }) {
+export function TextField({ label, micro, value, onInput, onEnter, placeholder, placeholderShort, maxLength, transform, autoFocus, disabled, readOnly = false, type = 'text', size = 'md', icon, class: cls, inputRef, name, hint, invalid, ariaLabel, modalFocus = false }) {
   const localRef = useRef(null);
   const ref = inputRef || localRef;
   const composing = useRef(false);
@@ -1034,7 +1034,7 @@ export function TextField({ label, micro, value, onInput, onEnter, placeholder, 
     ${label || micro ? html`<span class="field__label">${label}${micro ? html`<span class="micro">${micro}</span>` : null}</span>` : null}
     <span class="field__box brackets">
       ${icon ? html`<${Icon} name=${icon} class="field__icon" />` : null}
-      <input id=${id} ref=${ref} class="field__input" name=${name} value=${value} placeholder=${phShort && placeholderShort ? placeholderShort : placeholder}
+      <input id=${id} ref=${ref} class="field__input" name=${name} type=${type} readOnly=${readOnly} value=${value} placeholder=${phShort && placeholderShort ? placeholderShort : placeholder}
         maxLength=${maxLength} disabled=${disabled} autocomplete="off" spellcheck=${false}
         aria-label=${ariaLabel} data-autofocus=${modalFocus ? '' : undefined}
         onInput=${handle}

@@ -5,20 +5,25 @@ import path from 'node:path';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { challengeDay, dailyChallenges, DAILY_VERSION, ROTATING_CHALLENGES, challengePreview } from '../shared/dailyChallenges.js';
 import { ACHIEVEMENTS, earnedAchievements, updateCollectionAwards } from '../shared/achievements.js';
+import { SCORE_SCALE, BOSS_HP_SCORE, bossHpScore } from '../shared/constants.js';
 
 const COOKIE = 'sp_challenge_identity';
 const CAP = 2000;
 const RETAIN_DAYS = 8;
 const TOTAL_CAP = 20000;
+/** 存储格式版本：4 = 积分改为 1/100 分整数刻度（3.25× 首领血量按倍率加权）。 */
+const STORAGE_VERSION = 4;
+/** 单个目标一天的得分上限（3.25× 挡位），用于校验日榜条目。 */
+const MAX_TARGET_SCORE = BOSS_HP_SCORE[3.25];
 export async function createDailyChallengeBoard({ file, legacyFile = null, now = Date.now, log = console }) {
-  let data = { version: 3, totals: { solo: {}, coop: {} }, rules: DAILY_VERSION, secret: randomBytes(32).toString('hex'), days: {}, achievements: {}, rotationStart: challengeDay(now() + 86400000) };
+  let data = { version: STORAGE_VERSION, totals: { solo: {}, coop: {} }, rules: DAILY_VERSION, secret: randomBytes(32).toString('hex'), days: {}, achievements: {}, rotationStart: challengeDay(now() + 86400000) };
   let healthy = true, writing = Promise.resolve();
   let cachedDay = null, cachedRows = {};
   async function load(source) {
     if ((await fs.stat(source)).size > 16 * 1024 * 1024) throw new Error('leaderboard data too large');
     const raw = await fs.readFile(source, 'utf8');
     const parsed = JSON.parse(raw);
-    if (![1, 2, 3].includes(parsed.version) || !/^[a-f0-9]{64}$/.test(parsed.secret) || !parsed.days || typeof parsed.days !== 'object' || Array.isArray(parsed.days)) throw new Error('invalid leaderboard data');
+    if (![1, 2, 3, STORAGE_VERSION].includes(parsed.version) || !/^[a-f0-9]{64}$/.test(parsed.secret) || !parsed.days || typeof parsed.days !== 'object' || Array.isArray(parsed.days)) throw new Error('invalid leaderboard data');
     if (parsed.version >= 2 && ![3, DAILY_VERSION].includes(parsed.rules)) throw new Error('unsupported rules version; preserve data');
     if (parsed.version < 2 || ![3, DAILY_VERSION].includes(parsed.rules)) {
       // Preserve identity and the old file; easy-task scores never become ultimate/no-AI scores.
@@ -38,7 +43,10 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
         for (const [id, row] of Object.entries(rows)) {
         if (!/^[a-f0-9]{32}$/.test(id) || typeof row?.name !== 'string' || row.name.length > 24
           || !Array.isArray(row.completed) || row.completed.length > 3 || new Set(row.completed).size !== row.completed.length
-          || row.completed.some(task => !ROTATING_CHALLENGES.some(c => c.id === task))) throw new Error('invalid score entry');
+          || row.completed.some(task => !ROTATING_CHALLENGES.some(c => c.id === task))
+          // 当日加权分（存储刻度）：v4 起必填，且不会超过「已完成目标数 × 最高挡位」。
+          || (parsed.version >= STORAGE_VERSION
+            && (!Number.isSafeInteger(row.w) || row.w < 0 || row.w > row.completed.length * MAX_TARGET_SCORE))) throw new Error('invalid score entry');
         }
       }
     }
@@ -101,9 +109,23 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
       const rows = parsed.totals[division];
       if (!rows || typeof rows !== 'object' || Array.isArray(rows) || Object.keys(rows).length > TOTAL_CAP) throw new Error('invalid cumulative division');
       for (const [id, row] of Object.entries(rows)) {
+        // v3 及更早存的是「目标个数」，v4 起是 1/100 分刻度，所以最小合法值随版本变化。
+        const minimum = parsed.version >= STORAGE_VERSION ? SCORE_SCALE : 1;
         if (!/^[a-f0-9]{32}$/.test(id) || typeof row?.name !== 'string' || row.name.length > 24
-          || !Number.isSafeInteger(row.points) || row.points < 1) throw new Error('invalid cumulative score');
+          || !Number.isSafeInteger(row.points) || row.points < minimum) throw new Error('invalid cumulative score');
       }
+    }
+    if (parsed.version < STORAGE_VERSION) {
+      // v3 → v4：积分从「每个目标 1 分」换成 1/100 分整数刻度，日榜补当日加权分。
+      // 旧对局一律按 1× 计（当时 3.25× 根本不入榜），所以已完成目标数 × 1 分即可。
+      await fs.copyFile(source, source + '.pre-weighted').catch(e => { if (e.code !== 'EEXIST') throw e; });
+      for (const rows of Object.values(parsed.totals)) for (const row of Object.values(rows)) row.points *= SCORE_SCALE;
+      for (const divisions of Object.values(parsed.days)) {
+        for (const rows of Object.values(divisions)) {
+          for (const row of Object.values(rows)) row.w = row.completed.length * SCORE_SCALE;
+        }
+      }
+      parsed.version = STORAGE_VERSION;
     }
     return parsed;
   }
@@ -176,7 +198,7 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
     const today = data.days[day]?.[division]?.[id];
     const total = data.totals[division]?.[id];
     const self = today || total ? { name: total?.name || today.name, completed: today?.completed || [],
-      points: today?.completed.length || 0, totalPoints: total?.points || 0, mine: true } : null;
+      points: today?.w || 0, totalPoints: total?.points || 0, mine: true } : null;
     const base = { ok: healthy, day, division, rankingScope: 'cumulative', rotationStart: data.rotationStart,
       challenges: dailyChallenges([], now(), data.rotationStart).challenges, rows: [], self };
     // No ranking sort or roster serialization until explicitly requested.
@@ -197,7 +219,101 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
       total: ranked.length, self: self ? { ...self, ...(own ? { rank: own.rank } : {}) } : null };
   }
 
+  function identityHasData(id) {
+    if (!/^[a-f0-9]{32}$/.test(String(id || ''))) return false;
+    const own = data.achievements[id];
+    if (own) for (const state of Object.values(own)) {
+      if (state && (Object.keys(state.progress || {}).length || Object.keys(state.unlocked || {}).length
+        || Object.keys(state.daily || {}).length || Object.keys(state.legacyDaily || {}).length)) return true;
+    }
+    const totals = data.totals || {};
+    return Boolean((totals.solo?.[id]?.points || 0) + (totals.coop?.[id]?.points || 0));
+  }
+  function mergeIdentities(from, to) {
+    if (!healthy || !/^[a-f0-9]{32}$/.test(String(from || '')) || !/^[a-f0-9]{32}$/.test(String(to || '')) || from === to) throw new Error('INVALID_IDENTITY');
+    const oldest = challengeDay(now() - (RETAIN_DAYS - 1) * 86400000);
+    const achievements = data.achievements || (data.achievements = {});
+    const source = achievements[from];
+    const target = achievements[to] || (achievements[to] = {});
+    const overlap = { solo: 0, coop: 0 };
+    // 保留期内的同日重复由 days 回执证明；保留期外的只能靠「首次完成时间戳」估计。只减不加，宁可少算也不多算。
+    if (source) for (const [div, state] of Object.entries(source)) {
+      const own = target[div];
+      if (!own || !state.daily) continue;
+      for (const [key, at] of Object.entries(state.daily)) {
+        const mine = own.daily?.[key];
+        if (!Number.isSafeInteger(at) || !Number.isSafeInteger(mine)) continue;
+        const day = challengeDay(at);
+        if (day < oldest && day === challengeDay(mine)) overlap[div] = (overlap[div] || 0) + 1;
+      }
+    }
+    if (source) for (const [div, state] of Object.entries(source)) {
+      const own = target[div] || (target[div] = { progress: {}, unlocked: {}, recent: [], daily: {}, legacyDaily: {} });
+      for (const [k, v] of Object.entries(state.progress || {})) own.progress[k] = Math.max(own.progress[k] || 0, v);
+      for (const [k, v] of Object.entries(state.unlocked || {})) {
+        const cur = own.unlocked[k];
+        if (v && (!cur || v < cur)) own.unlocked[k] = v;
+      }
+      for (const [k, v] of Object.entries(state.daily || {})) {
+        const cur = own.daily[k];
+        if (v && (!cur || v < cur)) own.daily[k] = v;
+      }
+      for (const [k, v] of Object.entries(state.legacyDaily || {})) {
+        const cur = own.legacyDaily[k];
+        if (v && (!cur || String(v) < String(cur))) own.legacyDaily[k] = v;
+      }
+      own.recent = Array.from(new Set([...(own.recent || []), ...(state.recent || [])])).slice(-32);
+    }
+    delete achievements[from];
+    const days = data.days || (data.days = {});
+    for (const [day, divs] of Object.entries(days)) {
+      for (const [div, rows] of Object.entries(divs)) {
+        const src = rows[from];
+        if (!src) continue;
+        const mine = rows[to];
+        if (mine) {
+          const missing = (src.completed || []).filter((x) => !(mine.completed || []).includes(x));
+          overlap[div] = (overlap[div] || 0) + (src.completed || []).length - missing.length;
+          mine.completed = Array.from(new Set([...(mine.completed || []), ...(src.completed || [])])).slice(0, 3);
+        } else rows[to] = { ...src, completed: [...(src.completed || [])].slice(0, 3) };
+        delete rows[from];
+        if (!Object.keys(rows).length) delete divs[div];
+      }
+      if (!Object.keys(divs).length) delete days[day];
+    }
+    const at = now();
+    const totals = data.totals || (data.totals = { solo: {}, coop: {} });
+    for (const div of ['solo', 'coop']) {
+      const rows = totals[div] || (totals[div] = {});
+      const src = rows[from];
+      if (!src) continue;
+      delete rows[from];
+      const gained = Math.max(0, (src.points || 0) - (overlap[div] || 0));
+      if (!gained) continue;
+      const mine = rows[to] || (rows[to] = { name: src.name || '', points: 0 });
+      mine.points = (mine.points || 0) + gained;
+      if (src.name && !mine.name) mine.name = src.name;
+    }
+    for (const div of ['solo', 'coop']) {
+      const own = target[div];
+      if (!own) continue;
+      updateCollectionAwards(own, at);
+      for (const a of ACHIEVEMENTS) {
+        if ((own.progress[a.id] || 0) >= a.target && !own.unlocked[a.id]) own.unlocked[a.id] = at;
+      }
+    }
+    return persist().then(() => true);
+  }
   return {
+    identityOf(req) { return healthy ? cookieIdentity(req) : null; },
+    identityHasData,
+    mergeIdentities,
+    accountIdentity(req, res) { return healthy ? ensureCookie(req, res) : null; },
+    restoreAccountIdentity(res, session, id) {
+      if (!healthy || !/^[a-f0-9]{32}$/.test(id)) throw new Error('SCORES_UNAVAILABLE');
+      setCookie(res, id);
+      if (session) identities.set(session, id);
+    },
     // Trusted server-only recovery adapter; never accepted as a client result or identity claim.
     recoveryIdentity: session => identities.get(session) || null,
     restoreRecoveryIdentity(session, id) { if (typeof id === 'string' && /^[a-f0-9]{32}$/.test(id)) identities.set(session, id); },
@@ -265,7 +381,9 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
     record(room, result, registry, proof) {
       if ((room.version && room.version !== DEFAULT_VERSION) || (result?.version && result.version !== DEFAULT_VERSION)) return;
       if (!healthy || result?.difficulty !== 'ABYSS' || room.test === true || result?.test === true || (room.content && room.content.vanilla !== true) || !Array.isArray(result?.players)) return;
-      if (!proof || !/^[a-f0-9]{32}$/.test(proof.runId) || proof.usedAI !== false || proof.difficulty !== 'ABYSS' || proof.bossHp !== 1 || !Array.isArray(proof.participants)) return;
+      // 记分的首领血量挡位：1× 每目标 1 分，3.25× 每目标 3.25 分；其它值一律拒收。
+      const weight = proof ? bossHpScore(proof.bossHp) : 0;
+      if (!proof || !/^[a-f0-9]{32}$/.test(proof.runId) || proof.usedAI !== false || proof.difficulty !== 'ABYSS' || !weight || !Array.isArray(proof.participants)) return;
       const { participants, mode: division } = proof;
       const ids = new Set(participants.map(p => p.playerId));
       if (participants.some(p => p.isBot !== false) || ids.size !== participants.length
@@ -318,7 +436,6 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
         const totals = data.totals[division];
         if (!totals[id] && Object.keys(totals).length >= TOTAL_CAP) continue;
         const previous = board[id]?.completed || [];
-        if (newlyUnlocked.feedback[player.playerId]) newlyUnlocked.feedback[player.playerId].pointsAdded = done.filter(key => !previous.includes(key)).length;
         const completed = [...new Set([...previous, ...done])].slice(0, 3);
         if (state && day < data.rotationStart && completed.length === 3) {
           state.legacyDaily ||= {};
@@ -327,12 +444,15 @@ export async function createDailyChallengeBoard({ file, legacyFile = null, now =
         if (completed.length === previous.length) continue;
         const name = String(session.name || player.name || '').slice(0, 24);
         const gained = completed.length - previous.length;
-        const points = (totals[id]?.points || 0) + gained;
+        // 得分按本局开的挡位加权：1× 每目标 1 分，3.25× 每目标 3.25 分（已换算成存储刻度）。
+        const added = gained * weight;
+        const points = (totals[id]?.points || 0) + added;
         if (!Number.isSafeInteger(points)) continue;
         // Day receipts and permanent totals share the same atomic snapshot / backup.
         // Trimming old receipts never trims totals; expired runs cannot re-add points.
         totals[id] = { name, points };
-        board[id] = { name, completed };
+        board[id] = { name, completed, w: (board[id]?.w || 0) + added };
+        if (newlyUnlocked.feedback[player.playerId]) newlyUnlocked.feedback[player.playerId].pointsAdded = added;
         changed = true;
       }
       if (proof.durableRecovery) {

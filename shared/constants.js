@@ -46,6 +46,23 @@ export const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
 export const BOSS_HP_OPTIONS = Object.freeze([1, 3.25]);
 /** 缺省挡位：官方原版。 */
 export const BOSS_HP_DEFAULT = 1;
+
+/**
+ * 挑战积分的存储刻度（2026-11-01）：积分一律以 1/100 分为单位存整数，避免浮点误差。
+ * 服务端校验是 Number.isSafeInteger，所以 3.25 分必须记作 325；展示时除以本值。
+ */
+export const SCORE_SCALE = 100;
+/** 每个挑战目标的得分：1× 首领血量 = 1 分，3.25× = 3.25 分（都按存储刻度）。 */
+export const BOSS_HP_SCORE = Object.freeze({ 1: SCORE_SCALE, 3.25: Math.round(3.25 * SCORE_SCALE) });
+/** 该挡位每个目标值几分（存储刻度）；不在白名单的挡位返回 0 = 不计分。 */
+export const bossHpScore = value => BOSS_HP_SCORE[Number(value)] ?? 0;
+/** 存储刻度 → 展示文本：300 → "3"，325 → "3.25"。 */
+export const scoreText = value => {
+  const n = (Number(value) || 0) / SCORE_SCALE;
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+};
+/** 一天三个目标全用最高挡位完成时的上限（存储刻度），用于「今日积分 / 上限」展示。 */
+export const DAILY_SCORE_CAP = 3 * BOSS_HP_SCORE[3.25];
 export const DIFFICULTY_NAMES = { FUNNY: N_('标准模拟'), NORMAL: N_('险境模拟'), HARD: N_('绝境模拟'), ABYSS: N_('终极模拟') };
 export const DIFFICULTY_COLORS = { FUNNY: '#f6a329', NORMAL: '#e85a1a', HARD: '#e73118', ABYSS: '#ff0024' };
 

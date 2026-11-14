@@ -22,6 +22,7 @@
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
 import { AssetDownloadButton } from '../ui/assetDownload.js';
 import { AssetImportButton } from '../ui/assetImport.js';
+import { GameAccountButton } from '../ui/gameAccount.js';
 import { useEffect, useMemo, useState } from '../../vendor/hooks.module.js';
 import { NAME_MAX_LEN, APP_VERSION, DEV_BUILD } from '../../../shared/constants.js';
 import { html, Button, Icon, MicroLabel, TextField, PingPill, Modal, confirmDialog } from '../ui/components.js';
@@ -328,10 +329,33 @@ export function TitleScreen() {
   const ridgesFailed = !!ridges && ridgesFailedUrl === ridges;
   // CSS ridgelines only when there is no ridge art (avoids a swap flash when the art arrives).
   const cssRidges = assetsSettled && (!ridges || ridgesFailed);
+  // 账号服务是否启用：3000 未加载账号模块时 /api/account/me 返回 404，此时不显示绑定提示；
+  // 已绑定时 boundQq 为号码，未绑定时为空串，未启用时为 null。
+  const [accountEnabled, setAccountEnabled] = useState(false);
+  const [boundQq, setBoundQq] = useState(null);
+  const [qqToken, setQqToken] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/account/me', { credentials: 'same-origin', cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((v) => {
+        if (!alive) return;
+        setAccountEnabled(!!(v && v.enabled));
+        setBoundQq(v && v.enabled ? (v.profile ? v.profile.qq : '') : null);
+        if (!v || !v.enabled || v.profile) return;
+        try {
+          if (!sessionStorage.getItem('sp.qqHint')) {
+            sessionStorage.setItem('sp.qqHint', '1');
+            toast(t('建议绑定 QQ：换浏览器或换设备也能找回昵称与战绩'), 'info');
+          }
+        } catch (_) {}
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const valid = isValidName(name);
-  const start = async () => {
-      if (!valid) { toast(t('请输入博士代号'), 'warn'); return; }
+  const enter = async () => {
       // 改编版（2026-10-18）：人少的时候不拦，人多才要求先导入素材包。
       // 理由：不导入时每局要从服务器下载几十 MB（立绘 / Spine / 特效 / 音频），
       // 人一多就把上行带宽占满；人少（< 5）时服务器扛得住，不该为难玩家。
@@ -381,6 +405,20 @@ export function TitleScreen() {
       }
       enterSession(name);
     };
+  // 未绑定 QQ：先弹绑定说明（可跳过）；已绑定或不支持则直接进入。
+  // 每次点击实时查一次绑定状态，避免绑定后返回标题页仍按旧状态弹窗。
+  const start = async () => {
+    if (!valid) { toast(t('请输入博士代号'), 'warn'); return; }
+    let bound = boundQq;
+    try {
+      const r = await fetch('/api/account/me', { credentials: 'same-origin' });
+      const data = r.ok ? await r.json() : null;
+      if (data && data.enabled) bound = data.profile?.qq || '';
+    } catch (_) { /* 查询失败按原状态处理 */ }
+    if (bound === '') { setQqToken((n) => n + 1); return; }
+    await enter();
+  };
+  const startSkip = () => enter();
 
   const online = conn.status === 'online' || conn.status === 'connected';
   const dotClass = online ? 'is-on' : conn.status === 'reconnecting' || conn.status === 'connecting' || conn.status === 'handshaking' ? 'is-warn' : 'is-bad';
@@ -443,13 +481,20 @@ export function TitleScreen() {
           onInput=${setName} onEnter=${start} />
         <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" disabled=${!valid} onClick=${start}>${t('开始')}<//>
         <div class="title-conn">
-          <span class=${`status-dot ${dotClass}`}></span>
-          <span>${STATUS_TEXT[conn.status] ? t(STATUS_TEXT[conn.status]) : conn.status}</span>
-          ${conn.status === 'online' ? html`<${PingPill} ms=${conn.ping} />` : null}
+          <span class="title-conn__status">
+            <span class=${`status-dot ${dotClass}`}></span>
+            <span>${STATUS_TEXT[conn.status] ? t(STATUS_TEXT[conn.status]) : conn.status}</span>
+            ${conn.status === 'online' ? html`<${PingPill} ms=${conn.ping} />` : null}
+          </span>
+          <span class="title-conn__acts">
+            <button type="button" class="title-settings fsbtn tapx" aria-label=${t('设置')} title=${t('设置')}
+              onClick=${() => setSettingsOpen(true)}><${GIcon} name="gear" /></button>
+            <${FullscreenButton} class="title-fs" />
+          </span>
+        </div>
+        <div class="title-conn__guide">
+          ${accountEnabled ? html`<${GameAccountButton} plain=${true} class="title-qqlink" label=${boundQq ? t('QQ 已绑定') : t('建议绑定 QQ')} openToken=${qqToken} onSkip=${startSkip} />` : null}
           <${GuideButton} class="title-guide" label=${t('玩法说明')} />
-          <button type="button" class="title-settings fsbtn tapx" aria-label=${t('设置')} title=${t('设置')}
-            onClick=${() => setSettingsOpen(true)}><${GIcon} name="gear" /></button>
-          <${FullscreenButton} class="title-fs" />
         </div>
       </div>
       <div class="title-assets">

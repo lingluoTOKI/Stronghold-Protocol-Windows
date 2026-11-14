@@ -229,7 +229,7 @@
 
 import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.js';
 import { randomBytes, randomInt } from 'node:crypto';
-import { DIFFICULTIES, BOSS_HP_DEFAULT, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, MATCH_TARGET, MATCH_TIMEOUT_MS } from '../shared/constants.js';
+import { DIFFICULTIES, BOSS_HP_DEFAULT, bossHpScore, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, MATCH_TARGET, MATCH_TIMEOUT_MS } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 import { encode, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
@@ -2364,7 +2364,7 @@ export class Lobby {
       if (player && !feedback) {
         const proof = ctx.challenge;
         const reason = !proof || proof.difficulty !== 'ABYSS' ? 'difficulty'
-          : proof.bossHp !== 1 ? 'boss-hp' : ctx.match?.challengeUsedAI !== false ? 'ai'
+          : !bossHpScore(proof.bossHp) ? 'boss-hp' : ctx.match?.challengeUsedAI !== false ? 'ai'
           : room.test || msg.test ? 'test' : room.content && !room.content.vanilla ? 'content'
           : !(proof.mode === 'solo' ? proof.participants.length === 1 : proof.mode === 'coop' && proof.participants.length >= 2 && proof.participants.length <= 6) ? 'mode'
           : !msg.victory || !player.victory || !player.alive || player.left ? 'survival' : 'identity';

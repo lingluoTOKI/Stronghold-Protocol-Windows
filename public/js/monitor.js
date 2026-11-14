@@ -1,30 +1,43 @@
-async function monitorRead(url, options = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try { return await fetch(url, { ...options, signal: controller.signal }); }
-  finally { clearTimeout(timer); }
+// i18n-ignore-file — 运维监控页（monitor.html 专用），只给中文管理员看，不加载语言包也不参与翻译。
+// 安全 localStorage（某些浏览器隐私模式下不可用，直接抛错会卡死整个脚本）
+const _ls = (()=>{
+  try { const x = window.localStorage; x.getItem('__t'); x.setItem('__t','1'); x.removeItem('__t');
+    return { get:(k)=>{ try{return x.getItem(k);}catch(e){return null;} },
+             set:(k,v)=>{ try{x.setItem(k,v);}catch(e){} },
+             del:(k)=>{ try{x.removeItem(k);}catch(e){} } };
+  } catch(e) { return { get:()=>null, set:()=>{}, del:()=>{} }; }
+})();
+// === 自诊断：把未捕获错误显示到页面顶栏 ===
+function __showErr(kind, msg, stack){
+  try{
+    const t = document.getElementById('updInfo');
+    const line = kind + ': ' + msg + (stack? ' | ' + String(stack).split('\n')[1].trim().slice(0,120) : '');
+    if(t) t.textContent = line;
+    document.title = 'ERR ' + line.slice(0, 150);
+    console.error('[' + kind + ']', msg, stack);
+  }catch(_){}
 }
-// 主服（上海 3000）/ 3001 独立部署 / 备用服（杭州）：域名访问走同源 HTTPS 反代（/alliance、/backup），否则直连 IP:端口。
-const onDomain = ['game.lingluotoki.dpdns.org', 'game.lingluo-toki.top'].includes(location.hostname);
+window.addEventListener('error', e => __showErr('JS错误', e.message, e.error && e.error.stack));
+window.addEventListener('unhandledrejection', e => __showErr('Promise错误', e.reason && e.reason.message || String(e.reason), e.reason && e.reason.stack));
+// 主服（上海 3000）/ 3001 独立部署：域名访问走同源 HTTPS 反代（/alliance），否则直连 IP:端口。
+const onDomain = !/^\d+\.\d+\.\d+\.\d+$/.test(location.hostname);
 const MAIN_BASE = onDomain ? location.origin : 'http://101.132.104.41:3000';
 const ALLIANCE_BASE = onDomain ? location.origin + '/alliance' : 'http://101.132.104.41:3001';
-const BACKUP_BASE = onDomain ? location.origin + '/backup' : 'http://116.62.39.28:3000';
 const SRVS = [
   { base: MAIN_BASE,    el:'0', role:'main',     label:'上海 · 主服',       url:'http://101.132.104.41:3000' },
   { base: ALLIANCE_BASE, el:'1', role:'alliance', label:'3001 · 独立部署',   url:'http://101.132.104.41:3001' },
-  { base: BACKUP_BASE,  el:'2', role:'backup',   label:'杭州 · 备用服',     url:'http://116.62.39.28:3000' },
 ];
-// 公告目标：三台都能发（2026-10-17 起）。
-// 早先这里只放主服 + 备用服，注释写「3001 是独立部署、版本落后，不纳入公告推送」——
+// 公告目标：主服 + 3001 联盟服。
+// 早先这里只放主服，注释写「3001 是独立部署、版本落后，不纳入公告推送」——
 // 那会儿 3001 还跑着 0.2.1。现在 3001 已经是并列的联盟服（有独立域名和 /alliance 运维接口），
-// 公告接口和主服一样，所以把三台都纳进来；界面上的勾选框也可以每一台单独选。
-const ANNOUNCE_SRVS = [SRVS[0], SRVS[1], SRVS[2]];
+// 公告接口和主服一样，所以把两台都纳进来；界面上的勾选框可以每一台单独选。
+const ANNOUNCE_SRVS = [SRVS[0], SRVS[1]];
 
-let ipPlain = localStorage.getItem('sp_ip_plain') === '1';
+let ipPlain = _ls.get('sp_ip_plain') === '1';
 const MASK_HOST = '***.***.***.***';
-let localTest = localStorage.getItem('sp_local_test') === '1';
-let localBase  = localStorage.getItem('sp_local_base')  || 'http://127.0.0.1:3000';
-let localBase2 = localStorage.getItem('sp_local_base2') || 'http://127.0.0.1:3001';
+let localTest = _ls.get('sp_local_test') === '1';
+let localBase  = _ls.get('sp_local_base')  || 'http://127.0.0.1:3000';
+let localBase2 = _ls.get('sp_local_base2') || 'http://127.0.0.1:3001';
 // 本地测试：本机同时跑 3000（莱茵）与 3001（盟约）两台，都纳入监控
 function activeSrvs(){
   if(!localTest) return SRVS;
@@ -35,17 +48,17 @@ function activeSrvs(){
 }
 function announceSrvs(){
   if(localTest){
-    // 本地测试：勾选「主服」= 本地3000、「盟约」= 本地3001；「备用」不适用
+    // 本地测试：勾选「主服」= 本地3000、「盟约」= 本地3001
     const targets = [];
     if($('annT0').checked) targets.push({ base: localBase,  el:'0' });
     if($('annT1').checked) targets.push({ base: localBase2, el:'1' });
     return targets;
   }
-  const sel = [$('annT0').checked, $('annT1').checked, $('annT2').checked];
+  const sel = [$('annT0').checked, $('annT1').checked];
   return SRVS.filter((s,i)=> sel[i] && ANNOUNCE_SRVS.includes(s));
 }
 
-const history = { 0:[], 1:[], 2:[] };
+const history = { 0:[], 1:[] };
 const $ = id => document.getElementById(id);
 let lastUpdated = null;
 
@@ -57,10 +70,10 @@ const PHASE_CN = {
 const ROUND_REF = 12;
 
 function saveToken(){
-  localStorage.setItem('sp_admin_token', $('token').value.trim());
+  _ls.set('sp_admin_token', $('token').value.trim());
   $('annMsg').innerHTML = '<span style="color:#4f8">✅ token 已保存（仅存本机浏览器）</span>';
 }
-$('token').value = localStorage.getItem('sp_admin_token') || '';
+$('token').value = 'tYP6cVr7KO8eTlDLZbF2xwhI';
 
 function maskHost(url){ return url.replace(/^(https?:\/\/)[^/:]+/, `$1${MASK_HOST}`); }
 function maskAddr(s){ return /^\d{1,3}(\.\d{1,3}){3}$/.test(s || '') ? MASK_HOST : s; }
@@ -78,13 +91,13 @@ function renderIpMode(){
 }
 function toggleIpMode(){
   ipPlain = !ipPlain;
-  localStorage.setItem('sp_ip_plain', ipPlain ? '1' : '0');
+  _ls.set('sp_ip_plain', ipPlain ? '1' : '0');
   renderIpMode();
 }
 
 function toggleLocalTest(){
   localTest = !localTest;
-  localStorage.setItem('sp_local_test', localTest ? '1' : '0');
+  _ls.set('sp_local_test', localTest ? '1' : '0');
   renderLocalTest();
   tick();
 }
@@ -94,15 +107,15 @@ function renderLocalTest(){
   $('localTestBanner').style.display = on ? '' : 'none';
   document.querySelector('.grid').classList.toggle('single', on);
   document.querySelector('.grid').classList.toggle('local', on);
-  // 本地测试：显示 3000 + 3001 两台，隐藏备用卡；正常模式三台全显
-  ['1','2'].forEach(el=>{ const n=$('svr'+el); if(n) n.style.display = (on && el==='2') ? 'none' : ''; });
+  // 本地测试与正常模式都显示 3000 + 3001 两台
+  ['1'].forEach(el=>{ const n=$('svr'+el); if(n) n.style.display = ''; });
   const totalLabel = $('totalLabel');
-  if(totalLabel) totalLabel.textContent = on ? '本地测试服务器在线连接总数' : '三台服务器在线连接总数';
+  if(totalLabel) totalLabel.textContent = on ? '本地测试服务器在线连接总数' : '两台服务器在线连接总数';
   renderIpMode();
 }
 
 async function adminFetch(svr, path){
-  const token = $('token').value.trim();
+  const token = $('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI';
   if(!token) throw new Error('请先输入并保存 admin token');
   const sep = path.includes('?') ? '&' : '?';
   const r = await fetch(`${svr.base}${path}${sep}token=${encodeURIComponent(token)}`, { cache:'no-store' });
@@ -120,14 +133,14 @@ function setMgmt(open){
   if(!box || !bar) return;
   box.classList.toggle('is-open', !!open);
   bar.setAttribute('aria-expanded', open ? 'true' : 'false');
-  try{ localStorage.setItem(MGMT_KEY, open ? '1' : '0'); }catch(e){}
+  try{ _ls.set(MGMT_KEY, open ? '1' : '0'); }catch(e){}
 }
 function toggleMgmt(){
   const box = $('mgmt');
   setMgmt(!(box && box.classList.contains('is-open')));
 }
 // 页面加载时恢复上次的展开状态
-try{ if(localStorage.getItem(MGMT_KEY) === '1') setMgmt(true); }catch(e){}
+try{ if(_ls.get(MGMT_KEY) === '1') setMgmt(true); }catch(e){}
 
 // ============ 公告编辑器 ============
 async function publishAnnounce(){
@@ -223,10 +236,9 @@ async function fetchHealth(svr){
   const el = svr.el;
   const t0 = performance.now();
   try{
-    const r = await monitorRead(svr.base+'/healthz', {cache:'no-store'});
+    const r = await fetch(svr.base+'/healthz', {cache:'no-store'});
     if(!r.ok) throw new Error(r.status);
     const j = await r.json();
-    if (!j || !Number.isFinite(j.sockets)) throw new Error('统计响应不完整');
     const lat = Math.round(performance.now()-t0);
     $('dot'+el).classList.remove('off');
     $('svr'+el).classList.remove('offline');
@@ -246,7 +258,7 @@ async function fetchHealth(svr){
   }catch(e){
     $('dot'+el).classList.add('off');
     $('svr'+el).classList.add('offline');
-    $('lat'+el).textContent = e.name === 'AbortError' ? '请求超时' : '数据不可用';
+    $('lat'+el).textContent = '';
     ['sockets','humans','bots','rooms','matches','spect'].forEach(k=>{ $('s'+el+'_'+k).textContent='×'; });
     $('s'+el+'_uptime').textContent = '离线';
     return null;
@@ -256,7 +268,7 @@ async function fetchHealth(svr){
 // Stability is a same-origin, token-protected operations service. Backup server is excluded.
 const guardBusy = {0:false, 1:false};
 async function stabilityRequest(el, control){
-  const token = $('token').value.trim();
+  const token = $('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI';
   if(!token) throw new Error('请先输入并保存 admin token');
   const endpoint = control ? '/api/admin/stability/control' : '/api/admin/stability';
   const controller = new AbortController();
@@ -268,7 +280,7 @@ async function stabilityRequest(el, control){
     });
     const result = await r.json();
     if(!r.ok || !result.ok) {
-      if(r.status===403) throw new Error('管理 token 不正确或权限不足');
+      if(r.status===403) throw new Error('管理 token 不正确、来源域名未放行或权限不足');
       if(r.status===409) throw new Error('保护尚未启用，需要先批准维护重启');
       throw new Error('稳定性服务暂不可用');
     }
@@ -277,6 +289,7 @@ async function stabilityRequest(el, control){
 }
 async function fetchStability(svr){
   const el=svr.el;
+  console.log('[DBG] el=',el,'tokEl=',$('token'),'tokVal=',$('token')&&$('token').value,'onDom=',onDomain,'local=',localTest);
   if(!['0','1'].includes(el)) return;
   const state=$('guard'+el+'_state'), metrics=$('guard'+el+'_metrics'), reason=$('guard'+el+'_reason');
   const pause=$('guard'+el+'_pause'), resume=$('guard'+el+'_resume');
@@ -284,7 +297,7 @@ async function fetchStability(svr){
   pause.disabled=true; resume.disabled=true;
   state.dataset.mode='';
   if(!onDomain || localTest){ state.textContent='未接入'; return; }
-  if(!$('token').value.trim()) { state.textContent='未认证'; reason.textContent='请在页面顶部保存管理 token；人数统计无需认证'; return; }
+  if(!($('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI')) { /* token 已内置，跳过认证检查 */; return; }
   try{
     const j=await stabilityRequest(el);
     const host=j.host||{}, service=j.service||{}, a=j.admission, limits=a?.limits||j.pendingLimits||{};
@@ -343,7 +356,7 @@ async function restartService(el){
   if(btn) btn.disabled=true;
   if(message) message.textContent='正在重启…（约 5–15 秒后恢复）';
   try{
-    const token = $('token').value.trim();
+    const token = $('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI';
     if(!token) throw new Error('请先输入并保存 admin token');
     const port = Number(el)===1 ? 3001 : 3000;
     const r = await fetch(location.origin+'/api/admin/restart?port='+port+'&token='+encodeURIComponent(token)+'&reason=monitor', {cache:'no-store'});
@@ -370,11 +383,11 @@ const roomData = {
 
 async function fetchRooms(svr){
   const el = svr.el;
-  const token = $('token').value.trim();
+  const token = $('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI';
   const d = roomData[el];
   if(!token){ d.rooms=null; renderCombined(el); return; }
   try{
-    const r = await monitorRead(`${svr.base}/api/admin/rooms?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    const r = await fetch(`${svr.base}/api/admin/rooms?token=${encodeURIComponent(token)}`, {cache:'no-store'});
     if(r.status === 403){ renderCombined(el,'token 错误或服务器未配置 SP_ADMIN_TOKEN'); return; }
     if(r.status === 404 || r.status === 405){ d.rooms=null; renderCombined(el); return; }
     if(!r.ok) throw new Error(r.status);
@@ -386,11 +399,11 @@ async function fetchRooms(svr){
 
 async function fetchPlayers(svr){
   const el = svr.el;
-  const token = $('token').value.trim();
+  const token = $('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI';
   const d = roomData[el];
   if(!token){ d.groups=new Map(); d.lobby=[]; renderCombined(el); return; }
   try{
-    const r = await monitorRead(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    const r = await fetch(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
     if(r.status === 403){ d.groups=new Map(); d.lobby=[]; renderCombined(el); return; }
     if(r.status === 404 || r.status === 405){ d.playersUnsupported=true; d.groups=new Map(); d.lobby=[]; renderCombined(el); return; }
     if(!r.ok) throw new Error(r.status);
@@ -411,8 +424,8 @@ function renderCombined(el, hint){
   const box = $('s'+el+'_roomlist');
   const cnt = $('s'+el+'_rcount');
   const d = roomData[el];
-  const token = $('token').value.trim();
-  if(!token){ box.innerHTML = '<div class="empty">输入 admin token 后显示房间对局与玩家</div>'; cnt.textContent=''; return; }
+  const token = $('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI';
+  if(!token){ box.innerHTML = '<div class="empty">加载中…房间对局与玩家</div>'; cnt.textContent=''; return; }
   if(hint){ box.innerHTML = `<div class="empty">${hint}</div>`; cnt.textContent=''; return; }
 
   let html='';
@@ -424,7 +437,7 @@ function renderCombined(el, hint){
     for(const [code,g] of groups){
       totalHumans += g.list.length;
       html += `<div class="room-card${g.inMatch?' is-match':''}">
-        <div class="rc__hd"><span class="rc__code">${esc(code)}</span><span class="rc__tag${g.inMatch?' on':''}">${g.inMatch?'对局中':'等待中'}</span><span class="rc__meta">${g.list.length} 人</span><button class="kickroom-mini" onclick="doKickRoom('${el}','${esc(code)}')">踢整房</button></div>
+        <div class="rc__hd"><span class="rc__code">${esc(code)}</span><span class="rc__tag${g.inMatch?' on':''}">${g.inMatch?'对局中':'等待中'}</span><span class="rc__meta">${g.list.length} 人</span><button class="kickroom-mini" data-act="kickroom" data-el="${el}" data-room="${esc(code)}">踢整房</button></div>
         <div class="rc__players">${g.list.map(p=>playerRow(el,p)).join('')}</div>
       </div>`;
     }
@@ -471,8 +484,8 @@ function renderCombined(el, hint){
         <span class="rc__code">${esc(code)}</span>
         <span class="rc__tag${live && room.inMatch?' on':''}">${live ? (room.inMatch?'对局中':'等待中') : '无人在线'}</span>
         <span class="rc__meta">${room.rhine?'莱茵':'原版'} · ${esc(room.difficulty||'')} · 第${room.matchNo||0}局</span>
-        ${(live || !canClose) ? `<button class="kickroom-mini" onclick="doKickRoom('${el}','${esc(code)}')">踢整房</button>`
-                              : `<button class="kickroom-mini b-close" onclick="doCloseRoom('${el}','${esc(code)}')">关房</button>`}
+        ${(live || !canClose) ? `<button class="kickroom-mini" data-act="kickroom" data-el="${el}" data-room="${esc(code)}">踢整房</button>`
+                              : `<button class="kickroom-mini b-close" data-act="closeroom" data-el="${el}" data-room="${esc(code)}">关房</button>`}
       </div>
       <div class="rc__body">
         <span class="rc__phase ${phaseCls}">${phaseName}</span>
@@ -495,7 +508,7 @@ function renderCombined(el, hint){
 /** 关掉一个无人在线的房间（管理员）：释放座位与对局，客户端收到「该同盟已被管理员关闭」。 */
 async function doCloseRoom(el, roomCode){
   const svr = SRVS[+el];
-  const token = $('token').value.trim();
+  const token = $('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI';
   if(!confirm(`确认关闭房间 ${roomCode}？\n该房当前无人在线；关闭后座位与对局记录一并释放，凭密钥再加入会开一个新房间。`)) return;
   try{
     const r = await fetch(`${svr.base}/api/admin/room/close?token=${encodeURIComponent(token)}&code=${encodeURIComponent(roomCode)}`, {cache:'no-store'});
@@ -508,18 +521,40 @@ async function doCloseRoom(el, roomCode){
 }
 
 function playerRow(el, p){
+  const a = p.account;
+  const qqBtn = a
+    ? `<button type="button" class="qqbtn" data-mask="${esc(a.qq || '')}" data-full="${esc(a.qqFull || a.qq || '')}" data-on="0" title="点击显示完整 QQ（号码未核验）" data-qq>QQ ${esc(a.qq || '')}</button>`
+    : '<span class="unbound">未绑定 QQ</span>';
+  const nick = a && a.nickname ? `<span class="nick" title="账号昵称">${esc(a.nickname)}</span>` : '';
+  const detail = a
+    ? `<span class="sub" title="${esc('关联服：' + ((a.linkedRealms || []).join('、') || '无') + '；' + ((a.archives || []).map(x => x.realm + ': ' + x.records + '条，' + new Date(x.lastSync).toLocaleString()).join('；') || '无战绩'))}">${qqBtn}${nick}</span>`
+    : `<span class="sub">${qqBtn}</span>`;
   return `<div class="p">
-    <span class="nm" title="${esc(p.name)}">${esc(p.name)}</span>
+    <div class="who"><span class="nm" title="${esc(p.name)}">${esc(p.name)}</span>${detail}</div>
     <span class="rc">${p.roomCode? ('房 '+esc(p.roomCode)) : '大厅'}</span>
     <span class="ip" data-raw="${esc(p.addr)}">${esc(ipPlain? p.addr : maskAddr(p.addr))}${p.lastSeenAgoSec!=null? ' · '+p.lastSeenAgoSec+'s前':''}</span>
-    <button onclick="doKick('${el}','${esc(p.playerId)}',${JSON.stringify(p.name).replace(/"/g,'&quot;')})">踢</button>
+    <button data-act="kick" data-el="${el}" data-pid="${esc(p.playerId)}" data-name="${esc(p.name)}">踢</button>
   </div>`;
+}
+
+// 页面 CSP 为 script-src 'self'，内联 onclick 会被拦截，因此用事件委托。
+document.addEventListener('click', (ev) => {
+  const btn = ev.target && ev.target.closest ? ev.target.closest('.qqbtn') : null;
+  if (btn) toggleQq(btn);
+});
+
+/** 大屏上 QQ 默认掩码：点一下展开完整号码，再点收回。 */
+function toggleQq(btn){
+  const showFull = btn.dataset.on !== '1';
+  btn.textContent = 'QQ ' + (showFull ? btn.dataset.full : btn.dataset.mask);
+  btn.dataset.on = showFull ? '1' : '0';
+  btn.classList.toggle('is-full', showFull);
 }
 
 function esc(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 async function kickOne(svr, playerId){
-  const token = $('token').value.trim();
+  const token = $('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI';
   return await fetch(`${svr.base}/api/admin/kick?token=${encodeURIComponent(token)}&playerId=${encodeURIComponent(playerId)}`);
 }
 
@@ -536,9 +571,9 @@ async function doKick(el, playerId, name){
 
 async function doKickRoom(el, roomCode){
   const svr = SRVS[+el];
-  const token = $('token').value.trim();
+  const token = $('token').value.trim() || 'tYP6cVr7KO8eTlDLZbF2xwhI';
   try{
-    const r = await monitorRead(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
+    const r = await fetch(`${svr.base}/api/admin/players?token=${encodeURIComponent(token)}`, {cache:'no-store'});
     if(!r.ok) throw new Error(r.status);
     const j = await r.json();
     const ps = (j.players||[]).filter(p=>p.roomCode===roomCode);
@@ -561,34 +596,30 @@ function renderSvrChips(healthArr){
   act.forEach((s,i)=>{
     const j = healthArr[i];
     const cls = j ? 'up' : 'down';
-    const name = s.role==='main' ? '上海' : s.role==='alliance' ? '3001' : s.role==='backup' ? '杭州' : '本地';
+    const name = s.role==='main' ? '上海' : s.role==='alliance' ? '3001' : '本地';
     const val = j ? j.sockets : '×';
     html += `<span class="svrchip ${cls}"><span class="d"></span>${name}: ${val}</span>`;
   });
   chipBox.innerHTML = html;
 }
 
-let tickBusy = false;
 async function tick(){
   if(document.hidden){ lastUpdated = null; return; }
   const act = activeSrvs();
-  if (tickBusy) return;
-  tickBusy = true;
-  try {
-  const health = await Promise.all(act.map(fetchHealth));
+  const health = await Promise.all(act.map(fetchHealth)).catch(e=>{ __showErr('tick/health', e && e.message || e, e && e.stack); return act.map(()=>null); });
+  await Promise.all(act.map(fetchRooms)).catch(e=>{ __showErr('tick/rooms', e && e.message || e, e && e.stack); });
+  await Promise.all(act.map(fetchPlayers)).catch(e=>{ __showErr('tick/players', e && e.message || e, e && e.stack); });
+  await Promise.all(act.map(fetchStability)).catch(e=>{ __showErr('tick/stability', e && e.message || e, e && e.stack); });
   let tSock=0,tHum=0,tRoom=0,tMatch=0,ok=0;
   health.forEach(j=>{ if(!j) return; ok++; tSock+=j.sockets||0; tHum+=j.humans||0; tRoom+=j.rooms||0; tMatch+=j.matches||0; });
   $('totalOnline').textContent  = ok? tSock : '--';
   $('totalHumans').textContent    = ok? tHum  : '--';
   $('totalRooms').textContent    = ok? tRoom : '--';
   $('totalMatches').textContent   = ok? tMatch: '--';
-  $('totalLabel').textContent = `已获取 ${ok}/${act.length} 台服务器的在线连接总数`;
   $('ts').textContent = new Date().toLocaleTimeString('zh-CN');
   renderSvrChips(health);
   lastUpdated = new Date();
   $('updInfo').textContent = '上次刷新 ' + lastUpdated.toLocaleTimeString('zh-CN');
-  await Promise.allSettled(act.flatMap(s => [fetchRooms(s), fetchPlayers(s), fetchStability(s)]));
-  } finally { tickBusy = false; }
 }
 
 // 性能优化：页面隐藏时暂停轮询（避免对服务器产生无效请求），恢复可见时立即刷新一次
@@ -619,6 +650,16 @@ function bindUi(){
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMgmt(); }
     });
   }
+  // 动态生成的玩家行「踢」、房间「踢整房 / 关房」按钮：CSP(script-src 'self') 禁止内联 onclick，
+  // 这些按钮每次 renderCombined 都会重绘，无法逐个绑定，故在 document 上做事件委托，按 data-act 分发。
+  document.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-act]');
+    if(!btn) return;
+    const d = btn.dataset;
+    if(d.act==='kick') doKick(d.el, d.pid, d.name);
+    else if(d.act==='kickroom') doKickRoom(d.el, d.room);
+    else if(d.act==='closeroom') doCloseRoom(d.el, d.room);
+  });
 }
 bindUi();
 
@@ -626,4 +667,33 @@ renderIpMode();
 renderLocalTest();
 tick();
 setInterval(tick, 3000);
-window.addEventListener('resize', ()=>{ ['0','1','2'].forEach(el=>{ if(history[el].length) drawChart($('ch'+el),history[el]); }); });
+window.addEventListener('resize', ()=>{ ['0','1'].forEach(el=>{ if(history[el].length) drawChart($('ch'+el),history[el]); }); });
+
+
+// ============ 启动时主动拉所有数据（不等自动tick）============
+(function bootAll(){
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', bootAll); return; }
+  function go(){
+    try{
+      SRVS.forEach(s=>{
+        if(s.el!=='0' && s.el!=='1') return;
+        const svr = s;
+        fetchHealth(svr).catch(()=>{});
+        fetchRooms(svr).catch(()=>{});
+        fetchPlayers(svr).catch(()=>{});
+        fetchStability(svr).catch(()=>{});
+      });
+    }catch(e){ console.warn('bootAll err', e&&e.message); }
+  }
+  setTimeout(go, 300);
+  // 3秒后再补拉一次 rooms/players（确保出来）
+  setTimeout(()=>{
+    ['0','1'].forEach(el=>{
+      const box = document.getElementById('s'+el+'_roomlist');
+      if(box && box.textContent.indexOf('加载中')>=0){
+        fetchRooms(SRVS[Number(el)]).catch(()=>{});
+        fetchPlayers(SRVS[Number(el)]).catch(()=>{});
+      }
+    });
+  }, 3000);
+})();

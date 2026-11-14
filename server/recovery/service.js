@@ -25,8 +25,10 @@ const pick=(o,keys)=>Object.fromEntries(keys.map(k=>[k,o[k]]));
 export function createRecoveryService({store,lobby,compatibility,log=console}) {
  let closing=false;const jobs=new Set();const failures=new Map();
  function track(p,id){jobs.add(p);p.catch(e=>{failures.set(id,e.message);log.error('[recovery]',id,e.message);}).finally(()=>jobs.delete(p));return p;}
+ // 掉线超过重连窗口的座位可能已经找不到会话：以前这里 throw，会把整个结算/封存一并堵死（所有玩家停在结算画面）。
+ // 结算真正要落地的只有「还在房间里的人」，找不到会话的座位直接跳过，交给房间自己的离场与空房流程。
  function envelope(room,ctx){return {version:1,room:pick(room,ROOM_KEYS),challenge:ctx.challenge,
-  sessions:room.seats.filter(s=>s&&!s.isBot&&!s.left).map(s=>{const session=lobby.registry.byId(s.playerId);if(!session)throw new Error('Missing reconnect identity');return {...pick(session,SESSION_KEYS),challengeIdentity:lobby.dailyBoard?.recoveryIdentity(session)||null};})};}
+  sessions:room.seats.filter(s=>s&&!s.isBot&&!s.left).flatMap(s=>{const session=lobby.registry.byId(s.playerId);if(!session)return [];return [{...pick(session,SESSION_KEYS),challengeIdentity:lobby.dailyBoard?.recoveryIdentity(session)||null}];})};}
  function put(room,ctx,status,payload){return store.put({id:ctx.challenge.runId,compatibility,status,payload:serialize(payload)});}
  function save(room,ctx){
   if(closing||ctx.ended||room.modded||room.test||(room.version && room.version!==DEFAULT_VERSION))return;
@@ -57,19 +59,25 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
    if(m.recoveryWaiting&&!m.ended&&humans.length&&humans.every(p=>p.connected&&m.recoveryConfirmed.has(p.playerId)))resumePrep(m,m._recoveryRemainingMs);
   };
   // 重连即视为确认：客户端没有单独的「确认恢复」流程，只等 g.ready 会让玩家卡在恢复帧里。
+  // recoveryConfirmed 只在 restorePrep（恢复出来的对局）里初始化，普通对局重连时是 undefined：
+  // 以前无条件 .add 会抛 TypeError（日志里 364 次），这里只在恢复等待期才记录确认。
   const reconnect=m.onReconnect.bind(m);
-  m.onReconnect=id=>{reconnect(id);m.recoveryConfirmed.add(id);maybeResume();};
+  m.onReconnect=id=>{reconnect(id);if(m.recoveryWaiting&&m.recoveryConfirmed)m.recoveryConfirmed.add(id);maybeResume();};
   const leave=m.onLeave.bind(m);
   m.onLeave=id=>{track(store.fact({id:ctx.challenge.runId,departed:id}).then(()=>{if(!m.disposed){leave(id);maybeResume();}}),ctx.challenge.runId);};
  }
  async function finish(room,ctx,summary,done){
   if(ctx.recoveryFinishing)return;ctx.recoveryFinishing=true;
   const messages=ctx.recoveryResults||[];
-  const payload={...envelope(room,ctx),summary,messages,publicFrame:ctx.lastPublic,usedAI:ctx.match.challengeUsedAI};
-  await put(room,ctx,'finished',payload); // Commit terminal state before any award or result reaches a player.
+  // 结算优先送到玩家：封存（envelope / sqlite 提交）只为回放与恢复服务，任何一步失败都不能把 m.result 扣住，
+  // 否则所有玩家会永远停在结算画面上（以前这个 await put 抛错或长期不返回就不会再调用 done()）。
+  try{
+   const payload={...envelope(room,ctx),summary,messages,publicFrame:ctx.lastPublic,usedAI:ctx.match.challengeUsedAI};
+   await put(room,ctx,'finished',payload); // Commit terminal state before any award or result reaches a player.
+  }catch(e){log.error('[recovery] finish commit failed',room.code,e&&e.message||e);}
   ctx.recoveryCommitted=true;
-  for(const [id,msg]of messages)lobby.matchSend(room,ctx,id,msg);
-  await lobby.dailyBoard?.flush();
+  for(const [id,msg]of messages){try{lobby.matchSend(room,ctx,id,msg);}catch(e){log.error('[recovery] result delivery failed',room.code,e&&e.message||e);}}
+  try{await lobby.dailyBoard?.flush();}catch(e){log.error('[recovery] daily flush failed',e&&e.message||e);}
   done();
  }
  async function restore(){
@@ -87,6 +95,8 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
    if(row.status==='finished'&&Date.now()-row.updated>60000)continue;
    try{
     const payload=deserialize(row.payload);if(payload.version!==1||payload.challenge.runId!==row.id)throw new Error('Invalid recovery envelope');
+    // 没有人能回来接的存档（例如全员都已超过重连窗口）不再重建房间：以前每次重启都会把这些老存档复活成空房。
+    if(!payload.sessions.length){failures.set(row.id,'No reconnectable sessions');continue;}
     const r=payload.room;if(row.status==='finished' && (lobby.rooms.has(r.code)||payload.sessions.some(s=>lobby.registry.byId(s.playerId))))continue;
     if(lobby.rooms.has(r.code))throw new Error('Recovered room code conflict');
     for(const s of payload.sessions)if(lobby.registry.byId(s.playerId)||lobby.registry.byTokenMap.has(s.token)||!/^([a-f0-9]{32})$/.test(s.token))throw new Error('Reconnect identity conflict');
@@ -128,7 +138,7 @@ export function createRecoveryService({store,lobby,compatibility,log=console}) {
   restoreMatch(room,ctx,payload){const saved=restorePrep(ctx.match,payload.checkpoint);ctx.match._recoveryRemainingMs=saved.remainingMs;ctx.challenge=payload.challenge;attach(room,ctx);},
   bufferResult(ctx,id,msg){if(ctx.recoveryCommitted)return false;(ctx.recoveryResults||= []).push([id,msg]);return true;},
   finish(room,ctx,summary,done){track(finish(room,ctx,summary,done),ctx.challenge.runId);},
-  abandon(room,ctx,reason){if(!ctx||closing||reason==='shutdown'||ctx.recoveryFinishing||ctx.ended)return;track(put(room,ctx,'finished',{...envelope(room,ctx),summary:{players:[],reason},messages:[]}),ctx.challenge.runId);},
+  abandon(room,ctx,reason){if(!ctx||closing||reason==='shutdown'||ctx.recoveryFinishing||ctx.ended)return;let payload;try{payload={...envelope(room,ctx),summary:{players:[],reason},messages:[]};}catch(e){log.error('[recovery] abandon envelope failed',room.code,e&&e.message||e);return;}track(put(room,ctx,'finished',payload),ctx.challenge.runId);},
   async close(){closing=true;while(jobs.size)await Promise.allSettled([...jobs]);await store.close();},
   async flush(){while(jobs.size)await Promise.all([...jobs]);await store.flush();},
   status(){return {enabled:true,pending:jobs.size,failures:[...failures].map(([id,error])=>({id,error}))};},

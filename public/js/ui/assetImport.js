@@ -190,7 +190,7 @@ export function AssetImportButton() {
   return html`<div class="title-assets__item">
     <${Button} variant="primary" block=${true} size="sm" data-testid="asset-import" aria-describedby="title-asset-import-hint"
       onClick=${() => setOpen(true)}>${t('导入素材包')}<//>
-    <small id="title-asset-import-hint">${support.ok ? t('读取自己的素材包，美术不占服务器流量。') : t('导入需要 HTTPS 或 localhost。')}</small>
+    <small id="title-asset-import-hint">${support.ok ? t('素材包在游戏交流群 1104628970 的群文件，读取本机 zip，美术不占服务器流量。') : t('导入需要 HTTPS 或 localhost。')}</small>
     <${Modal} open=${open} onClose=${close} title=${t('导入素材包')} class="asset-import-dialog" actions=${html`
       <${Button} onClick=${close}>${t('关闭')}<//>`}>
       <p class="t-lo">${t('从素材包 zip、完整包 zip 或自己的 public/assets 文件夹导入。只收下和服务器清单哈希一致的文件，不上传任何内容。')}</p>

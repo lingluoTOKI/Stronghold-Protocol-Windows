@@ -43,7 +43,7 @@ export function AchievementCollection() {
     ${showBoard ? html`<${MedalBoard} data=${data} division=${division} failed=${failed} onClose=${() => setShowBoard(false)} />` : null}
     <div class="permanent-tools"><details class="medal-preview"><summary>${t('获得规则与计次说明')}</summary>
     <p>${t('旧成就、获得日期和进度保留。新增累计章承接可核实的次数下限，无法证明的历史次数不补算。本地导入不补发服务器成就。')}</p>
-    <p>${t('获得条件：终极模拟、官方 1 倍首领血量、全程无 AI 队友及 AI 托管。')}</p>
+    <p>${t('获得条件：终极模拟、首领血量 1× 或 3.25×、全程无 AI 队友及 AI 托管。')}</p>
     <p>${t('单人榜仅收独立模拟；多人榜仅收开局 2–6 名真人的同盟模拟。开局人数决定分组，不按结算剩余人数改组。')}</p>
     <p>${t('任意队友开启过 AI 托管，整局不计分，关闭托管也不恢复资格；普通掉线重连不会直接取消资格。')}</p>
     <p>${t('无漏怪要求个人整局漏怪总数为零，不是仅有若干无漏怪回合。所有成就都须本人存活到结算。')}</p>
