@@ -2362,7 +2362,10 @@ function buildStages(ctx, modesById) {
   const out = {};
   const unite = [['escapedBattleTemplateMapSinglePlayer', 1], ['escapedBattleTemplateMapMultiPlayer', 2]]
     .filter(([k]) => ctx.act.constData[k]).map(([k, helpers]) => ({ stageId: templateIdOf(ctx.act.constData[k]), helpers }));
-  for (const { stageId, helpers } of [...ctx.stageIds.map((id) => ({ stageId: id, helpers: 0 })), ...unite]) {
+  // TEMP(h07-boss-terrain): Boss 战的 h07 波次模板不在 stageDatasDict 里，地形因此从未生成，
+  // 战斗回落 empty 导致没有部署格。这里把 h07 模板也当 stage 处理一次；跑完即还原本文件。
+  const h07Ids = [...ctx.templateIds].filter((k) => /h0[78]_/i.test(k));
+  for (const { stageId, helpers } of [...ctx.stageIds.map((id) => ({ stageId: id, helpers: 0 })), ...unite, ...h07Ids.map((id) => ({ stageId: id, helpers: 0 }))]) {
     const sd = helpers ? null : ctx.act.stageDatasDict[stageId];
     const lv = ctx.levels[stageId];
     const map = lv.mapData?.map || [];
