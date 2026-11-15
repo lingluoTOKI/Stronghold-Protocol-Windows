@@ -6,7 +6,7 @@ import { html, Button, Icon, MicroLabel, confirmDialog } from './components.js';
 import { t } from '../../../shared/i18n.js';
 import { THEME_LIMITS } from '../../../shared/uiTheme.js';
 import {
-  BUILTIN_ID, bootUiThemes, deleteTheme, importThemeFiles, importThemeZip, prepareTheme, selectTheme, themeCards, themeStatus,
+  BUILTIN_ID, bootUiThemes, deleteTheme, importThemeFiles, importThemeZip, prepareTheme, selectTheme, setShareUi, shareUiOn, themeCards, themeStatus,
 } from '../uiTheme.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -67,6 +67,7 @@ export function ThemeSection({ activeId = '' }) {
   const [report, setReport] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [shareUi, setShareUiState] = useState(() => shareUiOn());
   const refresh = () => setCards(themeCards());
 
   useEffect(() => {
@@ -181,6 +182,12 @@ export function ThemeSection({ activeId = '' }) {
         </article>`;
       })}
     </div>
+    <div class="theme-page__actions" style="margin-top:.1rem;align-items:center;gap:.08rem;">
+      <span class="set-row__label">${t('官方 UI 样式（仅外观）')}</span>
+      <${Button} variant=${shareUi ? 'secondary' : 'ghost'} size="sm" data-testid="share-ui-toggle"
+        onClick=${() => { const next = !shareUi; setShareUi(next); setShareUiState(next); }}>${shareUi ? t('已开启') : t('关闭')}<//>
+    </div>
+    <p class="set-hint">${t('用可露希尔主题包自己的样式表重绘现有界面，只改外观，不替换界面结构，不改变对局。')}</p>
     ${report ? html`<div class="theme-report" data-testid="theme-report" role="status">
       ${report.fail ? html`<p>${report.fail}</p>` : html`
         <p>${t('导入完成')}</p>

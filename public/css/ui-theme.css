@@ -14,12 +14,12 @@
 }
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 3.2rem), 1fr)); gap: .12rem; margin-top: .12rem; }
 .theme-card {
-  min-width: 0; display: grid; grid-template-columns: .72rem minmax(0, 1fr); grid-template-rows: auto auto;
-  gap: .06rem .1rem; padding: .1rem; border: 1px solid var(--line-2); background: rgba(8, 11, 10, .45);
+  min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto;
+  gap: .05rem .1rem; padding: .1rem; border: 1px solid var(--line-2); background: rgba(8, 11, 10, .45);
 }
-.theme-card.is-on { border-color: var(--mint-600); }
+.theme-card.is-on { border-color: var(--mint-600); background: rgba(78, 216, 175, .08); }
 .theme-card__thumb {
-  grid-row: 1 / span 2; width: .72rem; height: .72rem; object-fit: cover; display: grid; place-items: center;
+  grid-row: auto; width: 100%; height: auto; aspect-ratio: 284 / 114; object-fit: cover; display: grid; place-items: center;
   background: rgba(0, 0, 0, .35); color: var(--text-hi); font-size: calc(.22 * var(--t));
 }
 .theme-card__meta { min-width: 0; }
@@ -62,7 +62,8 @@ html[data-sp-color~="garrison1"] .gm .dgarrison__type { color: var(--sp-c-garris
 /* ---- stretched images, layered over the fill the element already has ---- */
 html[data-sp-slot~="hud_player_info"]:not([data-sp-slice~="hud_player_info"]) .gtop__band:not(.gtop__band--pf) {
   background-image: var(--sp-img-hud_player_info);
-  background-size: 100% 100%; background-repeat: no-repeat;
+  /* our top bar is a different aspect from the official one; 100% 100% stretched the pack's plate into a blob */
+  background-size: cover; background-position: center; background-repeat: no-repeat;
 }
 html[data-sp-slot~="game_start"] .pboot__stage {
   background-image: var(--sp-img-game_start);

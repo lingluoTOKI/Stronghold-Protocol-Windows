@@ -701,9 +701,55 @@ function applySlotAspects(root, pack, key) {
   }
 }
 
+/* ---- 官方 UI 样式层（仅外观，不动 DOM）: the closure pack's own stylesheets, appended after ours ----
+   Opt-in, browser-only, off by default. It repaints what our own classes already name; it does not
+   replace any of our screens (that would need the pack's V0.3.3 JS, which we do not have). */
+/* Order matters: the official screens paint first, then the closure-only layers, and our
+   compat patch last so the 0.3.4-only pieces the official sheets never named keep their rules. */
+/* Only the closure pack's own incremental layers. The pack's `screens/*.css` are written for its
+   V0.3.3 DOM: class names match ours but the nesting does not, so applying them whole broke the
+   board, the shop row and the sidebar (report of 2026-11-14). They stay on disk for reference. */
+const SHARE_UI_CSS = [
+  'ac-theme-closure.css',
+  'ac-closure-battle.css',
+  'ac-closure-bonds.css',
+  'ac-closure-round.css',
+  'ac-closure-shop.css',
+  'ac-closure-tv.css',
+];
+
+export function shareUiOn() {
+  try { return localStorage.getItem('sp.share-ui') === '1'; } catch { return false; }
+}
+
+/** Turn the stylesheet layer on or off. Links are appended last so they win over our own rules. */
+export function applyShareUi(on) {
+  const root = typeof document !== 'undefined' ? document.documentElement : null;
+  if (!root) return;
+  if (on) root.setAttribute('data-share-ui', '1');
+  else root.removeAttribute('data-share-ui');
+  for (const name of SHARE_UI_CSS) {
+    const id = `share-ui-${name}`;
+    const have = document.getElementById(id);
+    if (on && !have) {
+      const el = document.createElement('link');
+      el.id = id;
+      el.rel = 'stylesheet';
+      el.href = `/assets/local/share-ui/css/${name}`;
+      document.head.appendChild(el);
+    } else if (!on && have) {
+      have.remove();
+    }
+  }
+}
+
+export function setShareUi(on) {
+  try { localStorage.setItem('sp.share-ui', on ? '1' : '0'); } catch { /* session only */ }
+  applyShareUi(on);
+}
+
 /** Paint `id`, or the built-in look when the id is empty or the pack is gone. */
-export function applyUiTheme(id) {
-  const pack = themePack(id);
+export function applyUiTheme(id) {  const pack = themePack(id);
   const key = pack ? `${pack.id}:${pack.rev}` : '';
   if (key === appliedKey && (pack ? voicePackId === pack.id : voicePackId === '')) return pack;
   appliedKey = key;
@@ -796,6 +842,7 @@ export function noteThemeBuy(buy) {
 }
 
 export async function bootUiThemes() {
+  applyShareUi(shareUiOn());
   try { await library.boot(); } catch { /* session only */ }
   let manifest;
   try { manifest = await library.loadAssetManifest(); } catch { manifest = null; }
