@@ -11,6 +11,16 @@ import { tileKey, parseKey, inField, canPlace, placeClass, freeSlot, pieceDir, p
 import { attackRangeGrid, loadoutRecord, resolveRecordLoadout } from '../../../shared/loadoutRecord.js';
 import { summonPlacementGrid } from '../../../shared/summonPlacement.js';
 import { OK, fail, TEMP_SIZE } from './common.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// A match host's forked child has stdout `ignore` (server/match/host/index.js), so console.log is lost; append a line
+// to the refusal log instead.
+const DENY_LOG = path.join(os.tmpdir(), 'sp-equip-deny.log');
+const denyLog = (stage, data) => {
+  try { fs.appendFileSync(DENY_LOG, `${new Date().toISOString()} [${stage}] ${JSON.stringify(data)}\n`); } catch { /* ignore */ }
+};
 
 export class PlayerPlacement {
   /**
@@ -21,18 +31,22 @@ export class PlayerPlacement {
   move(uid, to, dir) {
     const g = this._gate(); if (g) return g;
     const loc = this.find(uid);
-    if (!loc || loc.area === 'equipped') return fail(ERR.BAD_TARGET);
-    if (!to || typeof to !== 'object') return fail(ERR.BAD_TARGET);
+    if (!loc) return fail(ERR.BAD_TARGET, '找不到该单位');
+    if (loc.area === 'equipped') return fail(ERR.BAD_TARGET, '已装备在干员身上的道具不能直接移动');
+    if (!to || typeof to !== 'object') return fail(ERR.BAD_TARGET, '移动目标无效');
     const piece = loc.piece;
     if (to.area === 'board') {
-      if (piece.kind === 'item') return fail(ERR.BAD_TARGET, 'items are equipped, not placed');
+      if (piece.kind === 'item') {
+        denyLog('move-item-to-board', { uid, kind: piece.kind, id: piece.id, area: loc.area, to: { area: to.area, row: to.row, col: to.col } });
+        return fail(ERR.BAD_TARGET, '装备要拖到干员身上配发，不能直接放在格子');
+      }
       const d = parseDir(dir !== undefined ? dir : to.dir);
       if (!d) return fail(ERR.BAD_TARGET, 'bad dir');
       return piece.kind === 'token' ? this._moveTokenToBoard(loc, to.row, to.col, d) : this._moveChessToBoard(loc, to.row, to.col, d);
     }
     if (to.area === 'hand') {
       if (this.equipHand && piece.kind === 'item') return fail(ERR.BAD_TILE);
-      if (!Number.isInteger(to.idx) || to.idx < 0 || to.idx >= this.hand.length) return fail(ERR.BAD_TARGET);
+      if (!Number.isInteger(to.idx) || to.idx < 0 || to.idx >= this.hand.length) return fail(ERR.BAD_TARGET, '目标位置无效');
       return this._moveToHand(loc, to.idx);
     }
     if (this.equipHand && to.area === 'temp') {
@@ -50,7 +64,7 @@ export class PlayerPlacement {
       this.recompute();
       return OK;
     }
-    return fail(ERR.BAD_TARGET);
+    return fail(ERR.BAD_TARGET, '无法移动到该位置');
   }
 
   _placementOf(piece) {

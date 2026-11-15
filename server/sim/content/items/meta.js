@@ -166,7 +166,7 @@ export function registerMeta(registry) {
       if (!cards.length) { if (typeof base.onArt === 'function') base.onArt.call(base, ctx, ev); return; }
       const offer = ctx.rng.shuffle(cards.slice()).slice(0, OFFER_SIZE);
       const card = ctx.rng.pick(offer);
-      if (!card || !ctx.addBounty(card)) { ev.error = 'BAD_TARGET'; ev.detail = 'no bounty available'; }
+      if (!card || !ctx.addBounty(card)) { ev.error = 'BAD_TARGET'; ev.detail = '没有可用的悬赏'; }
     },
   }));
 

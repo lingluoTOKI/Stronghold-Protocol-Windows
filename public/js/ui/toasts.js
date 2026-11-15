@@ -113,6 +113,10 @@ export function describeError(err) {
   // blocked by NOT_READY keep the generic texts.
   if (err.code === 'NOT_READY' && err.detail === 'at least one player must remain seated') return t('至少保留一名参赛博士');
   if (err.code === 'ROOM_FULL' && err.detail === 'no free spectator seat') return t('观战席已满');
+  // A server detail that already reads as player-facing text (CJK) beats the generic code line: BAD_TARGET and the
+  // codes below would otherwise swallow it (「无效的目标」 for every refusal, whatever the reason actually was). English
+  // wire keys ("not equipment", "diy", "morph already equipped", …) keep the generic Chinese text, so the UI stays Chinese.
+  if (typeof err.detail === 'string' && /[\u4e00-\u9fff]/.test(err.detail)) return err.detail;
   if (err.code && Object.hasOwn(ERR_TEXT, err.code)) return t(ERR_TEXT[err.code]);
   if (typeof err.message === 'string' && err.message) return t(err.message);
   if (typeof err.msg === 'string' && err.msg) return t(err.msg);

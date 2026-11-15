@@ -67,6 +67,25 @@ function mostBondMate(ctx, bonds, minCount = 0) {
   return best >= minCount ? ctx.rng.pick(pick) || null : null;
 }
 
+// The official client's buff key and the key this project registers for the same item family are two different names:
+// a version's data (data/versions/<id>/items.json) carries the client's raw key (`use_equip_next_gold`), while the
+// handlers below are keyed by the semantic name data/items.json uses (`use_equip_gain_coin_when_next_round_start`).
+// Without this table such a version's consume-on-equip item resolves to no handler at all: registerBuiltins skips the
+// family (no `item:<key>`), and every equip is refused as "effect not available" — every 装备时销毁 item unusable.
+// Only families whose params are identical on both sides are listed (checked item by item against data/items.json).
+const BUFF_KEY_ALIASES = Object.freeze({
+  use_equip_bond_layer: 'use_equip_reward_char_chess_bond_layer',
+  use_equip_take_shop: 'use_equip_reward_random_char_chess_in_shop',
+  equip_destory_first_bond_char: 'use_equip_reward_char_chess_with_same_bond',
+  use_equip_next_gold: 'use_equip_gain_coin_when_next_round_start',
+  use_equip_spe_goods_first_bond: 'use_equip_reward_special_goods_char_chess',
+  use_equip_reward_same_tier: 'use_equip_reward_char_chess',
+  equip_use_main_bond: 'use_equip_reward_special_goods_char_chess',
+  equip_use_deploy: 'equip_destory_deployment_cnt_change',
+  equip_tier_recr_gift: 'use_equip_recruit_new_char_and_give_char_to_player_most_bond',
+});
+const normBuffKey = (k) => BUFF_KEY_ALIASES[k] || k;
+
 const ITEM_HANDLERS = {
   equip_destory_gain_random_coin: {
     onEquip(ctx, ev) {
@@ -176,6 +195,50 @@ const ITEM_HANDLERS = {
   // is sent as that elite (community report #6 after 0.1.2: it arrived as the normal card — the gift carried baseIdOf).
   // Destroying the carrier returns its pool copies (an elite's 3) at once; the gift takes them again when it is granted
   // (effect:builtin_gift: grantChess → acquireChess, an elite takes up to goldenCopies, as every effect grant).
+  // 定期存折 (act2autochess "装备时销毁，获得{showtag_value_1}资金（持有时每回合+1）"): pays `value` now and keeps a
+  // round-start income of `delta` for `n` rounds (params {value,n,delta}) — the reference record ships value 0, so the
+  // per-round part is the one that pays.
+  equip_destory_gain_coin: {
+    onEquip(ctx, ev) {
+      const p = paramsOf(ctx, ev.item);
+      const value = int(p.value, 0);
+      if (value > 0) ctx.addFunds(value, 'item');
+      const per = int(p.delta, 0);
+      const rounds = Math.max(0, int(p.n, 0));
+      if (per > 0 && rounds > 0) {
+        const rec = ctx.gd.item(ev.item.id);
+        ctx.addEffect({
+          id: `deposit:${ev.item.uid}`, key: 'effect:builtin_round_coin', name: rec ? rec.name : '', desc: rec ? rec.desc : '', iconKind: 'item', iconId: rec ? (rec.iconId || rec.id) : ev.item.id, battle: false, params: { count: per, rounds },
+        });
+      }
+    },
+  },
+  // 投机骰子 (act2autochess "装备时销毁，从3个指令中选择1个替换当前指令"): bandCommands.openSkillChangeDraft is the
+  // three-command chooser the item was designed around (bandCommands.js:163); a season without commands refuses.
+  equip_destory_skill_pool: {
+    onEquip(ctx, ev) {
+      const p = paramsOf(ctx, ev.item);
+      const choiceId = typeof p.choice_event === 'string' && p.choice_event ? p.choice_event : 'skill_change_1';
+      if (typeof ctx.openSkillChangeDraft === 'function' && ctx.openSkillChangeDraft(choiceId)) return;
+      // A mode without a replaceable command (solo has none) used to refuse outright — the player read that as the item
+      // being broken. The equip goes through and says why it changed nothing.
+      toastNothing(ctx, ev);
+    },
+  },
+  // 一次性促销券 (act2autochess "装备时销毁，在调度中心出现3件装备，免费获取其中1件（不高于当前调度中心等级）"):
+  // `option_count` normal items up to the shop level are offered, `select_count` of them free.
+  use_equip_spe_goods_equip: {
+    onEquip(ctx, ev) {
+      const p = paramsOf(ctx, ev.item);
+      const n = Math.max(1, int(p.option_count, 3));
+      const picks = Math.max(1, int(p.select_count, 1));
+      const maxTier = Math.max(1, ctx.shopLevel());
+      const ids = [];
+      for (let i = 0; i < n; i++) { const id = ctx.rollItem({ maxTier, exclude: ids }); if (id) ids.push(id); }
+      if (!ids.length) { toastNothing(ctx, ev); return; }
+      ctx.offerItems(ids, { picks });
+    },
+  },
   use_equip_recruit_new_char_and_give_char_to_player_most_bond: {
     onEquip(ctx, ev) {
       const target = ctx.piece(ev.target.uid);
@@ -234,7 +297,7 @@ const ITEM_HANDLERS = {
     onEquip(ctx, ev) {
       const target = ctx.piece(ev.target.uid);
       if (!target) return;
-      if (ctx.chessRecord(target.id)?.diyFor) { ev.error = 'BAD_TARGET'; return; }
+      if (ctx.chessRecord(target.id)?.diyFor) { ev.error = 'BAD_TARGET'; ev.detail = '自选干员不能使用该装备'; return; }
       const bonds = ctx.pieceBonds(target.uid);
       const to = mostBondMate(ctx, bonds, 1);
       ctx.destroyPiece(target.uid);
@@ -290,7 +353,7 @@ const ITEM_HANDLERS = {
       const cards = ((ctx.data.choices && ctx.data.choices.cards && ctx.data.choices.cards.bounty) || [])
         .filter((c) => c && c.tier <= 2 && (perfectOnly ? c.payout === 'perfect' : c.payout === 'kill') && ctx.gd.enemy(c.enemyKey) && !ctx.gd.inactiveEnemies.has(c.enemyKey));
       const card = ctx.rng.pick(cards);
-      if (!card) { ev.error = 'BAD_TARGET'; ev.detail = 'no bounty available'; return; }
+      if (!card) { ev.error = 'BAD_TARGET'; ev.detail = '没有可用的悬赏'; return; }
       ctx.addBounty(card);
     },
   },
@@ -300,8 +363,16 @@ const ITEM_HANDLERS = {
 const EFFECT_HANDLERS = {
   builtin_round_coin: {
     onRoundStart(ctx) {
-      const n = int(ctx.source.ref && ctx.source.ref.params && ctx.source.ref.params.count, 0);
-      if (n > 0) ctx.addFunds(n, 'doll');
+      const ref = ctx.source.ref;
+      const p = (ref && ref.params) || {};
+      const n = int(p.count, 0);
+      const left = p.rounds == null ? null : int(p.rounds, 0);
+      if (n > 0 && (left == null || left > 0)) ctx.addFunds(n, 'doll');
+      // a bounded income (定期存折 `n` rounds) counts down and drops the effect after its last payment
+      if (left != null && left > 0) {
+        if (left - 1 <= 0) { if (typeof ctx.removeEffect === 'function') ctx.removeEffect(ref.id); }
+        else p.rounds = left - 1;
+      }
     },
   },
   // 信标's gift: at the next round start (下个休整期) the original operator goes to the teammate picked at equip time. It
@@ -367,7 +438,7 @@ export function registerBuiltins(reg, data = null) {
     // golden and normal share the key; prefer the normal record's buff (博士投影 differs: handled by a merged handler)
     const buffKeys = new Set();
     for (const sib of [items[`${key}_a`], items[`${key}_b`], items[key]]) {
-      if (sib && Array.isArray(sib.buffs)) for (const b of sib.buffs) if (b && typeof b.key === 'string') buffKeys.add(b.key);
+      if (sib && Array.isArray(sib.buffs)) for (const b of sib.buffs) if (b && typeof b.key === 'string') buffKeys.add(normBuffKey(b.key));
     }
     const handlers = [...buffKeys].map((k) => ITEM_HANDLERS[k]).filter(Boolean);
     if (!handlers.length) continue;
@@ -392,7 +463,7 @@ function mergeHandlers(handlers, buffKeys) {
     out[hook] = function (ctx, ev) {
       const item = (ev && ev.item) || (ctx.source && ctx.source.piece);
       const rec = item ? ctx.gd.item(item.id) : null;
-      const own = new Set(rec && Array.isArray(rec.buffs) ? rec.buffs.map((b) => b.key) : []);
+      const own = new Set(rec && Array.isArray(rec.buffs) ? rec.buffs.map((b) => normBuffKey(b.key)) : []);
       for (const [k, h] of byKey) if (own.has(k) && typeof h[hook] === 'function') h[hook](ctx, ev);
     };
   }

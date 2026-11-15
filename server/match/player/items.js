@@ -11,6 +11,16 @@ import { tileKey, inField, parseDir, freeSlot } from '../board.js';
 import { offsetTile } from '../../sim/dir.js';
 import { itemKey } from '../gamedata.js';
 import { OK, fail } from './common.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// The match host runs in a forked child whose stdout is `ignore` (server/match/host/index.js), so console.log never
+// reaches the journal. Append to a file instead: one line per refusal, readable with `tail`.
+const DENY_LOG = path.join(os.tmpdir(), 'sp-equip-deny.log');
+const denyLog = (stage, data) => {
+  try { fs.appendFileSync(DENY_LOG, `${new Date().toISOString()} [${stage}] ${JSON.stringify(data)}\n`); } catch { /* ignore */ }
+};
 
 export class PlayerItems {
   /**
@@ -34,24 +44,42 @@ export class PlayerItems {
   equip(itemUid, targetUid, replaceUid = null) {
     const g = this._gate(); if (g) return g;
     const iloc = this.find(itemUid);
-    if (!iloc || iloc.piece.kind !== 'item' || (iloc.area !== 'hand' && iloc.area !== 'temp')) return fail(ERR.BAD_TARGET);
+    if (!iloc || iloc.piece.kind !== 'item' || (iloc.area !== 'hand' && iloc.area !== 'temp')) {
+      denyLog('item-not-in-hand-or-temp', { itemUid, targetUid, found: !!iloc, kind: iloc && iloc.piece ? iloc.piece.kind : null, id: iloc && iloc.piece ? iloc.piece.id : null, area: iloc ? iloc.area : null });
+      return fail(ERR.BAD_TARGET, '该装备不在手牌区/整备区');
+    }
     const rec = this.gd.item(iloc.piece.id);
-    if (!rec || rec.itemType !== 'EQUIP') return fail(ERR.BAD_TARGET, 'not equipment');
+    if (!rec || rec.itemType !== 'EQUIP') return fail(ERR.BAD_TARGET, '该道具不是装备');
     const tloc = this.find(targetUid);
-    if (!tloc || tloc.piece.kind !== 'chess' || tloc.area === 'equipped') return fail(ERR.BAD_TARGET);
-    if (this.gd.config.version?.rules?.benchEquip === false && tloc.area !== 'board') return fail(ERR.BAD_TARGET);
+    if (!tloc || tloc.piece.kind !== 'chess' || tloc.area === 'equipped') {
+      denyLog('target-not-chess', { itemUid, targetUid, found: !!tloc, kind: tloc && tloc.piece ? tloc.piece.kind : null, id: tloc && tloc.piece ? tloc.piece.id : null, area: tloc ? tloc.area : null });
+      return fail(ERR.BAD_TARGET, '目标不是棋盘上的干员');
+    }
+    if (this.gd.config.version?.rules?.benchEquip === false && tloc.area !== 'board') return fail(ERR.BAD_TARGET, '该规则下整备区干员不能装备');
     const item = iloc.piece;
     const target = tloc.piece;
     // Before anything moves: 信标's text (and any other item whose official sentence says so) cannot go on a 自选 piece.
-    if (itemForbidsDiy(rec) && chessIsDiy(this.gd.chess(target.id))) return fail(ERR.BAD_TARGET, 'diy');
-    if (replaceUid != null && !(Number.isInteger(replaceUid) && (target.items || []).some((x) => x.uid === replaceUid))) return fail(ERR.BAD_TARGET, 'replace: not equipped on the target');
+    if (itemForbidsDiy(rec) && chessIsDiy(this.gd.chess(target.id))) {
+      denyLog('diy', { itemUid, targetUid, item: item.id, target: target.id });
+      return fail(ERR.BAD_TARGET, 'diy');
+    }
+    if (replaceUid != null && !(Number.isInteger(replaceUid) && (target.items || []).some((x) => x.uid === replaceUid))) {
+      denyLog('bad-replace', { itemUid, targetUid, replaceUid, equipped: (target.items || []).map((x) => x.uid) });
+      return fail(ERR.BAD_TARGET, '要替换的装备不在该干员身上');
+    }
     const policy = this._slotPolicy();
     // [ASSUMED] a second 变形同构体 is refused before anything moves. Official accepts() is always true.
-    if (!policy.accepts(target.items || [], rec)) return fail(ERR.BAD_TARGET, 'morph already equipped');
+    if (!policy.accepts(target.items || [], rec)) {
+      denyLog('morph', { itemUid, targetUid, item: item.id, equipped: (target.items || []).map((x) => x.id) });
+      return fail(ERR.BAD_TARGET, 'morph already equipped');
+    }
     const consume = typeof rec.kind === 'string' && rec.kind.startsWith('consume_on_equip');
     if (consume) {
       const key = 'item:' + itemKey(item.id);
-      if (!this.m.registry.has(key)) return fail(ERR.BAD_TARGET, 'effect not available');
+      if (!this.m.registry.has(key)) {
+        denyLog('effect-not-registered', { itemUid, targetUid, key });
+        return fail(ERR.BAD_TARGET, 'effect not available');
+      }
       // a full carrier replaces first, consumables included (PRTS 卫戍协议/帮助 "达到上限强行佩戴会改为替换装备：指定一件已佩戴
       // 装备替换为将要佩戴的装备，并销毁被指定的装备"; GitHub #263): the pick (else the oldest) comes off before the effect —
       // which so sees the carrier without it (its bonds) — and is destroyed once the effect went through, leaving the slot
@@ -61,6 +89,7 @@ export class PlayerItems {
       this.m.dispatchItem(this, item, target, 'onEquip', ev);
       if (ev.error) {
         if (off) target.items.splice(Math.min(off.idx, target.items.length), 0, off.piece);
+        denyLog('effect-refused', { itemUid, targetUid, item: item.id, error: ev.error, detail: ev.detail });
         return fail(ERR[ev.error] ? ev.error : ERR.BAD_TARGET, typeof ev.detail === 'string' ? ev.detail : undefined);
       }
       if (off) {
@@ -183,11 +212,11 @@ export class PlayerItems {
     const d = parseDir(dir);
     if (!d) return fail(ERR.BAD_TARGET, 'bad dir');
     const loc = this.find(itemUid);
-    if (!loc || loc.piece.kind !== 'item' || (loc.area !== 'hand' && loc.area !== 'temp')) return fail(ERR.BAD_TARGET);
+    if (!loc || loc.piece.kind !== 'item' || (loc.area !== 'hand' && loc.area !== 'temp')) return fail(ERR.BAD_TARGET, '该法术不在手牌区/整备区');
     const rec = this.gd.item(loc.piece.id);
-    if (!rec || rec.itemType !== 'MAGIC') return fail(ERR.BAD_TARGET, 'not an art');
+    if (!rec || rec.itemType !== 'MAGIC') return fail(ERR.BAD_TARGET, '该道具不是法术');
     if (!inField(row, col)) return fail(ERR.BAD_TILE);
-    if (this.round.arts >= this.gd.maxArtsPerRound) return fail(ERR.BAD_TARGET, 'art limit');
+    if (this.round.arts >= this.gd.maxArtsPerRound) return fail(ERR.BAD_TARGET, '本回合法术使用次数已用完');
     const key = 'item:' + itemKey(loc.piece.id);
     if (!this.m.registry.has(key)) return fail(ERR.BAD_TARGET, 'effect not available');
     const grid = Array.isArray(rec.rangeGrid) && rec.rangeGrid.length ? rec.rangeGrid : [[0, 0]];
@@ -217,7 +246,7 @@ export class PlayerItems {
   destroy(uid) {
     const g = this._gate(); if (g) return g;
     const loc = this.find(uid);
-    if (!loc || loc.piece.kind !== 'item') return fail(ERR.BAD_TARGET, 'only items can be destroyed');
+    if (!loc || loc.piece.kind !== 'item') return fail(ERR.BAD_TARGET, '只能销毁道具');
     if (loc.area === 'equipped') return fail(ERR.BAD_TARGET, 'equipped items are locked');
     this._detach(loc);
     this.releaseItemStock(loc.piece);
@@ -236,7 +265,7 @@ export class PlayerItems {
     const g = this._gate(); if (g) return g;
     if (ruleOption(this.m?.rules, 'unequip') !== 'allow') return fail(ERR.BAD_TARGET, 'equipped items are locked');
     const loc = this.find(itemUid);
-    if (!loc || loc.piece.kind !== 'item' || loc.area !== 'equipped') return fail(ERR.BAD_TARGET);
+    if (!loc || loc.piece.kind !== 'item' || loc.area !== 'equipped') return fail(ERR.BAD_TARGET, '该装备没有装在干员身上');
     if (this.equipHand) {
       if (this.handSlot('item') < 0) return fail(ERR.HAND_FULL);
       this._detach(loc);
