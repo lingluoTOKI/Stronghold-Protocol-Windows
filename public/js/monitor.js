@@ -525,7 +525,8 @@ function playerRow(el, p){
   const qqBtn = a
     ? `<button type="button" class="qqbtn" data-mask="${esc(a.qq || '')}" data-full="${esc(a.qqFull || a.qq || '')}" data-on="0" title="点击显示完整 QQ（号码未核验）" data-qq>QQ ${esc(a.qq || '')}</button>`
     : '<span class="unbound">未绑定 QQ</span>';
-  const nick = a && a.nickname ? `<span class="nick" title="账号昵称">${esc(a.nickname)}</span>` : '';
+  // 账号昵称只在和游戏内昵称不同时才画出来，否则大屏上同一个名字会重复两次。
+  const nick = a && a.nickname && a.nickname !== p.name ? `<span class="nick" title="账号昵称">${esc(a.nickname)}</span>` : '';
   const detail = a
     ? `<span class="sub" title="${esc('关联服：' + ((a.linkedRealms || []).join('、') || '无') + '；' + ((a.archives || []).map(x => x.realm + ': ' + x.records + '条，' + new Date(x.lastSync).toLocaleString()).join('；') || '无战绩'))}">${qqBtn}${nick}</span>`
     : `<span class="sub">${qqBtn}</span>`;

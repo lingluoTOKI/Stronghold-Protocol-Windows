@@ -202,7 +202,21 @@ export function createRequestHandler({ accounts = null, serveStatic, health, log
       if (!adminAuthorized()) { sendError(req, res, 403, '拒绝 · Forbidden'); return; }
       const out = [];
       const now = Date.now();
-      for (const [code, r] of health.lobby.rooms) {
+      // 对局跑在 fork 出来的 match host 里，room.match 是 MatchProxy：phase / round 不在代理对象上
+      // （读 m.phase 永远是 undefined，JSON 序列化时字段直接消失，大屏就一直显示「等待中 · 回合 0」）。
+      // 并发问一次 diag()（IPC 往返）；250ms 兜底，超时或报错按未知处理，大屏回落「等待中」。
+      const roomsAt = [...health.lobby.rooms];
+      const states = await Promise.all(roomsAt.map(([, room]) => {
+        const mm = room.match;
+        if (!mm) return Promise.resolve({});
+        if (typeof mm.diag !== 'function') return Promise.resolve({ phase: mm.phase, round: mm.round });
+        return Promise.race([
+          mm.diag().then((v) => (v && !v.error ? v : {})).catch(() => ({})),
+          new Promise((resolve) => setTimeout(() => resolve({}), 250)),
+        ]);
+      }));
+      for (let i = 0; i < roomsAt.length; i++) {
+        const [code, r] = roomsAt[i];
         const m = r.match;
         const active = typeof r.activeHumans === 'function' ? r.activeHumans() : [];
         const connected = typeof r.connectedHumans === 'function' ? r.connectedHumans() : active.filter((s) => s.connected);
@@ -211,7 +225,7 @@ export function createRequestHandler({ accounts = null, serveStatic, health, log
         out.push({
           code, mode: r.mode, difficulty: r.difficulty,
           inMatch: !!m, matchNo: r.matchCount || 0,
-          phase: m ? m.phase : null, round: m ? m.round : 0,
+          phase: states[i].phase ?? null, round: states[i].round ?? 0,
           seatCount: (r.seats || []).filter(Boolean).length,
           humanCount: active.length,
           connectedHumans: connected.length,
