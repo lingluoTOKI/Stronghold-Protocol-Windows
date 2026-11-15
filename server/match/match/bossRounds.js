@@ -98,12 +98,7 @@ export class MatchBoss {
         kind: hidden ? 'hidden' : 'boss',
         modeId: this.modeId,
         round: this.round,
-        // The boss/hidden field stands on its own template's terrain (h07_* / h08_*), not the round's normal
-        // stage: the wave's routes and spawns are authored against that map, so reusing the m0x terrain leaves
-        // the boss standing on a hole outside the deployable area and unreachable. Fall back to the round's
-        // stage only when the template has no terrain entry (older data). UPSTREAM-GAP: upstream ships the
-        // wave templates but never emits their stages, so this pair of fixes is local.
-        stageId: (wave.templateId && this.gd.stage(wave.templateId)) ? wave.templateId : this.stageId,
+        stageId: this.stageId,
         rect: { ...GEO.BOSS_RECT },
         timeLimit: Infinity,
         players: inputs,
