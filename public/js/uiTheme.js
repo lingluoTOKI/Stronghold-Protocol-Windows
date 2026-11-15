@@ -981,7 +981,8 @@ export function setShareUi(on) {
 }
 
 /** Paint `id`, or the built-in look when the id is empty or the pack is gone. */
-export function applyUiTheme(id) {  const pack = themePack(id);
+export function applyUiTheme(id) {
+  const pack = themePack(id);
   const key = pack ? `${pack.id}:${pack.rev}` : '';
   if (key === appliedKey && (pack ? voicePackId === pack.id : voicePackId === '')) return pack;
   appliedKey = key;
