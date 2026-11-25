@@ -126,6 +126,8 @@ const CHECKS = [
   { group: '新增', label: 'funReport.js', file: 'public/js/ui/funReport.js', pattern: /.+/ },
   { group: '新增', label: 'localActivities.js', file: 'public/js/ui/localActivities.js', pattern: /.+/ },
   { group: '新增', label: 'assetImport.js', file: 'public/js/ui/assetImport.js', pattern: /.+/ },
+  // ── 12. 盐坨子炮素材提取（上游 11-23 同步时新增）───────────────
+  { group: '12 盐坨子炮素材', label: 'extract.py 提取 trap_196_cnnon（trap_19.ab）', file: 'tools/local-extract/extract.py', pattern: /trap_196_cnnon/ },
 ];
 
 function runOne(c) {

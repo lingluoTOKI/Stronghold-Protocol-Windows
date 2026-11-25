@@ -309,6 +309,11 @@ JOBS = [
     # bundle holds every 卫戍协议 device model; keep 射击台 and 阻隔工事 (trap_1105_accrate, #663)
     ('arts/maps/common/trap/trap_110.ab', 'mesh/trap_110', {'Mesh', 'GameObject', 'Material', 'Texture2D'},
      r'^((MT|TX)_)?(trap_1106_achplat|trap_1105_accrate)$'),
+    # 盐坨子炮 (trap_196_cnnon): 卫戍协议 battlefield #09's map device (PRTS "Bombard"). Its model is NOT in
+    # trap_110.ab (that bundle holds the 11xx 卫戍协议 devices only) but in trap_19.ab, the trap_1xx group; keep the
+    # mesh, its material and the four PBR textures (_D diffuse, _N normal, _M mask, _E emission).
+    ('arts/maps/common/trap/trap_19.ab', 'mesh/trap_19', {'Mesh', 'GameObject', 'Material', 'Texture2D'},
+     r'^((MT|TX)_)?trap_196_cnnon(_[DNME])?$'),
     ('arts/effects/[pack]map.ab', 'map/fx', {'Mesh', 'GameObject', 'Material', 'Texture2D'}),
     ('arts/maps/common/res.ab', 'map/common', {'Material', 'Texture2D'}, r'^(TX|MT)_wind_device$'),
     ('arts/maps/effect.ab', 'map/water', {'Texture2D'}, r'water_normal|Caustics|WaterNoise|noise_clouds|Water_Foam|SmoothWaves'),
