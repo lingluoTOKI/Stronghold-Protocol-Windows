@@ -5,7 +5,7 @@
 >
 > 用法：复制下面 `✂` 分隔线之间的全部内容，发给接手的 AI；它缺上下文时再去读交接文档。
 >
-> 最后更新：**2026-11-15**（基线对齐上游 v0.4.0 + CI 修复，本地 HEAD `f40b4cca`，与 `upstream/dev` 零遗漏）
+> 最后更新：**2026-11-25**（基线对齐上游 `dev` 至 `c7cea5a9`（11-23），本地 HEAD `2460aefe`，与 `upstream/dev` 零遗漏；本轮起有自动同步脚本 `deploy/auto-sync-upstream.ps1`）
 
 ---
 
@@ -16,7 +16,7 @@
 **仓库与路径**
 
 - 改编版工作目录（就在这里改）：`F:\github\Stronghold-Protocol\sp-clean-Stronghold-Protocol`
-- 当前活跃分支 `sync/upstream-0.4.0`，HEAD `f40b4cca`，`package.json` = **0.4.0**
+- 当前活跃分支 `sync/upstream-20261125`，HEAD `2460aefe`，`package.json` = **0.4.0**
 - 官服上游：`https://github.com/sganggs/Stronghold-Protocol`，**分支 `dev`**（不要拉 `master`）
 - 我的远程 origin：`https://github.com/lingluoTOKI/Stronghold-Protocol-Windows.git`
 - 两个 remote 都已配好，`git fetch upstream dev` 直连成功，**不需要镜像**；失败时才退回 `git -c http.sslVerify=false fetch https://ghfast.top/https://github.com/sganggs/Stronghold-Protocol.git dev`（ghfast.top 不通换 gh-proxy.com）
@@ -66,7 +66,13 @@
 
 0. **先满足前置条件 A/B/C**，确认 `git status --porcelain` 只剩可忽略项。
 1. `git fetch upstream dev`，记录上游最新 commit；用 `git merge-base --is-ancestor <上游最新> HEAD` 和 `git log --oneline HEAD..<上游最新>` 确认**哪些是上游新 commit**（同步前先告诉我数量和标题）。**不要拉 master。**
-   - 2026-11-15 基线：`upstream/dev` = `55f528e9`，本地已**零遗漏**（`is-ancestor` 退出码 0，领先 112 / 落后 0）。下次同步从 0 个待合提交起步。
+   - 2026-11-25 基线：`upstream/dev` = `c7cea5a9`，本地已**零遗漏**（`is-ancestor` 退出码 0，领先 / 落后 0）。下次同步从 0 个待合提交起步。
+   - **自动同步脚本**（Windows 本机，在仓库根执行）：
+     - 只看有没有更新：`pwsh -NoProfile -File deploy\auto-sync-upstream.ps1 -DryRun`
+     - 同步到新分支并自检（冲突即停、不自动解）：`pwsh -NoProfile -File deploy\auto-sync-upstream.ps1`
+     - 同步 + 自检 + 部署上线 + 推 GitHub：`... -Deploy -Push`（部署前后自动备份，健康检查失败自动回滚）
+     - 只发布一条公告：`... -AnnounceFile docs\announcements\<日期>.json`
+     - 脚本仍要求工作区干净、冲突为零、55 项校验全过、golden 全绿才部署；任何一步失败都会停在原地并保留分支。
 2. 从当前分支新建同步分支（如 `sync/upstream-<版本号>`），不要直接在 `sync/upstream-0.4.0` 上动。
 3. 合入上游（merge 或按 commit cherry-pick）。**先打备份标签**（`git tag -f pre-sync-<版本> HEAD`），建议 `git merge --no-commit --no-ff <上游最新>` 先看冲突面。逐文件解决：
    - `server/sim/**`、`tools/**`、`public/js/render/**`、官方数据 → 采用上游，再把独有钩子接上；
