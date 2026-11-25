@@ -138,6 +138,7 @@ const CHECKS = [
   { group: '14 塔露拉S3特效', optional: FX_ANCHOR, label: 'patch-oxi-s3 脚本有该弹道键', file: 'tools/local-extract/patch-oxi-s3.mjs', pattern: /projectile_chr_oxi_s_3_heatwave/ },
   { group: '14 塔露拉S3特效', optional: FX_ANCHOR, label: 'S3 弹道条目数据', files: ['tools/local-extract/oxi-s3-projectile.json'] },
   { group: '14 塔露拉S3特效', optional: FX_ANCHOR, label: 'fx/index.json 已打补丁（重跑提取后需再跑一次）', file: 'public/assets/local/fx/index.json', pattern: /projectile_chr_oxi_s_3_heatwave/ },
+  { group: '14 塔露拉S3特效', optional: FX_ANCHOR, label: 'FX_BINDINGS 的 S3 命中爆炸绑定', file: 'public/js/render/vfx/skills.js', pattern: /skchr_oxi_3: Object\.freeze/ },
 ];
 
 function runOne(c) {

@@ -1479,6 +1479,15 @@ export const FX_BINDINGS = Object.freeze({
     zone: binding({ owner: 'id', keys: ['sleach_skill_03_flag_01', 'sleach_skill_03_range_loop_01', 'sleach_skill_03_range_loop_02'], at: 'point', hold: 'fx', holdS: 10, during: true, cover: ['zone'] }),
     aoe: binding({ owner: 'id', keys: ['sleach_skill_03_range_start_01', 'sleach_skill_03_range_start_02'], at: 'point', holdS: 7.5, during: true }),
   }),
+  // 塔露拉 S3 日冕重烈 (op-oxi.js volley / explode): the kit fires a volley of 簇火 every normal_interval (overload
+  // width from half the duration) and sends its 'blast' fx where one meets an enemy — the client's
+  // projectile_chr_oxi_s_3_heatwave is that 簇火: oxi_skill_03_trail_01 while it flies, oxi_skill_03_hit_01 on the hit
+  // (index.json `effects`). Only the explosion binds here: the flight would need a lane path per volley, which the kit's
+  // fx does not carry (it sends the caster's tile, the facing and the lane count); the trail stays the sim's.
+  // No `during`: a 簇火 still in the air when the skill ends lands and explodes (PRTS).
+  skchr_oxi_3: Object.freeze({
+    blast: binding({ owner: 'id', keys: ['oxi_skill_03_hit_01'], at: 'point', oneshot: true }),
+  }),
 });
 
 /**
