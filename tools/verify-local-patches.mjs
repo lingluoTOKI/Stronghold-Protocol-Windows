@@ -128,6 +128,9 @@ const CHECKS = [
   { group: '新增', label: 'assetImport.js', file: 'public/js/ui/assetImport.js', pattern: /.+/ },
   // ── 12. 盐坨子炮素材提取（上游 11-23 同步时新增）───────────────
   { group: '12 盐坨子炮素材', label: 'extract.py 提取 trap_196_cnnon（trap_19.ab）', file: 'tools/local-extract/extract.py', pattern: /trap_196_cnnon/ },
+  // ── 13. 战场预览分片场景（本地补丁，非上游）─────────────────────
+  { group: '13 战场预览', label: 'stageThumb 预览走 arenaField（分片场景可显示）', file: 'public/js/ui/stageThumb.js', pattern: /arenaField\(stage, 'normal'/ },
+  { group: '13 战场预览', label: 'stageThumb 用折算后的棋盘 setStage', file: 'public/js/ui/stageThumb.js', pattern: /board\.setStage\(field\)/ },
 ];
 
 function runOne(c) {

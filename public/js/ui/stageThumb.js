@@ -10,6 +10,8 @@
 // not open another context. The magnifier scales this same bitmap (stagePreview.js).
 
 import { stagePreviewCamera, stagePreviewFrame, stagePreviewSize } from './stagePreview.js';
+// 本地补丁（非上游）：预览用对局口径的 arenaField，见 renderStageThumb。
+import { arenaField } from '../render/arenaView.js';
 
 const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
@@ -133,6 +135,11 @@ export async function renderStageThumb(stageId, opts) {
   seedThumbAssets(assetsApi, dataApi);
   const stage = opts.stage && opts.stage.id === id ? opts.stage : dataApi.lookup?.('stages', id);
   if (!stage || stage.id !== id) return null;
+  // 本地补丁（非上游）：上游把关卡原始记录直接交给 BoardScene，但分片场景（scene.json `layout: pieces'）
+  // 要在 `stage.scenePiece` 存在时才画（render/board3d/scene.js `_buildScene`）。scenePiece 是对局渲染时
+  // arenaView.js `arenaField` 现算的，原始记录里没有 → 上游预览永远是程序化地板。这里按 briefing 的座位
+  // 先折算一次，setStage 拿到的就是和对局一致的那个分片棋盘。
+  const field = arenaField(stage, 'normal', { seat: opts.seat ?? null });
   const [THREE, pack, scene] = await Promise.all([
     loadThree(),
     loadBoardPack(assetsApi),
@@ -155,7 +162,7 @@ export async function renderStageThumb(stageId, opts) {
     });
     board.setArea(AREAS.normal);
     // Same order as the match (render/app.js: setStage, then useOfficialScene → setScenePack).
-    board.setStage(stage);
+    board.setStage(field);
     board.setScenePack(id, scene);
     board.setBattleRect(null);
     const frame = stagePreviewFrame(opts.seat);
