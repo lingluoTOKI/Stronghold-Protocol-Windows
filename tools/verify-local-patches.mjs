@@ -19,6 +19,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** 账号子系统的锚点文件：它不在时整组标 SKIP（账号代码在 local/account-binding） */
 const ACCOUNT_ANCHOR = 'server/accounts/client.js';
 
+/** fx 索引的锚点：素材未提取的机器上没有它，第 14 组整组 SKIP */
+const FX_ANCHOR = 'public/assets/local/fx/index.json';
+
 /** 读取文件内容；不存在返回 null */
 function read(rel) {
   const abs = join(ROOT, rel);
@@ -131,6 +134,10 @@ const CHECKS = [
   // ── 13. 战场预览分片场景（本地补丁，非上游）─────────────────────
   { group: '13 战场预览', label: 'stageThumb 预览走 arenaField（分片场景可显示）', file: 'public/js/ui/stageThumb.js', pattern: /arenaField\(stage, 'normal'/ },
   { group: '13 战场预览', label: 'stageThumb 用折算后的棋盘 setStage', file: 'public/js/ui/stageThumb.js', pattern: /board\.setStage\(field\)/ },
+  // ── 14. 塔露拉 S3 特效（本地补丁：客户端把火墙弹道写在 buff 模板 oxi_s_3_wave 里，提取器抓不到）──
+  { group: '14 塔露拉S3特效', optional: FX_ANCHOR, label: 'patch-oxi-s3 脚本有该弹道键', file: 'tools/local-extract/patch-oxi-s3.mjs', pattern: /projectile_chr_oxi_s_3_heatwave/ },
+  { group: '14 塔露拉S3特效', optional: FX_ANCHOR, label: 'S3 弹道条目数据', files: ['tools/local-extract/oxi-s3-projectile.json'] },
+  { group: '14 塔露拉S3特效', optional: FX_ANCHOR, label: 'fx/index.json 已打补丁（重跑提取后需再跑一次）', file: 'public/assets/local/fx/index.json', pattern: /projectile_chr_oxi_s_3_heatwave/ },
 ];
 
 function runOne(c) {
