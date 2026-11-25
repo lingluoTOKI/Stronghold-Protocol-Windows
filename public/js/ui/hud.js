@@ -681,7 +681,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
     </div>
 
     <div class="gtop__right">
-      <div class=${cx('gtop__clock', pf.countdown && 'gtop__clock--pf')} style=${corner ? { '--pf-rx': corner.x, '--pf-ry': corner.y } : null}>
+      <div class=${cx('gtop__clock gtop__clock--right', pf.countdown && 'gtop__clock--pf')} style=${corner ? { '--pf-rx': corner.x, '--pf-ry': corner.y } : null}>
         ${pf.countdown
           ? (pfClock ? html`<div class="pfclock" role="timer" aria-label=${pfRemain == null ? t('无倒计时') : t('剩余{remain}秒', { remain: pfRemain })}>
               <${RegCountdown} pack=${pack} remain=${pfRemain} total=${total ?? null} ready=${showReady && !!priv?.ready} still=${!settings?.themeMotion} />

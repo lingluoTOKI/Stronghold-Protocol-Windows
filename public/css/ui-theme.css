@@ -99,7 +99,7 @@ html[data-sp-slot~="img_check_player"] .gtop__iconbtn.has-sprite { width: auto; 
 html[data-sp-slot~="img_check_enemy"] .enemybtn.has-sprite { width: auto; aspect-ratio: var(--sp-ar-img_check_enemy, 35 / 29); }
 /* the countdown plates keep their aspect: a box about 1.4 : 1 squeezed 卫戍协议终端's 216×87 plate (its STRONGHOLD PROTOCOL
    type) and 乌萨斯齐心团's 694×134 wedge (§37.204) */
-html[data-sp-slot~="countdown"] .gtop__right .countdown {
+html[data-sp-slot~="countdown"] .gtop__clock .countdown {
   background-image: var(--sp-img-countdown);
   background-size: contain; background-position: center; background-repeat: no-repeat;
 }

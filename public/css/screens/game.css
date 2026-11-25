@@ -202,8 +202,16 @@
 .gtop__iconbtn.is-on:not(.has-sprite) { opacity: .6; }
 .gtop__iconbtn .enemybtn__chev { color: #fff; }
 .gtop__right { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; justify-self: end; }
-.gtop__right .countdown { --cd-h: .7rem; filter: drop-shadow(0 0 .12rem rgba(0, 0, 0, .8)); }
+.gtop__clock .countdown { --cd-h: .7rem; filter: drop-shadow(0 0 .12rem rgba(0, 0, 0, .8)); }
 .gtop__clock { display: flex; align-items: flex-start; gap: .14rem; }
+/* the countdown sits on the very top-right corner (owner, 2026-11-25): the disc leads the clock group so it
+   hugs the screen edge and the speed / skip / pause buttons sit to its left. Only on roomy layouts - narrow
+   phones keep the old order (disc leftmost) so the corners stay clear of the centre band
+   (test/ui/match-topbar.e2e.test.js); skin prefabs (.gtop__clock--pf) place the disc themselves. */
+@media (min-width: 1001px) {
+  .gtop__clock--right:not(.gtop__clock--pf) { margin-right: -.3rem; }
+  .gtop__clock--right:not(.gtop__clock--pf) > .countdown { order: 9; }
+}
 
 /* solo pause / resume (ui/hud.js PauseButton, official battle pause: two bars on a dark square) */
 .pausebtn {

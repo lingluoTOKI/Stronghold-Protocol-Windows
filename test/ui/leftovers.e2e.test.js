@@ -143,7 +143,7 @@ describe('client leftovers — mock harness', { skip: !ENABLED && 'set SP_E2E=1 
   test("2. 最终攻势: the 120 s countdown gauge, then the red DOT overtime warning (drain start + live drain)", async () => {
     // start of the round: 95 s of 120 left → 4 of 5 bars, no warning yet
     let { page, problems } = await open('phase=FINAL_ASSAULT');
-    const lit = await page.$$eval('.gtop__right .countdown__gauge i.on', (els) => els.length);
+    const lit = await page.$$eval('.gtop__clock .countdown__gauge i.on', (els) => els.length);
     assert.equal(lit, 4, 'gauge counts the 120 s level time');
     assert.equal(await page.$('.otwarn'), null);
     assert.deepEqual(problems, []);
@@ -159,7 +159,7 @@ describe('client leftovers — mock harness', { skip: !ENABLED && 'set SP_E2E=1 
     // the mock sets the drain 18 s after its script ran; the page is read after networkidle0, which waits for the
     // official effects the board preloads (about 8 s here), so only the range is checked
     assert.ok(secs > 0 && secs <= 18, `drain in ${secs} s`);
-    assert.equal(await page.$eval('.gtop__right .countdown', (el) => el.getAttribute('aria-label')), '剩余0秒');
+    assert.equal(await page.$eval('.gtop__clock .countdown', (el) => el.getAttribute('aria-label')), '剩余0秒');
     await page.screenshot({ path: path.join(OUT, 'leftover-fa-overtime.png') });
     assert.deepEqual(problems, []);
     await page.close();
@@ -191,7 +191,7 @@ describe('client leftovers — mock harness', { skip: !ENABLED && 'set SP_E2E=1 
     await page.click('[data-testid="pause"]');
     await page.waitForSelector('.pauseov', { timeout: 3000 });
     assert.deepEqual(await mockReqs(page, 'g.pause'), [['g.pause', { on: true }]]);
-    const cd = () => page.$eval('.gtop__right .countdown', (el) => el.getAttribute('aria-label'));
+    const cd = () => page.$eval('.gtop__clock .countdown', (el) => el.getAttribute('aria-label'));
     const c1 = await cd();
     await sleep(1600);
     assert.equal(await cd(), c1, 'the countdown stands still while paused');
@@ -332,10 +332,10 @@ describe('client leftovers — real server', { skip: !ENABLED && 'set SP_E2E=1 (
       await c.page.waitForSelector('.pauseov', { timeout: 3000 });
       await sleep(400);
       const t1 = await btime();
-      const cd1 = await c.page.$eval('.gtop__right .countdown', (el) => el.getAttribute('aria-label'));
+      const cd1 = await c.page.$eval('.gtop__clock .countdown', (el) => el.getAttribute('aria-label'));
       await sleep(2000);
       assert.equal(await btime(), t1, 'the local battle clock stands still');
-      assert.equal(await c.page.$eval('.gtop__right .countdown', (el) => el.getAttribute('aria-label')), cd1, 'the countdown stands still');
+      assert.equal(await c.page.$eval('.gtop__clock .countdown', (el) => el.getAttribute('aria-label')), cd1, 'the countdown stands still');
       assert.deepEqual((await c.requests('g.pause')).map((r) => r[1]), [{ on: true }]);
       await c.shot('pause-real');
       await c.click('.pauseov .btn--primary', '继续作战');
