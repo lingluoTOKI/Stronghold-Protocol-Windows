@@ -137,7 +137,9 @@ export function BondLackTag() {
  * corner, BondLackTag) or one the mode never activates (✕), a red ring on an enabled bond that lost members; the
  * tooltip says which and how many members cannot appear (briefingBondTip), and a bond with banned members lists them
  * in a second box beside it (BondBannedAside). The disc carries no count since §37.200 (the official has none; the
- * count badge sat on the ✕).
+ * count badge sat on the ✕). An enabled disc wears the version's lit ring (components.js bondFrame): 规程 the unbroken
+ * 1_1, a 盟约 period N_N by the bond's first threshold, like an active disc in the match [ASSUMED for the 盟约 briefing:
+ * no recording checked shows it; §37.342].
  * `head`: null keeps this h3; false omits it (a 规程 group panel titles itself once); a vnode replaces the h3.
  * @param {{ title: string, micro: string, bonds: any[], model: MatchInfoModel, onBond?: (id:string)=>void, head?: any }} props
  */
@@ -155,8 +157,8 @@ export function MatchBondRow({ title, micro, bonds, model, onBond, head = null }
         return html`<${Tooltip} key=${b.bondId} text=${briefingBondTip(b.name, state, bannedN, model.regulation && b.isCore)}
           aside=${bannedN > 0 ? BondBannedAside(b, model, banned) : null}>
           <div class=${cx('brief-bond', off && 'is-off', state === 'drawn' && 'is-incomplete', !off && bannedN > 0 && 'is-partial')} data-bond=${b.bondId}>
-            <${BondDisc} name=${b.name} icon=${bondIconUrl(m, b.bondId)} active=${!off} disabled=${off} tier=${off ? 0 : (b.thresholds?.length || 1)}
-              maxTier=${Math.max(1, b.thresholds?.length || 1)} size="md" onClick=${onBond ? () => onBond(b.bondId) : undefined}
+            <${BondDisc} name=${b.name} icon=${bondIconUrl(m, b.bondId)} active=${!off} disabled=${off} minCount=${b.thresholds?.[0] ?? 0}
+              size="md" onClick=${onBond ? () => onBond(b.bondId) : undefined}
               cross=${state === 'off'} tag=${state === 'drawn' ? html`<${BondLackTag} />` : null} />
           </div>
         <//>`;
@@ -251,9 +253,25 @@ export function BannedOperators({ model }) {
 }
 
 /**
+ * One operator of the 规程 本局禁用干员 list as the official briefing draws it (recording BV1hmWL6fEmQ 0:13): the grey
+ * portrait with the red 禁用 corner on its top-right third (ui/outer img_chess_banned: a dark red fold with a struck-out
+ * figure) and the tier mark on its bottom-left; without the local art a CSS fold with a ✕.
+ * @param {{ id: string }} props
+ */
+export function BannedThumb({ id }) {
+  const url = localAsset('ui/outer', 'img_chess_banned');
+  const badge = url
+    ? html`<span class="uthumb__ban" style=${`--ban:url("${url}")`} aria-hidden="true"></span>`
+    : html`<span class="uthumb__ban is-plain" aria-hidden="true">✕</span>`;
+  return html`<${UnitThumb} kind="chess" ownerId=${null} id=${id} size="sm" dim=${true} class="uthumb--banned" badge=${badge} />`;
+}
+
+/**
  * 规程 本局禁用干员: each bond that lost members, then those operators (tier order of `model.banned`).
  * [ASSUMED] an operator of two such bonds is listed under each. Ids in no bond's visibleMembers stay, with no invented header.
- * The flat BannedOperators grid is unchanged (the draft dialog and every other version).
+ * Each operator is a BannedThumb and a bond of the drawn set keeps the official 阵容不完整 corner here as in its row
+ * (recording BV1hmWL6fEmQ 0:13; until round 83 small dim avatars with no mark under a ✕ disc — GitHub report
+ * 「没有显示ban了哪些」). The flat BannedOperators grid is unchanged (the draft dialog and every other version).
  * @param {{ model: MatchInfoModel, onBond?: (id:string)=>void }} props
  */
 export function BannedByBond({ model, onBond }) {
@@ -281,18 +299,18 @@ export function BannedByBond({ model, onBond }) {
         return html`<div class="reg-banned__group" key=${bond.bondId} data-bond=${bond.bondId}>
           <${Tooltip} text=${briefingBondTip(bond.name, state, bannedN, model.regulation && bond.isCore)}>
             <div class="reg-banned__disc">
-              <${BondDisc} name=${bond.name} icon=${bondIconUrl(m, bond.bondId)} active=${!off} disabled=${off}
-                tier=${off ? 0 : (bond.thresholds?.length || 1)} maxTier=${Math.max(1, bond.thresholds?.length || 1)}
-                size="md" onClick=${onBond ? () => onBond(bond.bondId) : undefined} />
+              <${BondDisc} name=${bond.name} icon=${bondIconUrl(m, bond.bondId)} active=${!off} disabled=${off} minCount=${bond.thresholds?.[0] ?? 0}
+                size="md" onClick=${onBond ? () => onBond(bond.bondId) : undefined}
+                cross=${state === 'off'} tag=${state === 'drawn' ? html`<${BondLackTag} />` : null} />
             </div>
           <//>
           <div class="reg-banned__ops">
-            ${members.map((id) => html`<${UnitThumb} key=${bond.bondId + ':' + id} kind="chess" ownerId=${null} id=${id} size="sm" dim=${true} />`)}
+            ${members.map((id) => html`<${BannedThumb} key=${bond.bondId + ':' + id} id=${id} />`)}
           </div>
         </div>`;
       })}
       ${rest.length ? html`<div class="reg-banned__rest" data-testid="banned-rest">
-        ${rest.map((id) => html`<${UnitThumb} key=${id} kind="chess" ownerId=${null} id=${id} size="sm" dim=${true} />`)}
+        ${rest.map((id) => html`<${BannedThumb} key=${id} id=${id} />`)}
       </div>` : null}
     </div>` : html`<p class="t-dim">${t('本局没有禁用干员')}</p>`}
     <${DiyBannedLine} model=${model} />

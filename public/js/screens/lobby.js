@@ -7,7 +7,8 @@ import { GameAccountButton } from '../ui/gameAccount.js';
 //   - 独立模拟 → 选择模拟协议 (ProtocolSelect): the difficulty (标准/险境/绝境/终极) cards beside its official picture
 //     (`modeChoice/*_rhodes_island`), then 开始独立模拟.
 //   - 同盟模拟 (or 密钥加入) → 选择同盟方式 (AllianceSelect), as in the event's 联合模拟 (research 06 §3.2): 创建同盟 creates
-//     the room at once — at the remembered difficulty (`sp.pref.lobby.difficulty`, 标准 at first), which the host changes
+//     the room at once — at the remembered difficulty (`sp.pref.lobby.difficulty`, 标准 at first) and with the remembered
+//     「AI 队友最后选择」 (`sp.pref.lobby.aiPicksLast`, off at first; #995: sent right after through room.setAiPicksLast), which the host changes
 //     in the room (screens/room.js: the difficulty pill opens this module's ProtocolSelect with 确认; the maintainer's
 //     decision of 2026-10-21 — the event's own 选择模拟协议 before a co-op room belongs to 搜寻队友 (finding
 //     teammates), which the remake dropped) — or join one with a 同盟密钥 (recent codes remembered) as a player
@@ -65,9 +66,10 @@ import { data, getConfig, getMode, getStage, localAsset, useData } from '../data
 import { t, tc, N_ } from '../../../shared/i18n.js';
 import { scriptOf } from '../../../shared/i18nPacks.js';
 import { NoticesButton } from '../ui/notices.js';
+import { LobbyPluginTag } from '../ui/pluginTag.js';
 import { VersionSwitch } from '../ui/versionPicker.js';
-import { contentSet, retryContentSet } from '../content.js';
-import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, ladderModes, ladderPick, seasonOf, soloTimedOf, soloTimeMsgid, versionLabel } from '../versions.js';
+import { activeLobbyPlugins, contentSet, lobbyPreview, retryContentSet } from '../content.js';
+import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, ladderModes, ladderPick, seasonOf, soloTimedOf, soloTimeMsgid, versionContentStatus, versionLabel } from '../versions.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
 export const MODE_TEXT = {
@@ -259,6 +261,29 @@ export function rememberRoom(code, test = false) {
   const marks = loadPref('recentTestRooms', []);
   savePref('recentTestRooms', recent.filter(c => c === code ? test : Array.isArray(marks) && marks.includes(c)));
   savePref('recentRooms', recent);
+}
+
+/**
+ * This browser's 「AI 队友最后选择」 (#995, §37.334; default off): the host's last switch that the server took in a room
+ * (screens/room.js), the default of the next co-op room this browser creates.
+ */
+export const AI_LAST_PREF = 'lobby.aiPicksLast';
+
+/**
+ * Applies the remembered 「AI 队友最后选择」 to the room 创建同盟 has just made (#995, §37.334): an "on" goes out through
+ * the room's own room.setAiPicksLast, so the server stays the authority (host-only, co-op only) and room.create keeps
+ * its keys; a new room is off already, so "off" sends nothing. Only after this browser created a co-op room — never on
+ * joining, a host handover or a later match of the same room, so a value set in the current room is never overridden
+ * and nobody else's room changes. A refusal leaves the room off without a toast: the switch in ⚙ 同盟设置 shows the
+ * room's state and the host can still turn it on.
+ * @param {string} mode the mode of the room just created
+ * @param {(t: string, fields: object) => Promise<unknown>} request net.request
+ * @param {(key: string, fallback: boolean) => unknown} [load] store.js loadPref
+ * @returns {Promise<boolean>} whether the server took the remembered "on"
+ */
+export function sendRememberedAiLast(mode, request, load = loadPref) {
+  if (mode === 'solo' || load(AI_LAST_PREF, false) !== true) return Promise.resolve(false);
+  return request('room.setAiPicksLast', { on: true }).then(() => true, () => false);
 }
 
 export async function joinKnown(type, key) {
@@ -950,9 +975,14 @@ export function LobbyScreen() {
   // one, or the server's fallback when the version lacks it (the pref is only overwritten when the player picks)
   const versions = useStore((s) => s.versions);
   const version = useStore(lobbyVersion);
-  const versionLoading = useStore((c) => version !== DEFAULT_VERSION && (c.kind !== 'version' || c.version !== version || c.status !== 'ready'), Object.is, contentSet);
-  // its set failed to load or its check (the chip's 重试 sits under the modal): 选择模拟协议 says so and offers 重试 too
-  const versionFailed = useStore((c) => version !== DEFAULT_VERSION && c.kind === 'version' && c.version === version && c.status === 'failed', Object.is, contentSet);
+  const preview = useStore((s) => s, Object.is, lobbyPreview);
+  const previewCs = (!preview.version || preview.version === version) && preview.content?.vanilla === false ? preview.content.cs : null;
+  const previewFailed = preview.status === 'failed' && (!preview.version || preview.version === version);
+  const activeState = useStore((c) => (version !== DEFAULT_VERSION
+    ? versionContentStatus(c, version, previewCs)
+    : (previewCs ? (c.kind === 'plugins' && c.cs === previewCs ? c.status : 'loading') : 'ready')), Object.is, contentSet);
+  const versionFailed = activeState === 'failed' || (previewFailed && !previewCs);
+  const versionLoading = !versionFailed && activeState !== 'ready';
   const cfg = getConfig();
   // null while that version's data is not on screen: the card states no time rule and the dialog hides the switch
   const soloTimed = soloTimedOf(versionLoading ? null : cfg, version);
@@ -1035,12 +1065,15 @@ export function LobbyScreen() {
     }
   };
   // 独立模拟: at the difficulty picked on 选择模拟协议; 创建同盟: at the remembered one, changed in the room by the host
-  // (`version`: the lobby's, only when welcome.versions is present — protocol §4; omitted when the server offers 第二期下半 alone)
+  // (`version`: the lobby's, only when welcome.versions is present — protocol §4; omitted when the server offers 第二期下半 alone);
+  // once the server made a co-op room, the remembered 「AI 队友最后选择」 follows (sendRememberedAiLast, #995)
+  const lobbyRoomPlugins = activeLobbyPlugins(versions ? version : DEFAULT_VERSION);
   const create = (mode) => run('create', () => net.request('room.create', {
     mode, difficulty: mode === 'solo' ? shownSolo : shownCoop, ...(testMode && asTest ? { test: true } : {}), ...(versions ? { version } : {}),
     ...(mode === 'solo' && soloFree && soloTimed === true ? { soloUnlimited: true } : {}),
     ...(mode === 'solo' && shownMode ? { modeId: shownMode } : {}),
-  }));
+    ...(lobbyRoomPlugins !== undefined ? { plugins: lobbyRoomPlugins } : {}),
+  }).then(() => sendRememberedAiLast(mode, (type, fields) => net.request(type, fields))));
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
     // `undefined` — codeArg keeps an event target out of the key and falls back to the input field
@@ -1098,6 +1131,7 @@ export function LobbyScreen() {
         </div>
       </div>
       <div class="topbar__right">
+        <${LobbyPluginTag} />
         <${VersionSwitch} />
         <${ResumeMatchButton} />
       </div>

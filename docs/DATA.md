@@ -8,6 +8,8 @@ with `docs/research/*.json`. Do not edit them by hand — change the build scrip
 fails while it is stale).
 `data/assets.json` is written by `tools/fetch-assets.mjs`, which keeps the current file rather than drop entries whose
 downloads failed on this machine unless `--allow-shrink` (or `--prune`) is passed (docs/ASSETS.md, DESIGN §21.25).
+`data/card-roster.json` (the 名片干员 roster of every official period) is written by `node tools/build-card-roster.mjs`,
+which `tools/build-data.mjs` runs after writing a version's default output directory ("Cross-period 名片干员 roster" below).
 
 ```
 node tools/build-data.mjs              # build (downloads missing official files into .cache/gamedata@<commit>/, the profile's pins)
@@ -17,18 +19,45 @@ node tools/build-data.mjs --no-research --out /tmp/x   # research-free build (fa
 node tools/build-data.mjs --cache <dir> --report <file> # other cache dir / report file (tests, CI)
 node tools/build-data.mjs --force      # write data/ even when integrity checks fail (debugging only)
 node tools/build-data.mjs --version act1autochess   # another official version → data/versions/<slug>/ (see "Official versions (M0)")
+node tools/build-data.mjs --gamedata-commit <sha> --out /tmp/x   # every official file from one full upstream commit (#567)
 node --test test/data.test.js          # integrity tests (+ raw-data cross-check and rebuild check when the pinned official files are cached)
 ```
 Unknown options or a missing option value are errors (exit code 2); `--refresh` and `--offline` are exclusive.
 
 - **Cache.** Official files live under `.cache/gamedata/<repo path>` (`excel/activity_table.json`,
   `levels/enemydata/enemy_database.json`, `levels/activities/act1autochess/level_*.json`, …) and are fetched from
-  `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/<path>` when missing.
+  `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/<path>` when missing; a file a
+  version profile pins to a commit (every profile pins all of its files today) lives under `.cache/gamedata@<sha>/` and
+  comes from that commit ("Official versions (M0)").
   Downloads are validated (must parse as JSON) and written atomically. With `--refresh`, a download that still fails
   after four attempts aborts the build (exit code 1), even if an older cached file exists. Generated files and the
   previous report remain untouched, including with `--force`; successfully downloaded cache entries are not rolled
   back. Retry `--refresh` to complete the refresh; cached files are not verified to share an upstream revision.
-- **Report.** A run that reaches integrity validation writes `.cache/build-data-report.json` (counts, byte sizes, warnings (each once), errors, `written`).
+- **Upstream commit (`--gamedata-commit <sha>`, GitHub #567, DESIGN §37.323).** Reads every official file of the run at
+  one full commit of Kengxxiao/ArknightsGameData: 40 hex digits (any case, kept in lower case). A branch, a tag or a short
+  SHA exits 2 with the reason, because the cache is keyed by the commit. The files are cached in `<cache>@<sha>/`
+  (`.cache/gamedata@<sha>/` by default: the directory a profile pin at the same commit uses, since the files are the same)
+  and downloaded from `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/<sha>/zh_CN/gamedata/<path>`. It
+  replaces the version profile's `pins` (and a mirror `source`) for every file and prints a note saying so (`--quiet`
+  hides it like the counts and the warnings; the report's `replacedPins` / `replacedSource` keep it) [ASSUMED: #567
+  settles the option, not how it meets a pinned profile]; `--version` still picks the profile's adapters, tables,
+  research, expected counts and output directory (`--out` keeps `data/` untouched). `--refresh` downloads every file of
+  the commit again; `--offline` downloads nothing and, when files are missing from `<cache>@<sha>/`, fails (exit code 1)
+  naming all of them at once (while `excel/activity_table.json` is missing, the level files it names cannot be listed,
+  and the message says so). Without the option nothing changes: the profile's pins, or master for a profile without
+  pins (`test/build-data-commit.test.js` rebuilds `data/*.json` without it, and `data/versions/act3autochess-v3_1/`
+  with it set to that profile's own pin, byte for byte). Asset downloads (`tools/fetch-assets.mjs`,
+  `tools/fetch-stats-assets.mjs`, `tools/local-extract/`) never read it, and the switch between the official versions
+  does not stand in for it (the maintainer on #567).
+- **Report.** A run that reaches integrity validation writes `.cache/build-data-report.json` (counts, byte sizes, warnings (each once), errors, `written`,
+  and `gamedata`: `files[<path>]` = `{ commit, from, pin, source }` for every official file read, `from` being `option`
+  (`--gamedata-commit`), `pin` (`pin` = the profile's pins key, `default` / `character` …) or `master` (`commit` null: the
+  branch head at download time); `groups`, the same files counted per commit and origin, which the run also prints after
+  the counts as `official data: <sha> (pin default): <n> file(s); …`; `commit`, the `--gamedata-commit` value or null;
+  `replacedPins` and `replacedSource`, the profile pins and the mirror `source` the option replaced, or null; and, for a
+  profile that reads a mirror only, `references`, the Kengxxiao files at the default version's pins that the mirror's
+  empty `{}` were checked against, in the same `{ commit, from, pin, source }` form; `tools/versions/profiles.mjs`
+  `gamedataReport` / `gamedataSummary`).
   Integrity errors (see §17) make the exit code 1 **and leave the previous output untouched** (unless `--force`);
   warnings never do. Each output file is written atomically (temp file + rename).
 - **Determinism.** Same inputs ⇒ byte-identical outputs (stable key order, no timestamps, no randomness).
@@ -106,7 +135,7 @@ Top level: `{ season, seasonName, modes, economy, lpCapPerRound, bossOvertimeAft
 
 | Field | Example | Meaning |
 |---|---|---|
-| `income` | `[0,4,5,6,…,12]` | index = round (index 0 unused): `min(3+r, 12)`; `incomeCap` 12, `incomeCapAlternative` 10, `incomeAssumedAfterRound` 3 |
+| `income` | `[0,4,5,6,…,12]` | index = round (index 0 unused): `min(3+r, 12)`; `incomeCap` 12, `incomeCapAlternative` 10, `incomeAssumedAfterRound` 3 (下半: only R1–R3 measured). 规程 measured it on recordings (profile `config.economy`): `min(3+r, 11)`, the two markers null; its 极速模拟 carries `modes.mode_single_funny.economy.income` = `min(5+r, 11)`, merged over the season's by `GameData` |
 | `leftoverFundsLost`, `leftoverFundsKeptByBands` | `true`, `["band_cannot"]` | |
 | `chessPrice[tier]` / `chessSell[tier]` | `{"normal":2,"golden":2}` / `{"normal":1,"golden":1}` | |
 | `chessStatus[tier]` | `{"normal":{"phase":1,"level":55,"skillLevel":4,"equipLevel":0,…},"golden":{…}}` | training status per tier |
@@ -134,7 +163,7 @@ Top level: `{ season, seasonName, modes, economy, lpCapPerRound, bossOvertimeAft
 | `hiddenCore` | `{"single":350,"multi":1200,"minTeamLpExclusive":1,"difficulties":["NORMAL","HARD","ABYSS"],"checkedAfterRound":14}` | Σ activated layers must be **>** threshold and LP **>** 1 (PRTS; the community's measurement 路标月报#2, GitHub #645) |
 | `dp` | `{"init":10,"perSec":1,"max":99}` | |
 | `unite` | `{"maxHelpers":2,"helperOrder":"unitsOnField>activeBond>undownedUnits; pair: unitsOnField>activeBond>activeLayers>undownedUnits, first = right field (PRTS 帮助)","layerGainsEnabled":false,"templates":{"1":"act1autochess_escaped_single","2":"act1autochess_escaped_multi"},…}` | 联防; `helperOrder` documents the rule `server/match/unite.js helperOrder` implements (research 08 §5; ties → seat) |
-| `finalAssault` | `{"pairing":"seatOrderPairs","oddPlayerAlone":true,"movableBossPerAlivePlayerSide":true,"layerGainsEnabled":false}` | |
+| `finalAssault` | `{"pairing":"seatOrderPairs","oddPlayerAlone":true,"movableBossPerAlivePlayerSide":true,"layerGainsEnabled":false}` | `layerGainsEnabled` is false in every covenant build. The 规程 profile sets it true, so Final Assault and Hidden Core keep permanent IN_BATTLE gains. `unite.layerGainsEnabled` stays false in every version. |
 | `timers` | `{"infoCheck":25,"infoCheckHint":5,"bandDraft":50,"bandDraftHint":15,"bandTurn":50,"battleCheck":3,"spFirst":30,"spTurn":16,"soloPrepTimeData":300,"soloSpTimeData":150,"chatCd":1,"chatBubble":3,"broadcastDelay":1,"enterSteps":[…]}` | seconds |
 | `bans[difficulty]` | `{"core":3,"addon":4}` (FUNNY `{0,1}`) + `rule` | per-match disabled-bond draw (research 01 A2) |
 | `bandDraft` | `{"skipsPerPlayer":1,"order":"random","duplicatesAllowed":true,"timeoutBandId":"band_bldsk"}` | |
@@ -300,7 +329,8 @@ full-rank build from the others; the build fails unless `atRank` rebuilds every 
 | `countMode` | `"BOARD"` | `BOARD` (distinct base chess on board), `BOARD_AND_DECK` (+hand: 远见/奇迹/投资人), `BOARD_ALL_CHESS` (绝技: every golden chess on board, duplicates count) |
 | `countsHand`, `countsGoldenOnly` | `false`, `false` | convenience flags |
 | `activeType`, `isActiveInDeck`, `noStack`, `weight`, `maxInactiveBondCount` | `"BATTLE"`, `false`, `false`, `10`, `-1` | `weight` 0 ⇒ never drawn for per-match bans |
-| `layerMilestones[]` | `[{"layer":25,"mode":"every","effect":"bond_layer_added_reward_equip"}]` | layer-based powers: `reach` (while L ≥ layer), `every` (each multiple), `first` (latched once) |
+| `layerMilestones[]` | `[{"layer":25,"mode":"every","effect":"bond_layer_added_reward_equip"}]` | layer-based powers: `reach` (while L ≥ layer), `every` (each multiple), `first` (latched once). Written for `power_bond_stack_cnt` (`reach`), `bond_layer_added_reward_equip` / `bond_layer_gain_coin` (`every`), `bond_layer_char_garrison_bonus` (`reach`) and as `first`: `bond_multi_layer_char_goods_price_bond_discount` (`layer1`, `layer2`), and since §37.343 the other versions' keys — `bond_layer_char_goods_price_discount` and `bond_layer_char_goods_price_bond_discount` (`layer`: 远见 100 in 第一期, 80 / 150 in 第二期上半), `bond_goods_disc_tier2` (each `layer_list` value, 规程 远见 80, 150) and `bond_layer_shop_same_tier` (`layer`, 规程 奇迹 100). Descriptive: only 投资人's row is read (`EffectDispatcher.investRepeat`); the add-on handlers read the buffs |
+| `phaseType`, `phaseCounts[]` (规程 only) | `"PEOPLE_COUNT"`, `[2,3]` (迅捷 `"STACK_COUNT"`, `[0,40]`) | the official phase table of the bond's own effect, copied from `effects.json` (§7). The client draws the numeral over an active disc from it (gameLogic `bondStage`, §37.341). Display only: the server, the sim and the bots read `thresholds`. 盟约 seasons omit both |
 | `desc`, `descRaw` | | bond panel text |
 | `effectId`, `effectName`, `effectDesc`, `effectDescRaw` | `"bondeffect_deput"`, …, `"所有干员防御力+{0:0%}（受层数影响）…"` | in-battle text with **positional** placeholders |
 | `effectDescParams[]` | `[{"index":0,"format":"0%","base":"base_def","perStack":"def_per_stack"}]` | `{i:fmt}` = `bb[base] + bb[perStack] × layers` — layers never exceed 999 (the official `MAX_GARRISON_STACK`, not in any table: shared/constants.js `BOND_LAYER_CAP`, research 11). 盟约's bond rows list the keys (`descParamBaseList` / `descParamPerStackList`); 规程 keeps them in `effectDescParamDataDict[effectId].descParamInfos`, whose `descParamMax` becomes `max` (the number never exceeds it: 萨尔贡's slow 60 %, the chances 100 %; §37.208) |
@@ -373,6 +403,7 @@ Types: `BAND_INITIAL` 41, `BOND` 23, `EQUIP` 115, `ENEMY_GAIN` 129 (悬赏), `BU
 | `buffs[]` | `{"key":"…","countType":"NONE","bb":{…},"bbStr":{…}}` | |
 | `params` | `{"layer":2}` | merged convenience view |
 | `effectDescParams[]`, `displayThresholds[]` (规程 `BOND` only) | `{ index, format, base, perStack, max? }`, `[3,6,9]` | Present when `effectDescParamDataDict[effectId].descParamInfos` is non-empty. Same `{i:fmt}` binding as a bond's `effectDescParams` (§3), read from that effect so a strategy's `auto_chess_effect_replace` target formats its own numbers. `displayThresholds` is `bondPhaseCountList` when `phaseType` is `PEOPLE_COUNT`. `max` is omitted unless `descParamMax` > 0. Older seasons omit both. |
+| `phaseType`, `phaseCounts[]` (规程 `BOND` only) | `"STACK_COUNT"`, `[80,150]` (远见) | `effectDescParamDataDict[effectId].phaseType` and `bondPhaseCountList`, written for every `BOND` effect that has an entry, also when `descParamInfos` is empty. `phaseType` is the client's `ActAutoChessBondPhaseType`: `PEOPLE_COUNT` (counts members), `STACK_COUNT` (counts layers) or `NONE` (`[]`: 调和, 协防干员, 独行). The phase level is how many entries the count reaches; the bond strip draws it over an active disc (§37.341). Older seasons omit both. |
 
 ## 8. `choices.json` — 机变 draft data
 
@@ -495,13 +526,14 @@ as official level data, and sim tests use them as a plain two-halves road.
 | `size` | `[19,21]` | |
 | `rows[]` | `rows[9] = "##Errr#rrrSrrr#rrrS##"` | 19 strings, **index = row (0 = bottom)**, one glyph per col |
 | `tiles[glyph]` | `{"tileKey":"tile_road","height":"LOW","buildable":"ALL","passable":"ALL","groundPassable":true,"flyPassable":true,"special":null,"bb":{}}` | actual tile properties of each glyph used. `buildable` is the **effective** deploy type: the level's buildableType, except a tile whose mechanism refuses deployment — 深水区 `tile_deepsea` (PRTS 深水区 地形信息 "部署类型 全部位 … 地形机制 拒绝部署（待补充）"; player report #3 after 0.1.0) — which is `NONE` and keeps the level's value in `buildableType` (`server/sim/grid.js DEPLOY_REFUSED_TILES`, shared with the builder) |
-| `devices[]` | `{"key":"trap_013_blower","name":"源石流发生装置","alias":"trap_013_blower#001","pos":[13,5],"dir":"DOWN","hidden":false,"role":"blower","active":true,"stats":{…},"rangeGrid":[[0,0],…],"rangeTiles":[[13,5],[12,5],[11,5],[10,5]],"skill":{"skillId":"sktok_blower","bb":{"blower_s_character[equal].atk":0.3,…}},"desc":null}` | predefined devices; `role` ∈ crate, platform, mound, blower, mireController, tideController, turret (双眼皮, activated by band 机械援助), coldWind, sandstorm, waterPlatform, sealedFloor, bush, bossSpawn; `active` = present at match start (= not `hidden` in the level file); `rangeGrid` is facing right, `rangeTiles` = absolute tiles after rotating by `dir` (RIGHT `(dr,dc)`, UP `(dc,−dr)`, LEFT `(−dr,−dc)`, DOWN `(−dc,dr)`), clipped to the grid (null without a range). Terrain cards / band effects toggle devices by `alias` |
+| `devices[]` | `{"key":"trap_013_blower","name":"源石流发生装置","alias":"trap_013_blower#001","pos":[13,5],"dir":"DOWN","hidden":false,"role":"blower","active":true,"stats":{…},"rangeGrid":[[0,0],…],"rangeTiles":[[13,5],[12,5],[11,5],[10,5]],"skill":{"skillId":"sktok_blower","bb":{"blower_s_character[equal].atk":0.3,…}},"desc":null}` | predefined devices; `role` ∈ crate, platform, mound, blower, mireController, tideController, turret (双眼皮, activated by band 机械援助), coldWind, sandstorm, waterPlatform, cannon (规程 盐坨子炮 `trap_196_cnnon`, on the separator above the field), sealedFloor, bush, bossSpawn; `active` = present at match start (= not `hidden` in the level file); `rangeGrid` is facing right, `rangeTiles` = absolute tiles after rotating by `dir` (RIGHT `(dr,dc)`, UP `(dc,−dr)`, LEFT `(−dr,−dc)`, DOWN `(−dc,dr)`), clipped to the grid (null without a range). Terrain cards / band effects toggle devices by `alias` |
 | `mapChars[]` | `{"key":"char_605_cmedic","alias":"char_605_cmedic#1","pos":[10,2],…}` | band_amedic map characters (→ `tokens.json`) |
 | `special` | `{"mire":{"intervalSec":1,"aspdPerStack":-0.05,"moveMulPerStack":-0.05,"maxStacks":10,"heavyWeight":3,…}}`, `{"infection":{"bb":{"damage":70,"atk":0.2,"attack_speed":20,"duration":300}}}`, `{"deepsea":{"skillId":"sktok_tidectrl_3","bb":{…}}}`, `{"smog":{"rule":"operatorsNotTargetableByEnemyRanged"}}`, `{"blower":{…}}` | special-terrain parameters |
 | `runes[]`, `globalBuffs[]` | `{"key":"map_tile_blackb_assign","bb":{…},"bbStr":{…}}` | level runes (act2 m03 reed rune has no reed tiles — leftover) |
 | `deployTiles` | `{"normal":{"melee":[[9,3],…],"rangedOnly":[[10,4],…],"changedByDevices":[…]},"bossLeft":{…},"bossRight":{…}}` | deployable tiles at match start: `melee` = LOW (effective) buildable ALL/MELEE (ranged may use them too) — and a 深水区 under an active 特制水上平台 (`waterPlatform`, "在水上建立可以部署任意单位的平台"; act1 m05 only — the prep's deploy map only: the sim does not model the canoes, so its Grid keeps those tiles NONE, automatic placements avoid them and the path tie-break counts them as non-blockable [ASSUMED, weight 0 this season]) —, `rangedOnly` = high ground / active platforms; tiles under active crates/mounds and the 深水区 excluded. `bossLeft` / `bossRight` (field coordinates, boss rows 1–5) are what a player may deploy on in a boss round's prep: board (r, c) = boss (r − 7, c) / the right half mirrored (r − 7, 20 − c) (server/match/board.js `field`, user playtest #5 item 7) |
 | `groundPaths` / `groundPathsWithDevices` | `{"12,10->9,2":[[12,10],[12,9],…,[12,3],[11,3],[10,3],[9,3],[9,2]]}` | the ground route of the sim's own `server/sim/grid.js` flow field (research 08 §3.4: 4-direction SPFA from the goal, crates cost 1000, Bresenham line-of-sight smoothing — official route lengths — kept unless the remake's (0.1.0's) road-over-floor preference route crosses strictly fewer non-blockable floor / gate / 深水区 tiles and no more 深水区 (GitHub #375) — the fewest among equal-length chains, smoothing that never cuts across floor its grid route does not walk; a corner touch does not count as a crossing — e.g. 战场#01's lower gate takes the col-8 road, not the col-9 floor lane, while 战场#04's keeps the official diagonal from row 9 into row 10; DESIGN §14 corrections, test/sim/pathing-official.test.js) as the tiles an enemy crosses, over the whole map, without / with the match-start devices (crates cost 1000, platforms / mounds blocking [ASSUMED]); the battle re-reads its flow fields live |
 | `options`, `config` | `{"characterLimit":8,"moveMultiplier":0.5}`, `{…configBlackBoard strings…}` | |
+| `arena` (规程 only) | `{"size":[36,55],"rows":[…36],"tiles":{…},"regions":[{"id":0,"role":"player","piece":1,"rect":[0,6,0,19],"field":{"dr":7,"dc":0},"ownerSeat":0},…],"devices":[{"key":"trap_1105_accrate","alias":"…","role":"crate","pos":[3,4],"dir":"RIGHT","hidden":false,"active":true,"rangeTiles":[]},…]}` | the official level as it is (`tools/versions/layouts.mjs regulationArena`): `rows` / `tiles` like the stage's (index = row from the bottom; `.` = `tile_acempty`, outside every piece), `regions` the seven pieces sorted by (row, col) — `role` player / unite / boss, `piece` 1–3 (`sub_0N`), `rect` [r0, r1, c0, c1] in arena cells, `field` the shift that puts the piece's first row on the 19×21 grid (`PIECE_FIELD`), `ownerSeat` 0–3 on the player blocks ([ASSUMED] in that order), `side` L / R on the boss fields — and `devices` in arena cells (stats and skill: the stage device of the same key). The sim and the server read `rows`; the client draws a view's piece (`render/arenaView.js`, DESIGN §15) |
 
 Glyph legend (`rows`):
 
@@ -882,7 +914,8 @@ every file system and URL).
   group), V1_2 over two, `21b1f240` 48 MB with 6 tables and the levels plus
   `ee2cabff` 13 MB with the 2 enemy tables, V2_1 in one, `1457587e` 65 MB with the 8 tables and the 50 level files of
   both seasons). `--offline` / `--refresh` keep their per-file meaning; `--cache
-  <dir>` moves every cache (`<dir>` and `<dir>@<sha>`).
+  <dir>` moves every cache (`<dir>` and `<dir>@<sha>`). `--gamedata-commit <sha>` reads every file at one commit instead
+  of the pins (the "Upstream commit" note at the top of this file).
 - **`adapters`** (`tools/versions/adapters.mjs`, applied to the season section right after it is loaded, never for the
   default; each throws on a shape it does not know):
   - `bondActiveType` — 上半's `bondInfoDict` activates by `activeType` + `isActiveInDeck`; 下半 by `activeCondition` +
@@ -946,7 +979,8 @@ every file system and URL).
   carries the 鸭爵 effect, unused there: V1_1 has no 鸭爵 band).
 - **`pools`** (optional): `{ <pool id>: [charId…] }` replaces the operators the build writes for a hand-written chess
   pool where the version's trait text names others. Both 上半 profiles set `pool_chess_glady` to 斯卡蒂 / 幽灵鲨 / 安哲拉
-  (`garrison_39`: 「斯卡蒂、幽灵鲨或安哲拉」; 下半: 深巡); V2_1 and the default have none.
+  (`garrison_39`: 「斯卡蒂、幽灵鲨或安哲拉」; 下半: 深巡). 规程 sets it to 斯卡蒂 / 幽灵鲨 / 深巡 / 安哲拉
+  (`garrison_61`: 「幽灵鲨、安哲拉、深巡或斯卡蒂」). V2_1 and the default have none.
 - **规程 `config.version.rules.equipHand`**: `true` only in the act3autochess-v3_1 profile. The official season's
   `maxDeckChessCnt` 10 / `maxDeckEquipmentChessCnt` 5 and separate client hand areas define character and equipment
   rows. Hidden overflow policy is [ASSUMED] by the owner (2026-11-09); see [META](META.md#regulation-equipment-row-and-overflow).
@@ -998,7 +1032,7 @@ there):
   operator there), so `pool_char_pinus` is empty). A profile's `pools` replaces the operators of a hand-written chess pool
   where the version's trait text names others: both 第一期 builds list 斯卡蒂 / 幽灵鲨 / 安哲拉 in `pool_chess_glady`, as
   their `garrison_39` says (下半: 深巡, who is shop chess in 第一期 too, so the charId lookup alone kept him; DESIGN
-  §35.22.3).
+  §35.22.3). 规程 lists 斯卡蒂 / 幽灵鲨 / 深巡 / 安哲拉, as its `garrison_61` says.
 - `TRIGGER_DEVIATIONS` (`server/plugins/officialUnitBuilder.js`) by the operator's `charId` and skill id, and like
   `STANDIN_TRIGGER_DEVIATIONS` applied only over an official `TAKE_DAMAGE` row — the row they override (DESIGN §21.29,
   §22.10). Every 下半 entry meets one (V2_1: all but 雷蛇's, who joined with V2_2); in 上半 none applies.
@@ -1101,8 +1135,9 @@ it under `enabled` and keeps the configured `default`. The default version is th
 
 The vanilla `/cs/<cs16>/index.json` is byte-identical (no `version`, no `bounds`, URLs under `/data/`). The build tag
 (`server/http/buildTag.js`) counts the served version directories only, so rebuilding a version the server does not offer
-is no new build. `/healthz` adds `versions: { enabled, default, hosts: { workers, matches, transport } }` only when a
-non-default version is enabled.
+is no new build. `/healthz` adds `versions: { enabled, default, loaded, hosts: { workers, matches, transport } }` only when
+a non-default version is enabled (`loaded`: how many versions other than 第二期下半 have their data in memory now, the lobby's default 规程 included — they load on
+first use; a 名片干员 of another period loads none, DESIGN §37.325).
 
 **Match hosts**: unmodded rooms of a non-default version start their matches in `server/match/host/` with `kind: 'version'` —
 one child process per version `cs`, at most `maxHosts`, counted apart from the plugin hosts (docs/design/match.md). The
@@ -1115,6 +1150,37 @@ Gameplay plugins that explicitly list a room's official version in `versions` co
 manifest and changed files, and run in the plugin pool under its existing composition/host limits. Missing `versions`
 means act2autochess only, independently of the lobby default. Official generated data and unmodded version identities
 keep their existing format.
+
+### Cross-period 名片干员 roster (`card-roster.json`, #877)
+
+DESIGN §37.325. The waiting room's seat card may show any official period's card candidate, so one file lists them all:
+`data/card-roster.json` — `{ format: 1, periods, operators }`, one operator per line (sorted by charId, a newline at
+the end: a readable diff), each `{ charId, name, appellation, rarity, golden, periods }`. `periods` are the official
+periods (registry ids, oldest first: `act1autochess@V1_1`, `act1autochess`, `act2autochess@V2_1`, `act2autochess`,
+`act3autochess@V3_1` — `shared/cardRoster.js CARD_PERIOD_ORDER`) whose data lists it; `golden` is true when any of them
+has a visible elite chess record (its E2 art), false for an operator only a 自选编队 pool lists (its E1 art, as in its
+own period's rooms).
+
+- **Source**: per period, `cardEntries(chess, backups)` (`shared/cardRoster.js`) — the visible, non-自选 chess records
+  (an elite record preferred) and `backups.diy.ownedPool` (name and rarity from `backups.diy.operators`, else
+  `backups.units`; appellation from `backups.units`) — the same candidates the room's picker lists and `room.card` accepts
+  for a room's own content. Merged by charId; a name, rarity or appellation that differs between periods, an unknown or
+  repeated period id, a missing name or a rarity outside 1–6 is an error.
+- **Build**: `node tools/build-card-roster.mjs [--check] [--data <dir>]` (`npm run build:roster`) reads `chess.json` and
+  `backups.json` of the default data and of every version's directory (`server/data.js versionDataDir`), writes atomically
+  (temp file + rename); `--check` compares only and exits 1 with "run npm run build:roster" when the file is stale.
+  `tools/build-data.mjs` calls it after writing a version's default output directory (`data/`, or `data/versions/<slug>/`
+  with `--version`; an `--out` elsewhere leaves it alone), a failure counting as an error (exit 1), so every data rebuild
+  keeps it current. `test/card-roster.test.js` regenerates it and compares byte for byte.
+- **Served and read**: a top-level data file, so `/data/card-roster.json` serves it (no route of its own) and
+  `server/data.js loadData` reads it into `getData()` with the others; `server/lobby.js` parses it once per data object
+  (`parseCardRoster`, which drops a malformed row and answers null for another format). It is presentation data
+  (`server/plugins/identity.js PRESENTATION_DATA`, like `assets.json`): outside the content hash, `/cs/` manifests,
+  plugin content sets and the version directories (not in `DATA_FILES`). A data directory without it (a test fixture)
+  falls back to each room's own candidates.
+- **Counts** (current data): 250 operators — 第二期下半 187, 第二期上半 182, 第一期下半 167, 第一期上半 166, 规程 200; 217
+  golden, 33 only in a 自选 pool; 45 059 bytes, 6 477 gzipped. Every row has its avatar and portrait in `data/assets.json`
+  (a golden row also `avatarE2` / `portraitE2`).
 
 ### Per-form equipment capacity and special recruitment
 
@@ -1150,3 +1216,11 @@ The generator keeps MAP09's official `w` cells and emits `special.duelGrass` wit
 terrain stealth buff; the official 0 restores concealment as soon as the block ends. Missing blackboard values do not imply plain ground: these
 rules come from the official tile and buff templates, recorded in
 [the field receipt](research/regulation-map09-20261112.json). No other map record changes.
+
+### Salt cannon landing data
+
+A regulation `role:cannon` device stores `level`, `distance`, `initSp`, `spCost`, `spRecovery`, `branchId` and
+its resolved landing `route`. Both layout composition and device generation read the distance from the unlocked
+EnemyCannon00 talent's `rangeId` and `range_table`. Routes come from the owning sub-scene's `extraRoutes` and
+move with the battle coordinates. [ASSUMED] Bare prefab-key runes apply once; parallel alias selectors are
+considered duplicates. Missing base stats remain null when processing attribute runes.

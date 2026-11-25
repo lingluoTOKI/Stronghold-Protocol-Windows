@@ -18,6 +18,24 @@
 // pastes a template at its 盟约 place (TEMPLATE_OFFSETS), moving every position with it. The two hand rows (0 and 7) get
 // 盟约's isValidHand mark: 规程's hand tiles carry none (its client knows them by MapAreaType CHAR_HAND), and cells no piece
 // covers are void tile_forbidden ('#'). test/versions-regulation.test.js pins the result against 盟约's cells.
+//
+// The sim keeps that 19×21 grid. The client draws the official arena (regulationArena): the 36×55 level itself and where
+// each piece lies in it (its seven regions), with the place each piece takes in the 19×21 grid (PIECE_FIELD), so a field
+// is drawn as the one official piece the player sees there — the own block with its pen beside the road, the 联防 board,
+// the boss field with its pen above — instead of rows cut from three pieces.
+
+import { createOfficialUnitBuilders } from '../../server/plugins/officialUnitBuilder.js';
+
+const { bestCandidate } = createOfficialUnitBuilders();
+
+/** The cannon's unlocked EnemyCannon00 talent defines its landing distance in range_table. */
+export function cannonDistance(ctx, level) {
+  const talents = ctx.charTable.trap_196_cnnon.talents;
+  const talent = talents.map(t => bestCandidate(t.candidates, 0, level)).find(t => t?.prefabKey === 'EnemyCannon00');
+  const grids = ctx.rangeTable[talent?.rangeId]?.grids;
+  if (!grids?.length) throw new Error(`cannon: missing landing range at level ${level}`);
+  return Math.max(...grids.map(g => g.col));
+}
 
 export const ROWS = 19;
 export const COLS = 21;
@@ -99,9 +117,10 @@ const HAND_ROWS = new Set([0, 7]);
  * from the three pieces (the atlas repeats them once per player).
  * @param {any} main level_<stage>.json
  * @param {[any, any, any]} pieces sub_01, sub_02, sub_03
+ * @param {{ charTable: any, rangeTable: any }} [tables] official tables, required for pieces with cannons
  * @returns {any} a new level object
  */
-export function composeRegulationStage(main, [sub1, sub2, sub3]) {
+export function composeRegulationStage(main, [sub1, sub2, sub3], tables) {
   const want = { 1: '7x20', 2: '6x21', 3: '13x21' };
   const piece = { 1: sub1, 2: sub2, 3: sub3 };
   for (const k of [1, 2, 3]) if (sizeOf(piece[k]) !== want[k]) throw new Error(`layout: ${main.levelId} sub_0${k} is ${sizeOf(piece[k])}, expected ${want[k]}`);
@@ -117,6 +136,17 @@ export function composeRegulationStage(main, [sub1, sub2, sub3]) {
   // sub_02's left half, its own copies are left out
   const moved = (lv, shift) => {
     const out = structuredClone(lv.predefines ?? {});
+    for (const t of out.tokenInsts || []) {
+      if (t.inst?.characterKey !== 'trap_196_cnnon') continue;
+      // Each arena piece owns the cannon's landing route. Its branch actions share placeholder indices across
+      // pieces; resolve the actual extraRoute at this cannon's landing point before moving it into battle space.
+      const distance = cannonDistance(tables, t.inst.level || 1);
+      const [dr, dc] = { UP: [1, 0], DOWN: [-1, 0], LEFT: [0, -1], RIGHT: [0, 1] }[t.direction];
+      const route = (lv.extraRoutes || []).find(r => r.startPosition.row === t.position.row + dr * distance
+        && r.startPosition.col === t.position.col + dc * distance);
+      if (!route) throw new Error(`layout: ${lv.levelId} cannon has no landing route`);
+      t.cannonRoute = structuredClone(route);
+    }
     for (const p of positions(out)) { const to = shift(p.row); if (to === null) throw new Error(`layout: ${lv.levelId} has a predefine at row ${p.row} outside the rows it lends`); p.row = to; }
     return out;
   };
@@ -148,4 +178,98 @@ export function placeRegulationTemplate(lv) {
   out.mapData = { ...out.mapData, map, tiles };
   for (const p of positions(out)) { p.row += off.dr; p.col += off.dc; }
   return out;
+}
+
+/**
+ * Where each piece's bottom-left cell lies in the 19×21 grid (rows from the bottom) — the same shifts as STAGE_ROWS:
+ * sub_01's hand row is grid row 7 (its road rows 2–5 are the normal field, rows 9–12, and its pen cols 12–18 sit
+ * beside it in rows 8–12), sub_02's road rows 1–5 are grid rows 9–13 (its hand row 0 is row 8), sub_03 is rows 0–12
+ * (boss field 0–6, its pen 7–11).
+ */
+export const PIECE_FIELD = Object.freeze({
+  1: Object.freeze({ dr: 7, dc: 0 }),
+  2: Object.freeze({ dr: 8, dc: 0 }),
+  3: Object.freeze({ dr: 0, dc: 0 }),
+});
+const PIECE_ROLE = Object.freeze({ 1: 'player', 2: 'unite', 3: 'boss' });
+
+/** What makes two official cells the same cell (the atlas writes an empty blackboard as null, the pieces as []). */
+const cellKey = (t) => (t ? JSON.stringify([t.tileKey, t.heightType, t.buildableType, t.passableMask, t.blackboard?.length ? t.blackboard : null]) : '');
+
+/**
+ * Every place where `piece` lies in `level` cell for cell, as [r0, c0] (rows from the bottom). A piece cell is matched
+ * against the level's cell of the same kind, height, buildable / passable masks and blackboard.
+ */
+function findPiece(level, piece) {
+  const m = level.mapData.map, pm = piece.mapData.map;
+  const H = m.length, W = m[0]?.length ?? 0, h = pm.length, w = pm[0]?.length ?? 0;
+  const want = [];
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) want.push([r, c, cellKey(tileAt(piece, r, c))]);
+  const at = [];
+  for (let r0 = 0; r0 + h <= H; r0++) {
+    for (let c0 = 0; c0 + w <= W; c0++) {
+      if (want.every(([r, c, k]) => cellKey(tileAt(level, r0 + r, c0 + c)) === k)) at.push([r0, c0]);
+    }
+  }
+  return at;
+}
+
+/**
+ * 规程's arena: the stage's 36×55 level (the hand rows marked like composeRegulationStage marks them) and its regions —
+ * every place one of the three pieces lies in it, found cell for cell, never a fixed rect:
+ *   { id, role: 'player' | 'unite' | 'boss', piece: 1 | 2 | 3, rect: [r0, r1, c0, c1], field: { dr, dc }, ownerSeat? , side? }
+ * rect is inclusive, in arena rows from the bottom; field is PIECE_FIELD (arena cell (r, c) of the region is grid cell
+ * (r − r0 + dr, c − c0 + dc)). Region ids follow the rects (bottom row first, then left col). The 11-08 client puts one
+ * player per player block (map layers A–D) and the two boss fields on BATTLE_BOSS_LEFT / RIGHT; which seat takes which
+ * block is not in the data: [ASSUMED] seats 0–3 take the player blocks in id order (bottom left, bottom right, top left,
+ * top right), and `side` is 'L' / 'R' by column. The arena must be the three pieces and nothing else: four player
+ * blocks, one 联防 board, two boss fields, every other cell tile_acempty — anything else throws.
+ * @param {any} main level_<stage>.json
+ * @param {[any, any, any]} pieces sub_01, sub_02, sub_03
+ * @returns {{ level: any, regions: any[] }}
+ */
+export function regulationArena(main, pieces) {
+  const want = { 1: 4, 2: 1, 3: 2 };
+  const found = [];
+  pieces.forEach((piece, i) => {
+    const n = i + 1;
+    const at = findPiece(main, piece);
+    if (at.length !== want[n]) throw new Error(`layout: ${main.levelId} holds sub_0${n} ${at.length} times, expected ${want[n]}`);
+    const [h, w] = sizeOf(piece).split('x').map(Number);
+    for (const [r0, c0] of at) found.push({ piece: n, rect: [r0, r0 + h - 1, c0, c0 + w - 1] });
+  });
+  found.sort((a, b) => a.rect[0] - b.rect[0] || a.rect[2] - b.rect[2]);
+  const m = main.mapData.map;
+  const H = m.length, W = m[0]?.length ?? 0;
+  const inside = (r, c) => found.some(({ rect: [r0, r1, c0, c1] }) => r >= r0 && r <= r1 && c >= c0 && c <= c1);
+  for (let r = 0; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      if (!inside(r, c) && tileAt(main, r, c)?.tileKey !== 'tile_acempty') {
+        throw new Error(`layout: ${main.levelId} cell (${r},${c}) is ${tileAt(main, r, c)?.tileKey}, outside every piece`);
+      }
+    }
+  }
+  let seat = 0;
+  const bossCols = found.filter((x) => x.piece === 3).map((x) => x.rect[2]);
+  const regions = found.map((x, id) => ({
+    id, role: PIECE_ROLE[x.piece], piece: x.piece, rect: x.rect, field: { ...PIECE_FIELD[x.piece] },
+    ...(x.piece === 1 ? { ownerSeat: seat++ } : {}),
+    ...(x.piece === 3 ? { side: x.rect[2] === Math.min(...bossCols) ? 'L' : 'R' } : {}),
+  }));
+  const { map, tiles } = (() => {
+    const out = { map: [], tiles: [] };
+    const index = new Map();
+    for (let r = H - 1; r >= 0; r--) {
+      const row = [];
+      for (let c = 0; c < W; c++) {
+        const t = asHandSlot(tileAt(main, r, c));
+        const key = JSON.stringify(t);
+        if (!index.has(key)) { index.set(key, out.tiles.length); out.tiles.push(t); }
+        row.push(index.get(key));
+      }
+      out.map.push(row);
+    }
+    return out;
+  })();
+  return { level: { ...main, mapData: { ...main.mapData, map, tiles } }, regions };
 }

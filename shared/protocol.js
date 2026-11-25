@@ -503,6 +503,9 @@ const target = (v) => {
   return false;
 };
 
+const isPluginSelection = (v) => isList(v, 32, (p) => isPlain(p) && isPluginId(p.id)
+  && (p.settings === undefined || isMap(p.settings, 32, (k) => isStr(k, 32), isScalar)));
+
 /** @type {Record<string, Record<string, (v:any)=>boolean> & { $optional?: string[] }>} */
 export const C2S = {
   // session & lobby
@@ -521,7 +524,8 @@ export const C2S = {
   // the server applies `true` solely to a solo room of a version whose solo is timed, and ignores it otherwise, so a
   // default create stays the message it was.
   // modeId: an official mode of a laddered version's room mode (规程's solo: 极速模拟 / 规程等级 n); ignored elsewhere
-  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, soloUnlimited: isBool, modeId: isId, $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'modeId'] },
+  // plugins: optional initial plugin list chosen in the lobby; omitted uses the server policy defaults.
+  'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, soloUnlimited: isBool, modeId: isId, plugins: isPluginSelection, $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'modeId', 'plugins'] },
   'room.join': { $optional: ['testAck'], testAck: (v) => v === true, code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'p2p.enable': { enabled: isBool },
   'p2p.signal': { epoch: isId, to: isId, description: isPeerDescription, candidate: isPeerCandidate, $optional: ['description', 'candidate'] },
@@ -563,7 +567,8 @@ export const C2S = {
   // any room phase (the loadout locks at INFO_CHECK because it changes what a unit does; a skin changes only the model)
   'room.skins': { skins: isSkinSelection },
   // 名片干员 (PR #643 split 6): the operator whose portrait fills the player's seat card in the waiting room — an
-  // operator charId ('' for none; the server keeps only a visible charId of the room's chess.json); cosmetic, any room phase
+  // operator charId ('' for none; the server keeps only one server/lobby.js cardAllowed takes: the cross-period roster,
+  // DESIGN §37.325, or a card candidate of the room's content); cosmetic, any room phase
   'room.card': { charId: (v) => v === '' || isCharId(v) },
   // operator ownership (干员持有, 0.2.0 补位): stored per session / seat; a match takes the list its seat had when it
   // started (an out-of-match setting — during a match it is stored for the next one: ROOM_STARTED)
@@ -581,8 +586,9 @@ export const C2S = {
   // and sorts it: shared/plugins/order.js); [] = the original content. Cosmetic plugins (art: the room's visual set,
   // `vs`) and, from P1c (DESIGN §32.6), content plugins (gameplay: the room's content set, a `cs` of its own); `settings`
   // is for the classes that have settings (a cosmetic plugin has none, so it is ignored). room.state.content names the set
-  'room.setPlugins': { plugins: (v) => isList(v, 32, (p) => isPlain(p) && isPluginId(p.id)
-    && (p.settings === undefined || isMap(p.settings, 32, (k) => isStr(k, 32), isScalar))) },
+  'room.setPlugins': { plugins: isPluginSelection },
+  // Resolve a room plugin set for the lobby before creating a room (`plugins` omitted = server policy defaults).
+  'plugins.preview': { version: isVersionId, plugins: isPluginSelection, $optional: ['version', 'plugins'] },
   // the room's mode (DESIGN §32.6, P1c; host, before the match — like a difficulty change it un-readies the others): an
   // official mode of the room's type (the one of a difficulty: it sets the difficulty) or a mode a plugin of the room's
   // content set provides (room.state.content.modes; room.state.content.modeId while it is chosen)
@@ -647,6 +653,9 @@ export const C2S = {
   // playerId: the player tapped in the team panel (a 联防 / boss pair field shows two) — what an eliminated viewer or a
   // spectator seat follows from then on (Match.watchPref; community report of 2026-10-06, item 56)
   'g.watch': { fieldId: (v) => isStr(v, 32), playerId: isId, $optional: ['playerId'] },
+  // 同盟盟约速查浮窗（public/js/ui/teamPanel.js）：展开 / 收起。`true` 订阅当前回合与阶段，并用 m.peek 回
+  // 除自己外所有座位的名册——状态通道，独立于 g.watch 的战场流（不含战况，始终可用）
+  'g.peek': { open: isBool },
   'g.autoplay': { on: isBool },
   // solo pause (official PauseUp / ResumeUp, DESIGN §14): freezes the running battle (field clock, deadlines, the
   // browser's local runner) — solo matches only (co-op ⇒ WRONG_PHASE), only while a battle runs; m.public.paused
@@ -712,6 +721,9 @@ export const S2C = [
   'm.layer',
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)
   'm.unitStats',
+  // m.peek { seq, ops: { [playerId]: [{ id, golden? }] } } —— g.peek 的应答（只发给请求者）：除自己外所有座位的
+  // 干员名单，形状同 m.private boardOps。m.peek { seq, seat, ops } 替换单个座位。
+  'm.peek',
   // client-side combat (DESIGN §14): b.start { battleId, fieldId, kind, spec, authoritative, startAt, serverNow, elapsed,
   // speed, watch? } · b.pool { hp, max, teamLp, acked: { [fieldId]: cumulative boss damage counted } } ·
   // b.end { battleId, fieldId, reason }

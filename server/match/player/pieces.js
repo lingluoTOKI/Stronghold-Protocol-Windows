@@ -117,13 +117,28 @@ export class PlayerPieces {
     return null;
   }
 
-  /** Every owned chess piece: board (reading order, board.js boardOrder) then hand then temp. */
+  /**
+   * Every owned chess piece: board (reading order, board.js boardOrder) then hand then temp. someChess below scans the same
+   * containers with the same filter: a new container goes into both.
+   */
   allChess() {
     const out = [];
     for (const { piece } of boardOrder(this.board)) if (piece.kind === 'chess') out.push(piece);
     for (const p of this.hand) if (p && p.kind === 'chess') out.push(p);
     for (const p of this.temp) if (p && p.kind === 'chess') out.push(p);
     return out;
+  }
+
+  /**
+   * `allChess().some(pred)` without the reading-order list (boardOrder parses and sorts every tile key): a `some` does not depend
+   * on the order. The same containers and filter as allChess above (perf: aiPlan ownsElite / planCopyUseful).
+   * @param {(piece: any) => boolean} pred
+   */
+  someChess(pred) {
+    for (const p of this.board.values()) if (p.kind === 'chess' && pred(p)) return true;
+    for (const p of this.hand) if (p && p.kind === 'chess' && pred(p)) return true;
+    for (const p of this.temp) if (p && p.kind === 'chess' && pred(p)) return true;
+    return false;
   }
 
   /** Locations of owned pieces, in merge-consumption preference order: temp, hand (left→right), board (reading order). */
@@ -244,22 +259,6 @@ export class PlayerPieces {
     for (const [k, p] of [...this.board]) if (p.kind === 'token' && p.ownerUid === ownerUid) this.board.delete(k);
     for (let i = 0; i < this.hand.length; i++) if (this.hand[i] && this.hand[i].kind === 'token' && this.hand[i].ownerUid === ownerUid) this.hand[i] = null;
     for (let i = 0; i < this.temp.length; i++) if (this.temp[i] && this.temp[i].kind === 'token' && this.temp[i].ownerUid === ownerUid) this.temp[i] = null;
-  }
-
-  /**
-   * An owner that changes its board tile (moved, swapped): its summons on the board go back onto its stack (PRTS
-   * 卫戍协议/帮助 "移动干员时，其所属召唤物全部退场并重置至手牌区"). With no stack and no free hand slot the summon joins
-   * the expandable temp queue (`allowTemp`). A stack that a prep deadline then removes still comes back at the next
-   * round start. `keep`: a summon the player just placed (the one dragged onto its owner, which swapped the owner
-   * away) stays where it was put.
-   */
-  _liftTokensOf(ownerUid, keep = null) {
-    for (const [k, p] of [...this.board]) {
-      if (p.kind !== 'token' || p.ownerUid !== ownerUid || p === keep) continue;
-      this.board.delete(k);
-      // allowTemp always queues past the visible row; put the summon back only if stow itself refused.
-      if (!this._returnToken(p, null, { allowTemp: true })) this.board.set(k, p);
-    }
   }
 
   /** Copies of one summon type an owner has (placed pieces + stacks in the hand / temp). */

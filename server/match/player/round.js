@@ -1,5 +1,5 @@
 // server/match/player/round.js — PlayerState methods: the round lifecycle the match calls — startRound (income, pending
-// coins, the shop, summon stacks topped up), endPrep, eliminate (every copy back to the pool), recompute (legality,
+// coins, the shop, summon stacks topped up), endPrep (temp resolved, due reward offers lapse: lapseOffers), eliminate (every copy back to the pool), recompute (legality,
 // out-of-range summons, temp pieces into free hand slots, bonds; onActiveBonds when the set of active bonds changed),
 // the bond views — and battleInput (the player's PlayerBattleInput: board units with their loadout, their 补位 mark or
 // their 自选 pick, carried 联防 state, the reached layers).
@@ -8,6 +8,7 @@
 
 import { boardOrder, pieceDir } from '../board.js';
 import { equippedItemProgress } from '../itemProgress.js';
+import { garrisonShowTags } from '../showTags.js';
 import { syncCommand, commandBattleInput, keepsFunds } from '../bandCommands.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
 
@@ -24,9 +25,9 @@ export class PlayerRound {
     this.addFunds(nonNeg(ev.income) + nonNeg(ev.pending), { reason: 'income' });
     // temp is NOT wiped here: the last prep's deadline resolved what the player could act on (endPrep); what overflowed
     // after it (battle-result grants, SETTLE merges, returned equipment) is shown and usable in this prep (tempDue).
-    // Queued reward offers (a promotion's pick, a strategy's special refresh, an item offer) are kept until picked —
-    // they do not lapse at the prep deadline (PRTS 卫戍协议/帮助: the temporary shop leaves its state when one is bought;
-    // community report relayed by the maintainer on 2026-10-15) — so an offer left with 稍后 is shown again in this prep
+    // Likewise the queued reward offers: the last prep's deadline lapsed the ones the player could act on (endPrep);
+    // what is still queued arrived after that (after Ready, at the prep end, in COMBAT / SETTLE) and is shown in this
+    // prep, lapsing at its end (offerDue, DESIGN §37.339)
     this.ready = false;
     // summon stacks removed from temp at the last prep deadline come back (PRTS 卫戍协议/帮助 §手牌区); full hand ⇒ temp
     for (const p of [...this.board.values()]) if (p.kind === 'chess') this.grantTokensFor(p);
@@ -38,22 +39,41 @@ export class PlayerRound {
 
   /**
    * Prep deadline (Match.endPrep, after the <休整期结束时> onPrepEnd effects): the temp pieces due at this prep are
-   * resolved; what overflowed after Ready or during onPrepEnd stays for the next prep, which `prepsEnded` now names.
+   * resolved and the queued reward offers due at it lapse; what overflowed or was offered after Ready or during
+   * onPrepEnd stays for the next prep, which `prepsEnded` now names.
    */
   endPrep() {
     this.resolveTemp();
+    this.lapseOffers();
     this.prepsEnded++;
     for (const uid of [...this._tempDue.keys()]) if (!this.temp.some((p) => p && p.uid === uid)) this._tempDue.delete(uid);
-    // (queued reward offers stay: they last until picked, startRound)
     this.clearUnfrozenShop();
     if (!keepsFunds(this)) this.funds = 0;
     this.ready = true;
     this.dirty();
   }
 
+  /**
+   * Prep deadline: every queued reward offer due at this prep (offerDue ≤ prepsEnded) lapses unpicked — nothing is
+   * picked for the player, and a multi-pick offer (规程 促销券 golden: 2 of 6) goes as a whole, its open picks too. The
+   * official client tip 「晋级的特殊奖励无法被刷新、冻结，也不会保留至下一回合」 (autoChessData.gameTipsList, every season)
+   * names the promotion reward; the strategies' special refreshes and the item / 调度中心 offers follow it [ASSUMED]
+   * (the owner's decision of 2026-11-22, DESIGN §37.339 — it reverses the keep-until-picked rule of §32.14.32). Offers
+   * queued after the player could no longer act in this prep (after Ready, during onPrepEnd) wait for the next prep
+   * [ASSUMED: the tip does not cover them].
+   * The Final Assault and Hidden Core preps end the same way [ASSUMED, as before].
+   */
+  lapseOffers() {
+    const kept = this.offers.filter((o) => this.offerDue(o) > this.prepsEnded);
+    if (kept.length === this.offers.length) return;
+    this.offers = kept;
+    this.dirty();
+  }
+
   // `effects` are kept: a 信标 gift still pending is delivered to the teammate at the next round start (builtin_gift is
   // flagged afterElimination — GitHub #86); nothing else of an eliminated player is dispatched.
   eliminate(round) {
+    delete this.tempLayers;
     this.alive = false;
     this.ready = false;
     this.eliminatedRound = round;
@@ -140,6 +160,8 @@ export class PlayerRound {
         const u = { uid: piece.uid, kind: 'chess', chessId: piece.id, row: r, col: c, dir: pieceDir(piece), items: (piece.items || []).map((i) => i.id) };
         const progress = equippedItemProgress(this, piece);
         if (progress) u.itemProgress = progress;
+        const tags = garrisonShowTags(this, piece);
+        if (tags) u.garrisonTags = tags;
         const pick = this.diyPickOf(piece.id);
         if (pick) {
           // 0.2.0 自选编队: a slotted DIY slot fights as its pick (sim getChess(id, { diy }): the operator's body, the pick's
@@ -229,6 +251,8 @@ function regulationBench(ps) {
     };
     const progress = equippedItemProgress(ps, piece);
     if (progress) u.itemProgress = progress;
+    const tags = garrisonShowTags(ps, piece);
+    if (tags) u.garrisonTags = tags;
     const pick = ps.diyPickOf(piece.id);
     if (pick) {
       u.diy = { charId: pick.charId, skillIndex: pick.skillIndex, uniEquipId: pick.uniEquipId };

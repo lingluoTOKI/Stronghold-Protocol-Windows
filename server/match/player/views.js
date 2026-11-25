@@ -148,12 +148,16 @@ export class PlayerViews {
       temp: (this.equipHand ? this.temp.slice(0, this.gd.tempSize) : this.temp).map((p) => (p ? this.pieceView(p) : null)),
       ...(this.equipHand ? { stashCount: this.tempPieces().length } : {}),
       board,
+      // 「同盟盟约速查」浮窗（PR #922 批注）：自己的场上干员，供该浮窗使用。刻意按观众裁剪——m.public 是一条面向
+      // 所有座位与观战席的广播，放 boardOps 会绕过 g.watch。队友的干员通过屏上的侦察 / 战场视图，或通过 peek
+      // （g.peek / m.peek）到达客户端。
+      boardOps: typeof this.m._boardOps === 'function' ? this.m._boardOps(this) : [],
       // The stage's 外勤医疗 reserve medic is present during prep, but is not a draggable board piece.
       prepMapChars: this.m.prepMapChars(this),
       deployCap: this.deployCap,
       deployCount: this.deployCount,
       // + the mode-off bonds it has members of (`off: true`, the strip's grey 本局禁用 discs — bondsMeta.offBondCounts)
-      bonds: bondList(this.gd, this.bondsView(), { full: true, off: offBondCounts(this.gd, this), effectOverrides: commandBondOverrides(this) }),
+      bonds: bondList(this.gd, this.bondsView(), { full: true, tempLayers: this.tempLayers, off: offBondCounts(this.gd, this), effectOverrides: commandBondOverrides(this) }),
       effects: this.effectsView(),
       nextEnemies: this.m.nextEnemiesFor(this),
       // DESIGN §16: the effective operator loadout ({ [baseChessId]: { skill, module } }; chess not listed use defaults)

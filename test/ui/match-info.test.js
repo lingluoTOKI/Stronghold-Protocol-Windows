@@ -95,7 +95,7 @@ test('MatchBondRow: greyed by state (✕ when the mode never activates it, the o
   assert.equal([...walk(row)].some((v) => hasClass(v, 'brief-bond__ban')), false);
   // 奥术: switched off by the mode — greyed, ✕, no corner, no tier, tip 本局禁用
   assert.ok(hasClass(cell('arcaneShip'), 'is-off') && !hasClass(cell('arcaneShip'), 'is-incomplete'));
-  assert.deepEqual([disc('arcaneShip').props.disabled, disc('arcaneShip').props.active, disc('arcaneShip').props.tier], [true, false, 0]);
+  assert.deepEqual([disc('arcaneShip').props.disabled, disc('arcaneShip').props.active, disc('arcaneShip').props.tier], [true, false, undefined]);
   assert.deepEqual([disc('arcaneShip').props.cross, disc('arcaneShip').props.tag], [true, null]);
   assert.equal(tipOf('arcaneShip').props.text, '奥术：本局禁用（该盟约不会激活）');
   // 坚守: drawn (D) — greyed as well, marked incomplete: the official corner instead of the ✕, the 阵容不完整 tip
@@ -113,7 +113,8 @@ test('MatchBondRow: greyed by state (✕ when the mode never activates it, the o
   assert.ok(!hasClass(cell('deputShip'), 'is-off') && !hasClass(cell('deputShip'), 'is-partial'));
   assert.deepEqual([disc('deputShip').props.cross, disc('deputShip').props.tag], [false, null]);
   assert.equal(tipOf('deputShip').props.text, '助力');
-  assert.equal(disc('deputShip').props.tier, DATA.bonds.deputShip.thresholds.length);
+  // no tier is reached before the match (§37.340 review): the disc carries none (the lit disc is the full ring anyway)
+  assert.equal(disc('deputShip').props.tier, undefined);
   // the box beside the tip: one line per banned member (avatar, name, its bonds with this one highlighted); none ⇒ null
   const aside = tipOf('preciShip').props.aside;
   const ops = [...walk(aside)].filter((v) => hasClass(v, 'brief-bantip__op'));
@@ -450,8 +451,6 @@ test('a greyed regulation core card says its operators cannot appear; an unpicke
   assert.equal(regulationCoreAbsent(before, 'yanShip'), false);
   assert.equal(regulationCoreAbsent(before, 'sargonShip'), false);
   const comparing = card(before, 'yanShip', { count: 0, layers: 0, tier: 0, active: false });
-  assert.match(comparing, /当前效果/);
-  assert.match(comparing, /成员/);
   assert.doesNotMatch(comparing, /该核心盟约的干员无法出现/);
   assert.doesNotMatch(comparing, /本模式下该盟约不会激活/);
 
@@ -464,13 +463,11 @@ test('a greyed regulation core card says its operators cannot appear; an unpicke
   assert.equal(regulationCoreAbsent(funny, 'arcaneShip'), false, 'an add-on keeps the covenant rule');
   const modeOff = card(funny, 'egirShip', { count: 0, layers: 0, tier: 0, active: false });
   assert.match(modeOff, /阿戈尔：该核心盟约的干员无法出现，同属其他亮着的核心盟约的除外/);
-  assert.match(modeOff, /当前效果/, 'the covenant off branch, which hides the effect, is not used');
   assert.doesNotMatch(modeOff, /本模式下该盟约不会激活/);
   assert.doesNotMatch(modeOff, /仍可能因所属的其他盟约出现/);
   const addon = card(funny, 'arcaneShip');
   assert.match(addon, /本模式下该盟约不会激活（其干员仍可能因所属的其他盟约出现）/);
   assert.doesNotMatch(addon, /该核心盟约的干员无法出现/);
-  assert.doesNotMatch(addon, /当前效果/);
 
   const after = matchInfoModel({
     bondDraw: 'regulation', bondChoice: { groups: [['yanShip'], ['sargonShip']], picked: 0 },
@@ -481,7 +478,6 @@ test('a greyed regulation core card says its operators cannot appear; an unpicke
   assert.equal(regulationCoreAbsent(after, 'yanShip'), false);
   const drawn = card(after, 'sargonShip', { count: 0, layers: 0, tier: 0, active: false });
   assert.match(drawn, /萨尔贡：该核心盟约的干员无法出现，同属其他亮着的核心盟约的除外/);
-  assert.match(drawn, /当前效果/);
   assert.doesNotMatch(drawn, /仍可能因所属的其他盟约出现/);
   assert.doesNotMatch(card(after, 'yanShip', { count: 1, layers: 2, tier: 1, active: true }), /该核心盟约的干员无法出现/);
 

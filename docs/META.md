@@ -47,14 +47,17 @@ LOBBY → INFO_CHECK (co-op 25 s; solo and single-human matches untimed; all hum
 → for r = 1..lastRound (+ hidden):
      ROUND_START (2 s)  income + pending coins, upgrade price −1 (r > 1, floor 0), temp NOT wiped (what overflowed after
                         the last prep's deadline — battle-result grants, a SETTLE merge's elite with no copy deployed,
-                        returned equipment — is shown and usable in this prep, `PlayerState.tempDue`; every queued reward
-                        offer — a promotion's pick, a special refresh, an item offer — is kept until picked),
+                        returned equipment — is shown and usable in this prep, `PlayerState.tempDue`; likewise every
+                        reward offer queued after the last prep's deadline — a promotion's pick, a special refresh, an
+                        item offer — is shown in this prep, `PlayerState.offerDue`, [ASSUMED]),
                         shop reroll (frozen slots kept in place, then unfrozen), the round's wave generated (preview),
                         onRoundStart dispatch
      [SP_DRAFT]         r ∈ modes[m].spRounds (机变)
      PREP               onPrepStart; co-op timer rounds[r].prepTime, solo / single human untimed; ends when every alive seat is ready
      (prep end)         onPrepEnd, the temp pieces due at this prep resolved (tempDue; what arrived after Ready or
-                        during onPrepEnd waits for the next prep), queued reward offers kept until picked, unfrozen shop cleared, funds lost
+                        during onPrepEnd waits for the next prep), the queued reward offers due at this prep lapse
+                        unpicked (offerDue, §37.339: the same due prep as temp; what arrived after Ready or during
+                        onPrepEnd waits for the next prep [ASSUMED]), unfrozen shop cleared, funds lost
                         (band_cannot keeps them), boss round: Σ activated layers recorded for the hidden-core check
      COMBAT             one Battle per alive player (FieldRunner, 2× game speed; limit = 2 × maxPlayTime game s, §3)
      UNITE              co-op, ≥ 1 leaker and ≥ 1 perfect player (§4)
@@ -140,16 +143,27 @@ The private snapshot's `command` contains `effectId`, `bandId`, type, cost, cool
 text, unlock parameters and exact valid targets. `g.command {effectId,target}` accepts `{}`, `{uid}`, `{slot}` or
 `{row,col}` according to the skill. The server checks phase, ownership, funds, stock, special recruit and target before
 payment. Random draws use `rngMeta`; intents participate in the existing test journal/replay. `[ASSUMED]` a queued
-recruit/reward offer is the special-recruit state. Marks apply to this round's normal battle, a boss / pair / hidden
+recruit/reward offer is the special-recruit state; it ends when the offer is picked or lapses at its prep's end
+(§37.339). Marks apply to this round's normal battle, a boss / pair / hidden
 field that includes that player's board, and a 联防 helper's half. A leaker's board is not on the unite field, so an
 untouched chest there is not at risk. Treasure marks (`enemy_9038_achest`) persist until a validated battle receipt
 says an enemy touched them. While one stands, its board tile refuses operators and the prep view shows the chest.
 
+Nymph's `MAP_TILE` / `PASSABLE` targets exclude `tile_start` and `tile_end`: passability alone does not make a red
+or blue gate a legal command target. The private target list and use-time validation share `commandTargets`;
+a forged gate target is refused before spending funds or a use, and creates no mark. Ordinary ground remains
+eligible. Source: [official play recording in the PR #940 follow-up](https://github.com/sganggs/Stronghold-Protocol/pull/940#issuecomment-6881784894), 2026-11-15.
+
 ITEMS integration: import `openSkillChangeDraft(player, choiceId, ctx?)` from `server/match/bandCommands.js`, or call
 `ctx.openSkillChangeDraft(choiceId)` in a meta handler. `skill_change_1` queues three cards; `skill_change_2` queues two.
-It returns false for unknown choices or commandless data. `[ASSUMED]` the missing official pool is all other ACTIVE
-rows, including upgraded rows. `commandDraft` exposes the first queued draft; `g.commandChoice {choiceId,idx}` takes a
-card. Ready waits for these choices, while bots and the prep deadline resolve them deterministically.
+It returns false for unknown choices or commandless data. The pool is one row per other strategy chain, at the
+level the player would hold now: start at `skills[0]` and walk `next` while that row's unlock holds (the same rule
+as the held command). Official Followers screenshots (PR #940, 2026-11-14) include both ACTIVE and PASSIVE cards.
+A chain still on a NONE row is left out, as is the held chain. A resolved row whose buffs include
+`auto_chess_effect_replace` (变约 stays on the opening band) or `gain_band_skill_from_pool_in_prep` (追随者们' own
+per-round choice) is left out. `[ASSUMED]` exact server weights are unavailable. `commandDraft` exposes the first
+queued draft; `g.commandChoice {choiceId,idx}` takes a card. Ready waits for these choices, while bots and the prep
+deadline resolve them deterministically.
 
 ### 1.2 机变 (SP draft)
 Family = weighted pick from `choices.schedule[modeId].rounds[r].families`; cards: co-op 6 shared (each player takes 1,
@@ -254,7 +268,7 @@ fields' `startAt` / `lastProgressAt` and the boss start by the paused time and r
 
 `drawDisabledBonds` retains the covenant result `{ drawn, staticOff, banned }`. With
 `config.version.rules.bondDraw === 'regulation'`, SINGLE also returns `choice: { groups: [ids, ids], picked: null }`;
-MULTI greys half the available cores immediately. `Match.bondChoice` is settled by `pickBondGroup` during INFO_CHECK.
+MULTI greys cores by difficulty from the version config (`bans.core`: 标准 0, 险境 / 绝境 / 终极 5; `server/match/pool.js`, DESIGN §37.128), and add-ons 2 below 险境, 5 from 险境 (§37.119). `Match.bondChoice` is settled by `pickBondGroup` during INFO_CHECK.
 `g.bondGroup { idx, setupRevision }` refuses stale revisions, non-integer/out-of-range indices, repeated choices,
 spectators, co-op, reroll votes and other phases. It responds with the ordinary intent acknowledgement.
 The choice rebuilds the provisional shared pool and every player's 自选 stock; no shop or chess acquisition runs
@@ -270,9 +284,11 @@ The [official 初雪 counterexample](research/regulation-core-ban-video-20261114
 
 ### 1.4 Watching fields
 Client-side combat (the default, DESIGN §14 Spectating; `Match._watchClient`): `g.watch` answers with the field's
-`b.start` (a display replica fast-forwarded to the field clock); an alive player may not watch another normal field
-while its own normal battle runs (`WRONG_PHASE 'own battle running'`) nor the other pair's boss field (`BAD_TARGET 'other
-group hidden'`); eliminated players watch anything. Whatever is watched, the viewer's bond strip shows the bonds of the
+`b.start` (a display replica fast-forwarded to the field clock). Living players may view an existing teammate's normal field while their own battle continues, or the other pair's boss / hidden field. Viewing never transfers authority; eliminated players retain their existing spectating permissions.
+While the own battle still runs, the client allows this only with the setting 「作战中查看队友」 (`watchDuringBattle`, off by
+default: watching runs a second simulation in the page; DESIGN §37.268); the server does not check the setting. Everyone
+outside a field (spectator seats, eliminated players, living watchers) gets its spec without the players' funds
+(`_spectatorSpec`); the 规程 `bench` stays, the battle summons from it. Whatever is watched, the viewer's bond strip shows the bonds of the
 player on screen from that player's `m.public players[].bonds` (§5) plus the replica's live layers (DESIGN §20.15) — no
 extra message. On a shared field (联防 / a pair's boss field) the client remembers the teammate picked with 前往查看
 (the `g.watch` request still names the field) and frames that player's half; a viewer who does not fight on the field
@@ -282,7 +298,7 @@ screen (the runner's `ownerOps`, its field meta predating their deploy). A clien
 player) sends no `g.watch` (it would be refused with `BAD_TARGET 'no such field'`). A reload / reconnect while watching a
 teammate's battle after the own one gets the watched field again (`_resendBattle`, `b.start watch: true`); the fresh
 screen adopts it as the watched field once per battle (`battle/observe.js resumedWatch`: a living player's teammate
-normal battle in COMBAT, first seen while watching nothing), so the observing pill, 返回战场 and the own row work again.
+normal / boss / hidden battle in the matching phase, first seen while watching nothing), so the observing pill, 返回战场 and the own row work again.
 Before a co-op match, a seated human can switch to a free spectator seat without leaving the room (#76). Another connected human must remain seated; a disconnected seat does not count, and the switch is refused (`NOT_READY`, detail `at least one player must remain seated`) rather than handing the host to that seat. Bots do not keep a room alive. A host hands over by the existing connected-human-first rule when someone online remains. The spectator record keeps that seat's `content` and `contentGen`, so a loadout sent while watching a room that needs its content stays stamped with the room's cs. Returning to a free player seat retains session preferences but requires readiness and any content consent again (the new seat's content report starts over); an active version vote is cancelled by either change of player membership. Running matches do not allow this role change. A full spectator strip answers `ROOM_FULL` with detail `no free spectator seat`; a solo room stays `ROOM_FULL` with detail `solo room`.
 
 Spectator seats (a remake feature, community report #26; server/lobby.js): `opts.spectators` / `addSpectator(id)` register
@@ -296,8 +312,7 @@ The rest of this section is the legacy server-run mode
 `g.watch { fieldId }`: any live field during COMBAT / 联防; while no battle field is up (PREP, drafts, SETTLE)
 `'n:<pid>'` keeps the viewer scouting that board and pushes `prepFieldMeta` again when it changes (GitHub #87) — during a battle phase an `'n:<pid>'` id must name a live field
 (`BAD_TARGET 'no such field'` otherwise, and the viewer keeps its stream). In the
-最终攻势 / 隐秘核心 a player fighting in a boss field may only watch its own field ("两名参与者会处于同一个战场，但无法查看
-另一组队友的战场情况" → `BAD_TARGET 'other group hidden'`); eliminated / departed players spectate any field.
+最终攻势 / 隐秘核心 living players can view either existing boss group and return to their own field; eliminated / departed players retain their existing spectating permissions.
 
 ### 1.5 AI player (bot.js)
 
@@ -847,7 +862,8 @@ Any `choice:` handler whose EffectRef reuses its own key must guard like this (o
 
 ## 3. Rules implemented (summary; details in each module header)
 
-* **Economy**: income `config.economy.income[r]` (= min(3+r, 12)); bounty coins / pending funds credited at the next
+* **Economy**: income `config.economy.income[r]` (= min(3+r, 12); 规程 min(3+r, 11) and its 极速模拟 min(5+r, 11), from
+  official recordings — a mode's `economy` merges over the season's); bounty coins / pending funds credited at the next
   round start; leftover funds lost at prep end except `leftoverFundsKeptByBands`. Chess price by tier (2/3/3/3/4/4),
   items by `price`, refresh 1 (free refreshes first), sell +1 (elite too; items cannot be sold, only destroyed).
 * **Shop**: `shopSlots[level]` chess slots + item slot(s), copy-weighted rolls over remaining pool copies of unbanned,
@@ -908,8 +924,18 @@ Any `choice:` handler whose EffectRef reuses its own key must guard like this (o
   the expandable temp queue; all returned equipment is retained); summons of
   consumed copies are removed; a reward offer of 3
   **different** free chess of tier min(level+1, 6) (copy-weighted from the shared pool, already-drawn ones excluded; a
-  short tier tops up from the tier below — user playtest #6 item 19; pick 1, expires at prep end; queued when several
-  merges or special refreshes happen — `shop.rewardOffer.queued` counts the ones behind the shown offer). The same rule holds for every way a merge completes — buy, reward pick, effect / band / choice grants
+  short tier tops up from the tier below — user playtest #6 item 19; pick 1; queued when several
+  merges or special refreshes happen — `shop.rewardOffer.queued` counts the ones behind the shown offer). Every queued
+  offer — the promotion reward, a strategy's special refresh, an item / 调度中心 offer (`offerChess` / `offerItems`) —
+  lapses unpicked at the deadline of the first prep in which the player could act on it (`PlayerState.offerDue`, set
+  when queued like a temp piece's `tempDue`: this prep before Ready, else the next [ASSUMED]; un-readying makes it due
+  at this prep [ASSUMED]; `lapseOffers` in `endPrep`); nothing is picked for the player, a multi-pick offer (`picks`, 规程 促销券 golden)
+  goes as a whole, elimination clears every offer. Source: the official client tip 「晋级的特殊奖励无法被刷新、冻结，也不会
+  保留至下一回合」 (autoChessData.gameTipsList, every season) names the promotion reward; the other offers follow it
+  [ASSUMED] (the owner's decision of 2026-11-22, §37.339, reversing §32.14.32's keep-until-picked), as does the carry-over
+  of an offer that arrives when its player can no longer act in that prep (the tip does not cover it). AI seats take
+  their queued offers at the prep start, after each buy loop, right after equipping and once more before Ready
+  (`botPrep.js createPrepSteps`). The same rule holds for every way a merge completes — buy, reward pick, effect / band / choice grants
   (`acquireChess`), transformations — and in every phase: a merge completed after the prep (SETTLE / Final Assault
   effects such as 突变细胞) keeps its offer for the next prep; its elite takes the deployed copy's tile at once, or goes to
   the hand / temp (kept through the next prep, see Hand). In a boss round's prep the tile is read on the player's half of
@@ -934,8 +960,14 @@ Any `choice:` handler whose EffectRef reuses its own key must guard like this (o
   one stack of deploy-limit copies (凯瑟琳 2 of her 3 devices); each copy is placed and turned like any piece (no deploy
   slot — the PRTS token pages give 部署占用数 0), only while its owner is on the board. Withdrawing / selling / merging the
   owner removes its summons; moving it to another tile (a move, a swap, or a summon dragged onto it — that summon stays
-  where it was dropped) sends its placed summons back onto their stack ("移动干员时，其所属召唤物全部退场并重置至手牌区";
-  `PlayerState._liftTokensOf`). A stack that overflowed into temp and was removed at a prep deadline comes back at the
+  where it was dropped) keeps each placed summon whose tile is still legal for the owner's final position and sends only
+  the others back onto their stack (PR #969's official recording of the new client, accepted for all five versions by the
+  maintainer on 2026-11-18; the PRTS help line "移动干员时，其所属召唤物全部退场并重置至手牌区" describes the older client;
+  `PlayerState._liftOutOfRange` after the move). A summon left on a tile it cannot stand on is returned the same way
+  (GitHub #984: 幻影 `position: MELEE` swapped onto the ranged tile its owner left). `_legal` is `canPlace` plus the range
+  rules, so a ranged-only tile, water and a blocked tile are covered. The swap stays allowed; the client does not predict
+  the return. An in-place re-orientation does not re-check tile class (`_roomForOutOfRange`): facing does not move the
+  summon. A stack that overflowed into temp and was removed at a prep deadline comes back at the
   next round start (§手牌区 "干员所属召唤物会于下一回合返还": `PlayerState.startRound` tops every board owner's summons up
   to the deploy limit, `grantTokensFor`). A summon whose text reads "只能部署在召唤者攻击范围内" (tokens.json `ownerRange`:
   the tacticians' 援军, 伺夜 狼群 / 缪尔赛思 流形 — choosing the tactical point; player report #9 after 0.1.0) only goes on
@@ -947,7 +979,9 @@ Any `choice:` handler whose EffectRef reuses its own key must guard like this (o
   place (or promoted) a summon its new range leaves out goes back onto its stack with a toast (`_liftOutOfRange` in
   `recompute`) — one still inside stays [ASSUMED]. A re-orientation that would leave such a summon with no stack and no
   free hand / temp slot is refused (HAND_FULL, like withdrawing a summon into a full hand); in the other cases (a
-  promotion, an owner moved while hand and temp are full) the summon leaves the board and its stack waits in the expandable temp queue (`_returnToken`), so no out-of-range placement reaches the battle. The client lights and accepts
+  promotion, an owner moved while hand and temp are full) the summon leaves the board and its stack waits in the
+  expandable temp queue (`_returnToken`), so no illegal placement (out of range, or a tile the summon cannot stand on)
+  reaches the battle. The client lights and accepts
   the same tiles (`ui/gameLogic.js summonRange`), the bot plans inside them. Battle side: SIM.md §1.1 token pieces.
 * **Bonds**: bondsMeta.js (BOARD distinct, BOARD_AND_DECK, 绝技 elites, 调和 +1 — the state and the views mark it
   `harmony: 1`, DESIGN §21.26 —, 独行 downward, 助力 upper tiers, 变形同构体 grants). Σ activated layers for the hidden
@@ -993,7 +1027,7 @@ Any `choice:` handler whose EffectRef reuses its own key must guard like this (o
 * **SETTLE**: LP −min(counted leaks, 10) (after 联防: survivors attributed to their source, same cap); IN_BATTLE layer
   gains applied, each bond up to `BOND_LAYER_CAP` (999, `layerGainRoom`, as `PlayerState.addLayers`); kill-bounty coins (paid by the Battle to the killer — a 联防 helper included; a death no operator caused pays the card's owner, in 联防 the helper whose half it fell on: `Battle._bountyPayee`) and perfect-bounty coins
   (own phase perfect) go to pending funds; bounty rounds decrement; LP ≤ 0 ⇒ eliminated (all copies back to the pool).
-* **Final Assault / Hidden Core**: finalAssault.js header. Boards are passed in board coordinates; the sim maps board
+* **Final Assault / Hidden Core**: finalAssault.js header. Permanent IN_BATTLE layer gains follow `config.finalAssault.layerGainsEnabled` (规程 true, 盟约 false) and are kept in `_finishFinal` the same way SETTLE keeps a normal battle's gains. 联防 stays off. Hidden-core eligibility still uses the layer sum frozen at the end of the boss round's prep. Boards are passed in board coordinates; the sim maps board
   rows 9–12 onto boss rows 2–5 (`BOSS_ROW_OFFSET` −7, matching every stage's boss rows) and mirrors the right side.
   Pairing uses a separate seeded shuffle before Final Assault prep (salt `boss-pairs`) and a new one before Hidden Core
   prep (salt `boss-pairs:15`, `finalAssault.js bossPairSalt`: pairs and sides drawn anew, GitHub #845, DESIGN §35.27);
@@ -1135,9 +1169,42 @@ overtime drain starts; `deadline` = the level's 120 s countdown), `unite { helpe
 `players[].status`: INFO_CHECK ready/deciding · drafts ready (picked) / deciding (their turn) / acting (waiting) ·
 PREP ready/acting · COMBAT/boss combat/done · UNITE helping/done · others done · `left` / `dead` override.
 
+`players[]` here never carries a roster: `boardOps` (below) is a `m.private` field, because one broadcast cannot follow
+`g.watch` (§1.4).
+
 `m.private` = DESIGN §8.3 exactly (sent per player whenever it changed). `nextEnemies` = the current round's wave
 (+ the player's bounty enemies, tag `bounty`; boss rounds: the player's boss field, tag `boss` — the leader's entry with its
 spawn tile `start`, where the boss-field prep shows it —, + its bounties).
+
+`m.private boardOps` = `ps.alive ? [{ id: charId, golden?: 1 }] : []` — the chess pieces on the player's own board
+(its field record char, so a 替补 / 自选 slot shows the operator it actually deploys), for the alliance-bond flyout
+(「同盟盟约速查」).
+Board only: the hand, the temp area, equipment, summons (tokens), coordinates and `standInFor` are not copied; `[]` once
+the seat is eliminated. It is per-viewer on purpose: `m.public players[]` has NO `boardOps` — that view is one
+broadcast for every seat and the spectator bench, so the field there would bypass `g.watch` (§1.4). A teammate's
+operators reach the flyout through `g.peek` / `m.peek` (below) while the flyout is open — the standing roster channel —
+and, where one of their fields is on screen (`m.field` prep scout, `b.start`), the client prefers that field's own
+board over the snapshot (ui/teamPanel.js `flyOpsFor` + `mergeFlyOps`, called from game.js; the screen fills the live
+seats, peek answers the rest — a runner entry takes its elite bit from its chess record, as the thumbnail does). That
+is the status channel: a read-only roster channel separate from the battlefield channel (`g.watch` → `m.field` /
+`b.*`), which carries no battle state and never writes `MatchWatch.watchers`. `MatchPeek._peekVisible` is its own
+policy and is always on: the official
+flyout shows every teammate's operators at all times, so it answers in prep, inside a battle window and across a
+boss round's groups alike — a roster is status, not battle state (it is static inside a battle window and was already
+visible in prep).
+
+`g.peek { open }` / `m.peek` — the flyout's operator table. `open: true` subscribes the asking seat for the current
+round and phase and answers `m.peek { seq, ops: { [pid]: [{ id, golden? }] } }` with the lean lists of every other
+seat (the own seat never: that one is `m.private boardOps`); a repeat `open: true` in the same round and phase within
+a second is a re-render and keeps the earlier answer, but a round / phase change always answers again with a full
+snapshot (the new subscription's `known` is empty; without it the flush after the intent would send one per-seat frame
+per seat instead). A later layout change (add / remove / elite only, never a move) pushes `m.peek { seq, seat, ops }`
+to every open subscriber that may see that seat. `open: false`, a disconnect, a leave, and a round / phase change drop
+the subscription (the client collapses the flyout on the same boundaries, and after a reconnect closes it again);
+`ops: []` clears a seat. Nothing here goes into `m.public`, nothing
+is written to disk, and a spectator seat is refused like every other intent but `g.watch` (the client does not send
+it from a spectator seat, nor a mount-time `open: false`). A bond opened from a flyout row (`from: 'fly'`) steps ‹ ›
+through that row's bonds only (ui/teamPanel.js `bondPopupNav`), never through the top strip's.
 
 Bond layers in the views (DESIGN §20.15): from the end of COMBAT (`_finishCombat`, every normal result in) until SETTLE,
 `m.private bonds` and `m.public players[].bonds` add the finished battle's IN_BATTLE gains (`PlayerState.pendingLayerGains`
@@ -1273,7 +1340,8 @@ See [BOT_STRATEGIES](BOT_STRATEGIES.md) for composition and lifecycle details.
   does not count it), no knock-out hooks (`kill`, 'killed' deaths) a second time. A reached 阿戈尔 revive tier then
   revives that member on the same scan as the devour's knock-outs, spending one slot of this battle; 规程
   `bondeffect_egir_2` does not.
-* A merge completed after the prep (SETTLE effects) keeps its reward offer for the next prep; its elite goes where a prep
+* A merge completed after the prep (SETTLE effects) keeps its reward offer for the next prep (it lapses at that prep's
+  end, `offerDue`; the carry-over is [ASSUMED], §37.339); its elite goes where a prep
   merge's would — onto the tile of a consumed deployed copy (PRTS 卫戍协议/帮助 "若消耗已部署至作战区的干员，则发送至作战区
   对应位置"), else to the hand, overflowing into temp (temp pieces that arrive after the prep wait through the next prep).
 
@@ -1426,3 +1494,11 @@ it returns false for another location or a failed stow (reattaching on failure),
 The Stainless `SERVER_UPGRADE_SELF_EQUIP` handler walks a snapshot of carried items, upgrades valid normal items,
 returns each one and restores its old id if the return fails. UID, metadata and stock provenance remain attached to
 the original item. See [the match rule and footage](design/match.md#stainless-upgraded-equipment-return).
+
+
+临时盟约层数结算（维护者 2026-11-18 确认）：休整期结束到下一次进入休整期共用一个临时池。
+写入战后余额时仅保留已知盟约的有限正数，向下取整并封顶 10000；空结果清除旧余额。
+装备、盟约与驻守的普通／Boss 战斗通过 `tempLayerGains` 保存余额；本人战斗结束及 SETTLE 都不转换。
+联防输入 `tempLayers` 继承本人余额并冻结，不再叠加，也不重新记为收益；Boss 本身没有联防。
+下一次进入休整期时由 `onPrepStart` 转换器读取、消耗，然后清除余额，多功能补剂同样适用。
+完整 API 和来源见 [临时层数约定](design/engine.md#temporary-bond-layers)。

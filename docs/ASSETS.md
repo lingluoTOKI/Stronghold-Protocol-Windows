@@ -21,6 +21,12 @@ cooldown. It respects the SFX/mute settings; a stale asynchronous decode cannot 
 All downloaded game assets the client needs are listed in **`data/assets.json`**. Game-art requests must use that manifest.
 The original project icons below are shipped static files, not downloaded game assets.
 
+Bond UI sprites are registered in `docs/research/07-assets.json` under `autochessUi` (`hudBondItem`,
+`bondDetail`, `bondChar`) and `arts.bondBoardIcon`; the asset plan consumes these registrations.
+After updating a checkout, run `npm run assets` to download them and regenerate the manifest. An older or incomplete
+manifest keeps text stages and rarity badges, CSS discs, borders and badge backgrounds, and generic navigation arrows;
+optional decoration disappears. The UI never guesses `/assets/ui/` paths for missing entries.
+
 ## Original project application icons (#413)
 
 By the maintainer's revised decision of 2026-10-10, **沿用 0.2.x 的薄荷绿城堡并精修**.
@@ -311,7 +317,13 @@ containing the plugin JSON and roster; `--only plugin-art/<charId>` narrows the 
 
 ### Re-extracting scenes after an update
 
-Scene extraction version **4** removes complete, exact redundant renderers (GitHub #684, DESIGN §34.24).
+Scene extraction version **6** binds a lossless RGB companion for opaque albedo images containing zero-alpha
+texels with useful RGB. The original RGBA resource remains unchanged for transparent consumers. Cutout, blended,
+water, trap-shadow and independent data textures keep their original channels. RGB comes from the already encoded
+albedo, so this does not change its decoded colour or lighting. This is a compatibility workaround for a reported
+Edge snow-surface disappearance, not proof of a browser or GPU root cause. Version **5** writes 规程's three level prefabs whole, one group each (scene.json `layout: 'pieces'`,
+DESIGN §37.266); 盟约's scenes are unchanged from version 4. Version **4** removes complete, exact redundant renderers
+(GitHub #684, DESIGN §34.24).
 The official Android `26-04-13-12-31-42_e9b560` m03 scene contains both a base rock (renderer 2048) and its
 `HIDDEN@1` copy (2193); static batching gives the base a different mesh buffer and lightmap UVs. **[ASSUMED]**
 The maintainer's 2026-10-17 correction keeps the normal bake: all submeshes, oriented triangles, UV0, colours,
@@ -324,7 +336,8 @@ ties are described in §34.24; deletion is a remake art correction, not an offic
 After updating, run `node tools/setup.mjs --scenes`, or answer a typed **yes** to setup's existing version-only
 re-extraction prompt. Version-3 scenes still load but contain the redundant geometry; replacing code alone does
 not repair already extracted files. A missing-scene/partial set retains the existing explicit `--scenes` / `--yes`
-gate. `scene.json` mesh version remains 1; the manifest's `scene` record is version 4.
+gate. `scene.json` mesh version remains 1; the manifest's `scene` record is version 6. A 规程 scene of version 4 (cut
+into the 19×21 board) is not drawn by this client — the board stays procedural until it is extracted again.
 
 For inspection without replacing installed assets, the local extractor already supports **both** output options:
 
@@ -359,6 +372,80 @@ Each theme is `<out>/themes/<id>/`: `theme.json` (spTheme 1 — the 14 `skinColo
 Hub rows copied into `images`: `chess_frame_hub` → `chess_frame_normal`, `chess_frame_level_five`, `chess_frame_level_six`; `chess_level_icon_hub` → `chess_level_icon_1`–`6` (`chess_level_icon_0` is not a slot); `player_detail_shop_level_hub` → `shop_level_1`–`6` (the level card `.lvcard`). `shop_level_text_hub` is not copied. `shop_main` is omitted unless the shop prefab has a plate at least 480×150 that is not a shadow, deco strip, or the end-card character — the named sprites (`bg_open`, `btn_big_close`) are that ~200px card. [ASSUMED]
 
 `character` is optional. `ac_n_iron` is `{ "image": "sprites/char_2.webp" }` (the unfolded `group_bg/char` portrait, 127×157). Two sprites are named `char`; `sprites/char.webp` is the other texture, not the portrait. `ac_n_initial` is the UI Spine `trap_1096_acshopup` with `anims.idle` `Idle` and no voice map. `ac_s_closur` is `ac_s_closur_spine` with `anims.voice` from `skinVoiceAnimDict`, clip stems lowercased (`cn_001`), and only when that animation is on the skeleton. Data version 79.2.0. `ac_s_closur`'s board character is `trap_2000_acclsr`; the pack includes the UI Spine shipped in the theme bundle, and does not extract that trap when no bundle is named for it.
+
+### Official outfits and the picture gallery (§37.331)
+
+Two opt-in jobs of `tools/local-extract/extract.py` (`tools/local-extract/skins.py`, ported from PR #776 by @xcdoge).
+Like `fx` and `theme`, a plain extraction leaves them out and `expected_local_groups` does not list them, so no
+installation goes stale and setup never asks for them. Neither writes `data/local-assets.json`: the client loads none of
+this by itself, and the served manifest and the predownload stay as they were. Both read the client as every other job
+does: the LZ4AK decoder `aklz4.py` registers for its one compression flag, and a Windows client's hot update over its
+packaged bundles (`bundles.client_bundles`).
+
+```sh
+.venv-extract/bin/python -I -B tools/local-extract/extract.py --only skins [--only skins/<charId>] \
+  [--skin-table <skin_table.json>] [--limit N] [--out <dir>]
+cp -R out/local-extract/skins/local-skins* plugins/    # each part is a cosmetic plugin; extract.py already packed it
+.venv-extract/bin/python -I -B tools/local-extract/extract.py --only library [--only library/<kind>] [--limit N] [--out <dir>]
+```
+
+**Outfits** (`--only skins`). Every alternative outfit of an operator in the installation's `data/assets.json`
+(`--plugin-root`), or of an operator that `--only skins/<charId>` names. An alternative outfit is a `skin_table.json`
+`charSkins` id with `@`; the default outfits `#1` / `#2` and the patch forms' defaults (`char_1037_amiya3#2`) are the
+operator's own art. `--skin-table` defaults to `.cache/gamedata/excel/skin_table.json`, which setup does not download:
+put the official table there (Kengxxiao/ArknightsGameData `zh_CN/gamedata/excel/skin_table.json`) or pass the file. An
+outfit dresses its `tmplId` when it has one, else its `charId`: 阿米娅's patch forms (`char_1037_amiya3@sale#13` dresses
+`char_1037_amiya3`, the id of the remake's record and of `skinpack/char_1037_amiya3.ab`). Each outfit, by the official
+fields:
+
+| Record field | Official source | File in `<charId>/<outfit>/` |
+|---|---|---|
+| `avatar` | `avatarId`: that Sprite of `spritepack/ui_char_avatar_*.ab` | `avatar.png` |
+| `portrait` | `portraitId`: that Sprite of `spritepack/char_portrait_*.ab` | `portrait.png` |
+| `illust` | `illustId`: the UI Image of `arts/characters/<charId>/<illustId>.prefab` in `skinpack/<charId>.ab` (not `sp_illust_*` or the dynamic 立绘), padded back to its sprite rect; an `_AlphaTex` of the Image's material is merged in | `illust.webp`: lossy quality 90 with lossless alpha [ASSUMED, the guide pages' setting: 5.8 MB as PNG, 0.95 MB as WebP for one 2560² 立绘]; PNG without WebP support |
+| `spine.front`, `spine.back` | `battleSkin.skinOrPrefabId`: the battle prefab `battle/prefabs/skins/character/<charId>/<id>.prefab` of the same pack, whose Spine renderers named `Front` and `Back` are the two faces (`prefab_spine_nodes`: the node decides, never the order, and both skeletons share one name); one renderer named `Spine` is the front of a one-sided model (浊心斯卡蒂's outfits) | `front.skel`, `front.atlas`, `front.png` (`front_2.png` …), `back.*`, by `write_spine`: straight pages with their `[alpha]` merged in and no `pma` (#668), the atlas's page lines rewritten to the files |
+
+An outfit whose `battleSkin.skinOrPrefabId` is `DefaultSkin` gets pictures only: the picker's 「仅更换头像与立绘」, the
+battle model staying the operator's own (docs/SKINS.md "Picture-only outfits"). [ASSUMED] An outfit whose official
+model this client lacks is left out (logged), not worn as pictures only; a missing picture only leaves its field out.
+`name` / `group` are `displaySkin.skinName` / `skinGroupName` (1–64 / 0–64 characters). The outfits keep
+`displaySkin.sortId` order [ASSUMED], at most 64 per operator (docs/PLUGINS.md §9).
+
+Both jobs write under `--out` when it is given, else under `out/local-extract/`: a scratch folder git ignores, which
+the server neither serves nor hashes (everything under `public/assets/` is served to every player and hashed in the
+background by `server/http/assetIndex.js`). They stage their files in a hidden `.staging-*` folder beside the
+destination and rename them into place, so the files never pass through a RAM-backed `/tmp`; a stage an interrupted
+run left is removed by the next run.
+
+The output is `<out>/skins/local-skins/`, by default `out/local-extract/skins/local-skins/`: the source folder of a
+cosmetic plugin. Its `plugin.json` (manifest 2, `scope: ["personal"]`) asks for `assets.override` when the operators
+are the installation's and `assets.add` for any other; its overlay is the file `skins.json`
+(`chars[<charId>].skins[<skinId>]`), not inline: the manifest reader takes an inline `assets` text that ends like `.ext`
+for a file path, and official outfit names do (日晒 SS.SP, the series i.t). An outfit's folder is the
+part of its id after `@` with `@` `#` `+` turned into `_` (plugin file names, docs/PLUGINS.md §5); a second outfit of
+one name gets `_2`. A later run keeps the folder an earlier run gave each outfit (a new outfit takes a free name), so
+two outfits of one plugin-safe name (`a#1`, `a+1`) never swap folders when the official order changes. One plugin holds at most 512 MB, 5000 files and 2000 folders, so an outfit that would take a part
+past one of them goes to the next part with room or a new `local-skins-2`, `-3` … (the CN client of 2026-11-06: 342
+outfits of 221 operators, 690 MiB in two parts, extracted in 4.5 minutes). A later run replaces the outfits it
+extracts in their parts, keeps the others and rewrites the parts it changed. After writing every part's `plugin.json`
+and `skins.json` the extractor runs `node tools/plugin.mjs pack` on each changed part (the lock and the check), reading
+its output as UTF-8 whatever the locale's code page; a pack that does not run or fails is a warning with the command
+to run by hand. To use the outfits, copy the part folders into `plugins/`
+(or `pack --zip` and `install` them); each player then switches them on in 设置 → 外观插件.
+
+**Gallery** (`--only library`): `<out>/library/opillust/` (the Image of every `illust_*` prefab of `chararts/*.ab` and
+`skinpack/*.ab`, the default and the outfit 立绘, encoded as above), `opportrait/` (every Sprite of `char_portrait_*.ab`),
+`opavatar/` (every Sprite of `ui_char_avatar_*.ab`, summons included) and `library/index.json`
+`{ format: 1, kinds: { <kind>: { <official name>: { path, w, h } } } }`. Each kind has its own set of names: an avatar
+and a portrait of one name are both written, a second copy of a name within a kind is not. File names are plugin-safe
+and never collide (`illust_char_002_amiya_1+` becomes `illust_char_002_amiya_1_2` beside `illust_char_002_amiya_1`), and
+a kind is replaced as a whole once it wrote a picture. Nothing reads it: it is a gallery for the server's owner, for
+example for a cosmetic plugin made by hand.
+
+Neither folder is committed (`/out/` and `public/assets/` are ignored) or shipped: no package reads `out/`, and when
+`--out public/assets/local` puts them under the served art, `tools/package.mjs` `LOCAL_ONLY_ART_PREFIXES` holds
+`public/assets/local/skins/` and `public/assets/local/library/` back from every package (`localOnly`). Official art
+stays on the machine that extracted it.
 
 ### Id scope
 
@@ -510,7 +597,10 @@ All paths are URL paths relative to the site root, for example `/assets/char/ava
            // voiceEnChars / voiceKrChars / voiceNativeChars count the extra dubs; 0 until those trees are fetched
   chars:   { [charId]: { avatar, avatarE2?, portrait, portraitE2?, illust?, spine: { front: Spine, back?: Spine },
                          skins?: { [skinId]: { name, group?, avatar?, avatarE2?, portrait?, portraitE2?, illust?,
-                                               spine?: { front: Spine, back?: Spine } } } } },
+                                               spine?: { front: Spine, back?: Spine },
+                                               voice?, voiceJp?, voiceEn?, voiceKr?, voiceNative?: { …the slots of `voice` } } } } },
+                         // voice…: the outfit's own lines by dub and slot, played while it is worn (docs/SKINS.md
+                         // "Outfit voices", #733); a slot it lacks is the operator's line
                          // illust: the full illustration (立绘) a detail view shows; skins: one record per appearance,
                          // keyed by the installation's own skin id (char_4058_pepe@sightseer#2; a cosmetic plugin writes
                          // the same map, docs/PLUGINS.md §9). Neither is emitted today: the committed manifest has no
@@ -1021,3 +1111,82 @@ Forks with another local store may supply `hasResource(url, aliases)` returning 
 null (unverifiable), or reuse the pure plan/summary exports. `fetch` and `caches` adapters are injectable. The API
 rejects on manifest errors or cancellation; closing/switching the UI cancels the current check. The report reflects
 the current cache contents, not permanent availability: browsers can evict files later.
+
+## PRTS 骷髅手指光标
+
+设置 →「骷髅手指光标」默认关闭，只保存本机偏好 `arknightsCursor`。
+使用单个 Canvas 绘制，避免逐帧切换原生 CSS cursor 图片。Canvas 不参与输入或命中判定，保持点击坐标；文字、拖动、缩放、禁用、显式隐藏和其它自定义光标仍使用系统行为。
+
+素材来自 Windows 客户端 `init/mouse/pc_mouse_mgr.ab` 默认 `mouseHandler` 的六块手部 Sprite、RectTransform 枢轴及 `mouse_click_in`／`mouse_click_out` 动画；旧教程 `sprite_pointer` 不再用作新版素材。离线组合 11 姿态到同一透明 PNG，单帧 151×172，记录原版原点、基础缩放 0.44、参考宽度 1280、按下约 66.7 ms／恢复约 166.7 ms 及来源摘要。
+
+显示比例沿用 `0.44 × 视口宽度 / 1280 × 0.9`，最大边 128 CSS px；1920 宽视口为 90×102，热点同倍缩放，不受设置页面 UI 缩放影响。0.9 依据用户两张 3072×1920 截图：同一亮度阈值下官服可见主体约 110×127、本地约 122×142。它是实图标定值，不声称为官方设置的序列化默认值；PCMouseHandler.SetScaler 实际另乘 `0.75 + 0.5 × 设置值`。
+
+图集仅解码一次，直接按姿态 drawImage 到设备像素比对应的 backing store（最多 4 倍），CSS 尺寸和热点不变；不再逐帧生成／解码 PNG，也不再切换原生 cursor URL。指针位置对齐设备像素以免合成时再次模糊，事件坐标不作修改。移动和动画共用单个按需 requestAnimationFrame，移动只改变 transform，姿态不变不重绘；空闲／按住稳定后无持续循环。原版零端点切线使用 smoothstep，连点从当前状态连续转向，减少动态效果时直接切换姿态。窗口及 resolution 变化复用已加载图集和同一 Canvas 更新分辨率。
+
+Canvas 为 inert、aria-hidden、pointer-events:none，可用时以手动 popover 进入顶层；其 backdrop 也不拦截输入，不受页面入场 transform 裁剪。支持迁入全屏根，不能显示 DOM 子项的原生 canvas／video 等全屏元素则回退系统光标。普通区域和主题按钮共用唯一透明原生光标，动画和移动期间不再改动其图片；只有主题变量能实际隐藏原生光标时才绘制手形，避免同其它组件光标重叠。输入文字、抓取／缩放、禁用、显式 none 和主题外自定义光标均隐藏绘制手形并恢复对应原生语义。
+
+真正离窗、失焦、页面隐藏、指针取消／锁定、原生拖放、上下文丢失或关闭设置会停止动画并恢复系统光标；迟到的解码结果不能重新启用。点击控件导致其 DOM 被移除时的 relatedTarget:null 不视为离窗，以免连点时反复隐藏。下载／解码／Canvas2D 失败保留系统回退，不在输入路径自动重试；关闭设置移除 Canvas 与监听器。旧版静态素材仍可绘制为单帧。
+
+原生方案曾在预解码后仍收到闪烁反馈；Mozilla [2084967](https://bugzilla.mozilla.org/show_bug.cgi?id=2084967) 记录了 GTK/Wayland 更换图片光标时先清空导致的短暂偏移／消失，Canvas 方案绕开该逐帧路径。本 PR 尚无 Canvas 版本的浏览器截图复验，不沿用旧原生方案的通过记录。
+
+素材沿用 local-assets 的 `ui/cursor`、CDN、指纹、预载和 ZIP，不引入 Unity／Spine 运行时。安装了 UnityPy/Pillow 的环境可定向提取：
+
+```sh
+<venv>/bin/python tools/local-extract/extract.py --game '<Windows AB root>' --only ui/cursor
+```
+
+正常完整提取也尝试可选 PC 光标，不加入手机客户端的 `EXPECTED_LOCAL_GROUPS`。清单 `groups["ui/cursor"].prts_hand` 记录源包身份／文件名、各 Sprite 像素 SHA-256、源包及输出 SHA-256、帧布局、时间和提取版本 2；本次来源 `anon/f7bcd64480c4566f25d65d642f5fba95.bin`。二进制不入 Git，发布须同步实际文件及清单。Canvas 截图会包含实际手形，定向验证同时保留静止／按下像素与页面截图，并检查连续点击穿透、系统语义、DPR、全屏和 opt-out 清理。
+
+
+### Variable-length scene-binary transport
+
+Large scenes can declare an ordered, nonempty `scene.json.binParts` array of byte lengths, for example
+`[15000000, 15000000, 2194384]`. The loader derives manifest keys `bin`, `bin1`, `bin2`, ... from array indices;
+`binBytes` is the complete original mesh length. The format has variable part counts.
+Each part is at most 15,000,000 bytes to fit deployments
+with a 16,000,000-byte resource-pack cap, including ZIP framing and its manifest.
+
+Loader/exporter policy is separate from the format: `sceneTransport.js` and `scene_transport.py` currently allow
+60,000,000 total bytes and 256 parts. The total preserves the previous four-by-15-MB budget. The part-count budget
+bounds request/metadata work while permitting smaller pieces; neither value is an official game or browser limit.
+The Python writer accepts `part_bytes`, `max_bytes` and `max_parts` keyword budgets. **By default a scene stays one
+`scene.bin`** (no `binParts`), as before: the release packages allow 256 MiB per file and one request is cheaper. A
+deployment with a small per-file limit sets `SP_SCENE_PART_BYTES=15000000` (at most 15,000,000) while extracting, and
+every scene above that size is written in parts; a later export with fewer parts removes the stale `sceneN.bin` files
+and their manifest keys (`scene_transport.py` `write_scene_bins` / `record_scene_bins`). Existing single-file resources
+keep their original loading path. An old client reads only `scene.bin`, so a split scene needs the matching page too.
+
+The loader validates the complete declaration before allocating or requesting binary parts. It allocates the full
+destination once, awaits each part, checks its exact size, writes it at the next offset and releases the temporary
+reference before requesting the next. Missing, truncated, oversized or failed parts stop loading; incomplete bytes
+never reach the mesh parser. Allocation failure keeps the procedural-board fallback. Chunk offsets and the scene
+mesh version continue to address the completed byte-identical buffer.
+
+The loader retains the destination plus the current part, rather than all part buffers plus a second full copy.
+Network/cache storage and garbage-collection timing can add memory beyond these live references. Geometry is still
+parsed after the complete binary is loaded; this transport change does not introduce progressive scene rendering.
+
+The reporting fork's small-pack cap motivates the 15 MB piece size; upstream accepts 256 MiB per ZIP entry.
+Actual unmodified #977 MAP05 / MAP10 / MAP12 binaries are 19,614,492 / 31,660,444 / 32,194,384 bytes. Validation
+can repartition existing bytes without rerunning Unity extraction.
+
+### MAP10 salt cannon
+
+MAP10's pieces scene can include `deviceModels.trap_196_cnnon`, a local mesh group instantiated separately by
+preparation and battle views. Existing installations must explicitly re-extract `scene/act3autochess_m10` and `fx`
+to obtain the cannon model, eleven native effect prefabs and attachment points. The scene and FX format versions
+remain unchanged because the data schema is unchanged. See the [rendering notes](research/cannon-native-20261120.md).
+
+For an existing installation, re-extract the MAP10 scene, then merge the eleven named cannon prefabs and their
+unit bindings into the installed FX index:
+
+```sh
+python tools/local-extract/extract.py --game "/path/to/client" --only scene/act3autochess_m10
+python tools/local-extract/extract.py --game "/path/to/client" --only fx --fx-keys trap_cnnon_idle,trap_cnnon_start,trap_cnnon_attack_start,trap_cnnon_buff,trap_cnnon_lockon,trap_cnnon_trail_1,trap_cnnon_trail_2,trap_cnnon_explode_1,trap_cnnon_explode_2,trap_cnnon_explode_hit,trap_cnnon_destroyed
+```
+
+The named-key run preserves existing `used` entries. To rebuild the entire used set instead, use
+`--only fx --fx-set used`; bare `--only fx` defaults to the sample set.
+Preparation reuses battle idle and landing markers [ASSUMED]; it plays no cannon birth effect. Scouting a teammate's
+preparation board keeps its static devices, including after a stage rebuild or 2D/3D switch. Cannon death uses the
+native destruction effect, or the generic death fallback when it is unavailable, without crate-break debris.

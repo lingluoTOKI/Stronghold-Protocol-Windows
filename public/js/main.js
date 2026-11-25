@@ -64,6 +64,7 @@ import { isCombatPhase } from './ui/gameLogic/phases.js';
 import { registerImportedAssetWorker } from './assetCache.js';
 import { LoadoutHost } from './screens/loadout.js';
 import { StatsHost, useStatsOpen } from './screens/stats.js';
+import { LobbyPluginHost } from './ui/pluginTag.js';
 import { CoveredVersionVote } from './ui/versionVote.js';
 import { installRehearsal } from './battle/rehearsal.js';
 import { recordResult, installStatsRecorder } from './ui/stats.js';
@@ -72,7 +73,7 @@ import { startBuildGuard } from './ui/buildGuard.js';
 import { initLang, useLang, tickerText } from './ui/lang.js';
 import { t, N_, translateWire } from '../../shared/i18n.js';
 import { recordError, installTrafficMeter } from './diag.js';
-import { installContent, installContentSet } from './content.js';
+import { installContent, installContentSet, installLobbyPlugins } from './content.js';
 import { cosmetics } from './cosmetics.js';
 import { sanitizeVersions, roomVersion, isDefaultVersion, matchFrameVersion, musicSeason, seasonOf, startupVersion, REGULATION_SEASON } from './versions.js';
 
@@ -269,13 +270,31 @@ function wireNet() {
     const known = Object.hasOwn(CLOSE_REASON, String(msg.reason)) ? CLOSE_REASON[msg.reason] : null;
     toast(known ? t(known) : typeof msg.reason === 'string' && msg.reason.length < 60 ? t('同盟已关闭：{reason}', { reason: msg.reason }) : t('同盟已关闭'), 'warn');
   });
-  net.on('m.public', (msg) => { matchAt = Date.now(); store.patch('match', { public: payload(msg) }); maybeFinishRestore(); });
+  net.on('m.public', (msg) => {
+    matchAt = Date.now();
+    const pub = payload(msg);
+    const prev = store.get().match.public;
+    // 「同盟盟约速查」（g.peek）只属于当前回合 / 阶段（peek.js 在该边界丢弃订阅）：缓存的名册不能越过它，
+    // 否则过期的准备期名单会被当成实时数据显示
+    const rollover = !!prev && (prev.phase !== pub.phase || prev.round !== pub.round);
+    store.patch('match', { public: pub, ...(rollover ? { peek: null } : {}) });
+    maybeFinishRestore();
+  });
   net.on('m.private', (msg) => { matchAt = Date.now(); store.patch('match', { private: payload(msg) }); });
   net.on('m.layer', (msg) => {
     const s = store.get();
     if (selectRoute(s) === 'game' && msg.playerId === s.me?.playerId) audio.layerGain(msg.bondId, msg.add);
   });
   net.on('m.field', (msg) => store.patch('match', { field: payload(msg) }));
+  // 「同盟盟约速查」（g.peek）：不带 seat 为整表快照；带 seat 为单席替换（`ops: []` 即清空）
+  net.on('m.peek', (msg) => {
+    const prev = store.get().match.peek || {};
+    if (typeof msg.seat !== 'string') {
+      store.patch('match', { peek: (msg.ops && typeof msg.ops === 'object') ? msg.ops : {} });
+      return;
+    }
+    store.patch('match', { peek: { ...prev, [msg.seat]: Array.isArray(msg.ops) ? msg.ops : [] } });
+  });
   net.on('m.result', (msg) => {
     const res = payload(msg);
     recordAchievementNotice(res);
@@ -384,6 +403,7 @@ function App() {
     <${GuideHost} />
     <${ReleaseNotesHost} />
     <${LoadoutHost} />
+    <${LobbyPluginHost} />
     <${StatsHost} />
     <${VoteOverOverlays} />
   </div>`;
@@ -452,6 +472,11 @@ async function boot() {
 
   wireNet();
   installStatsRecorder(store); // follows the match on screen, so a 放弃模拟 can be recorded (ui/stats.js)
+  // Register content-set sync before the pref syncs so room.contentReady is always sent before room.loadout / room.diy
+  // when entering a room whose modded/version content set is already ready from lobby preview.
+  installContent({ toast });
+  installContentSet({ toast });
+  installLobbyPlugins({ net, toast });
   // the loadout / 干员持有 / 自选 settings by operator, shown for the data on screen (DESIGN §35.23; a v1 store migrates)
   installSettingsViews();
   installLoadoutSync({ net });
@@ -463,10 +488,6 @@ async function boot() {
   // 名片干员 (PR #643 split 6): the operator on this browser's seat card (room.card, ui/seatArt.js cardStore) — after every
   // welcome, pick and content change, with the engine's retries (the room screen only reads and sets the pick)
   installCardSync({ net });
-  // the room's cosmetic plugins and the player's own over the art manifest (content.js; nothing is fetched without them)
-  installContent({ toast });
-  // a room with gameplay plugins: its content set downloaded, checked and shown (content.js — DESIGN §32.6)
-  installContentSet({ toast });
   // A bot prep's layout rehearsal the server offers this host's browser (DESIGN §14, SP_BOT_REHEARSAL=host on the
   // server): a same-origin module Worker simulates the candidates off the main thread and answers with its pick; a
   // browser that cannot run one answers `error` and the server rehearses itself. Nothing happens while the server

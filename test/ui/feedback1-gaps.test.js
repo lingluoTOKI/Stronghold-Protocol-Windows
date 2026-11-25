@@ -253,7 +253,8 @@ describe('§21.26 2 — 调和\'s +1 in the bond popup', () => {
     assert.equal(view.entry.count, 3);
     const calls = [];
     const v = BondPopup({ bondId: 'yanShip', entry: view.entry, priv: view.priv, onClose() {}, onMember: (...a) => calls.push(a) });
-    assert.match(textOf(byClass(v, 'bpop__facts')[0]).replace(/\s+/g, ''), /在场3\/6（含调和\+1）/);
+    // 盟约 (§37.342): members over the FIRST threshold, as the official popup (7/3, 1/1)
+    assert.match(textOf(byClass(v, 'bpop__facts')[0]).replace(/\s+/g, ''), /在场3\/3（含调和\+1）/);
     const row = byClass(v, 'bpop__harmony');
     assert.equal(row.length, 1);
     assert.equal(row[0].type, 'button');
@@ -261,8 +262,7 @@ describe('§21.26 2 — 调和\'s +1 in the bond popup', () => {
     assert.match(textOf(row[0]), /缪尔赛思 在场：核心盟约激活人数 \+1/);
     row[0].props.onClick();
     assert.deepEqual(calls, [[MLYSS, null]], 'opens 缪尔赛思\'s card');
-    const head = [...walk(v)].filter((x) => x.type === 'h4').map(textOf).find((t) => t.includes('成员'));
-    assert.match(head.replace(/[\[\]\s]/g, ''), /^成员2\//, 'the real members: 2 in play + the 调和 row = 在场 3');
+  assert.equal(byClass(v, 'bpop__member').filter(x => x.props.class.split(' ').includes('is-on')).length, 2, 'the real members: 2 in play + the 调和 row = 在场 3');
     // the popup of 调和 itself (an add-on bond) and of a bond without the +1: no row
     const mani = popupView({ open: { id: HARMONY_BOND, ownerId: 'p_1' }, pub: m.publicView(), priv, myId: 'p_1' });
     assert.equal(byClass(BondPopup({ bondId: HARMONY_BOND, entry: mani.entry, priv, onClose() {} }), 'bpop__harmony').length, 0);
@@ -304,12 +304,14 @@ describe('§21.26 2 — 调和\'s +1 in the bond popup', () => {
     const slot = [...walk(strip)].find((x) => x.props?.['data-bond'] === 'yanShip');
     assert.equal(slot.props['data-harmony'], 1);
     const disc = [...walk(slot)].find((x) => typeof x.props?.title === 'string' && x.props.title.startsWith('炎'));
-    assert.equal(disc.props.title, '炎 3/6（含调和 +1）');
+    // 盟约 (§37.342): the tooltip and the chip count against the first threshold, like the popup (gameLogic bondCountCap)
+    assert.equal(disc.props.title, '炎 3/3（含调和 +1）');
     const chips = BondChips({ bondIds: ['yanShip'], bonds: [entry], onBond() {} });
     const chip = [...walk(chips)].find((x) => x.props?.['data-bond'] === 'yanShip');
-    assert.equal(chip.props.title, '炎：在场 3/6（含调和 +1），已激活 1 阶');
+    // 盟约 (§37.342): no stage numeral, so the chip says just 已激活
+    assert.equal(chip.props.title, '炎：在场 3/3（含调和 +1），已激活');
     const noPlus = [...walk(BondChips({ bondIds: ['yanShip'], bonds: [{ ...entry, harmony: undefined }] }))].find((x) => x.props?.['data-bond'] === 'yanShip');
-    assert.equal(noPlus.props.title, '炎：在场 3/6，已激活 1 阶');
+    assert.equal(noPlus.props.title, '炎：在场 3/3，已激活');
   });
 });
 

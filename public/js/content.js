@@ -47,7 +47,8 @@
 //     not the plugin Worker — a version set runs no script) and, in a room, the page tells the room (room.contentReady,
 //     exactly as for a content set — never from the lobby). The set on screen stays until the next one is checked (going
 //     from one version to another never shows 第二期下半 in between); gameplay compositions also retain their version.
-//     The last two checked version sets are kept, so a lobby ⇄ room round trip checks nothing twice.
+//     The last two checked version sets are kept, so a lobby ⇄ room round trip reuses data/bounds; the index is
+//     revalidated in the background (i18n overlays are outside cs) and setContent runs again only when i18n changed.
 //     A version set that fails is said once per set (a toast) and told to the room ({ ok: false }).
 //   * The catalogue is fetched only on a server that has plugins — `content.plugins` > 0 in /healthz (the build guard's
 //     first check, before any hello) or welcome (main.js keeps it as the store's `installedPlugins`: installedCount; a
@@ -59,7 +60,7 @@ import { createStore, loadPref, savePref, store as appStore } from './store.js';
 import { data as dataStore } from './data.js';
 import { net as appNet } from './net.js';
 import { cosmetics, loadVisual, visualNow } from './cosmetics.js';
-import { PLUGINS_URL } from '../../shared/plugins/manifest.js';
+import { PLUGINS_URL, pluginSupportsVersion } from '../../shared/plugins/manifest.js';
 import { contentHashOf, csUrlPart, isContentHash, isContentHash as isVisualHash } from '../../shared/plugins/identity.js';
 import { resolveThemeVars, themeVarsOf } from '../../shared/plugins/theme.js';
 import { applyThemeProperties } from './themeVars.js';
@@ -67,10 +68,12 @@ import { sha256Hex } from '../../shared/sha256.js';
 import { getLang, langChain, t, N_ } from '../../shared/i18n.js';
 import { DEV_BUILD } from '../../shared/constants.js';
 import { DEFAULT_VERSION, versionById, versionSlug } from '../../shared/versions.js';
-import { shownVersion, welcomeVersion } from './versions.js';
+import { lobbyVersion, shownVersion, welcomeVersion } from './versions.js';
 
 /** The localStorage preference (`sp.pref.<key>`) of the personal cosmetic plugins: their ids. */
 export const PERSONAL_PREF = 'cosmetics';
+/** The localStorage preference (`sp.pref.<key>`) of the lobby's room plugins (`null` = server policy defaults). */
+export const LOBBY_PLUGINS_PREF = 'lobby.plugins';
 /** Waits (ms) before a visual set's document is fetched again after a transient failure (like data.js). */
 export const VISUAL_RETRY_MS = Object.freeze([600, 2000]);
 /** How long one attempt at a visual set's document may take before it counts as a transient failure [ASSUMED]. */
@@ -81,8 +84,192 @@ const PARTLY = N_('部分外观插件素材无法使用，相应位置显示原�
 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const isIds = (v) => Array.isArray(v) && v.every((x) => typeof x === 'string' && /^[a-z0-9][a-z0-9-]{1,31}$/.test(x));
+const isScalar = (v) => typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v));
+const isPluginIdStr = (id) => typeof id === 'string' && /^[a-z0-9][a-z0-9-]{1,31}$/.test(id);
 const defaultFetch = (...a) => globalThis.fetch(...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Normalise a saved or incoming `[{ id, settings? }]` room-plugin selection (≤ 32 unique ids). */
+export function normalizeLobbySelection(raw) {
+  if (!Array.isArray(raw)) return null;
+  const seen = new Set();
+  const out = [];
+  for (const item of raw) {
+    const id = typeof item === 'string' ? item : item && typeof item === 'object' ? item.id : null;
+    if (!isPluginIdStr(id) || seen.has(id)) continue;
+    seen.add(id);
+    const clean = { id };
+    if (item && typeof item === 'object' && isObj(item.settings)) {
+      const entries = Object.entries(item.settings)
+        .filter(([k, v]) => typeof k === 'string' && k.length > 0 && k.length <= 32 && isScalar(v))
+        .slice(0, 32);
+      if (entries.length) clean.settings = Object.fromEntries(entries);
+    }
+    out.push(clean);
+    if (out.length >= 32) break;
+  }
+  return out;
+}
+
+function readStoredLobbyPlugins() {
+  try {
+    const raw = loadPref(LOBBY_PLUGINS_PREF, null);
+    if (raw == null) return null;
+    const list = normalizeLobbySelection(Array.isArray(raw) ? raw : raw?.plugins);
+    return list ? { custom: true, plugins: list } : null;
+  } catch { return null; }
+}
+
+/** Browser-remembered lobby room plugins (`custom: false` follows server policy defaults). */
+export const lobbyPlugins = createStore(readStoredLobbyPlugins() || { custom: false, plugins: [] });
+
+/** Update and persist the browser's lobby plugin selection (`null` resets to server policy defaults). */
+export function setLobbyPlugins(list, target = lobbyPlugins) {
+  if (list == null) {
+    if (target === lobbyPlugins) savePref(LOBBY_PLUGINS_PREF, null);
+    target.set({ custom: false, plugins: [] });
+    return [];
+  }
+  const plugins = normalizeLobbySelection(list) || [];
+  if (target === lobbyPlugins) savePref(LOBBY_PLUGINS_PREF, { v: 1, plugins });
+  target.set({ custom: true, plugins });
+  return plugins;
+}
+
+/** Server-resolved preview of the lobby's active plugins for the lobby version (`content` + `policy`). */
+export const lobbyPreview = createStore({ status: 'idle', version: null, content: null, policy: null, error: null });
+
+/** Keep only loaded room-scoped plugins supported by `version` when the catalogue is ready. */
+export function filterLobbySelection(list, catPlugins, version) {
+  const clean = normalizeLobbySelection(list) || [];
+  if (!Array.isArray(catPlugins)) return clean;
+  const byId = new Map(catPlugins.map((p) => [p.id, p]));
+  return clean.filter((item) => {
+    const p = byId.get(item.id);
+    if (!p || p.status !== 'loaded' || !Array.isArray(p.scope) || !p.scope.includes('room')) return false;
+    if (['content', 'script', 'trusted'].includes(p.class) && version && !pluginSupportsVersion(p, version)) return false;
+    return true;
+  });
+}
+
+let lobbySyncApplied = null;
+let lobbyRetryHook = null;
+
+/**
+ * Resolve `list` (`null` = server policy defaults) on the server via `plugins.preview`, and on acceptance save it as the
+ * browser's lobby plugin selection and update `lobbyPreview`. Rejects without overwriting saved selection on error.
+ */
+export async function applyLobbyPlugins(list, { version = null, store = appStore, net = appNet, lp = lobbyPlugins, preview = lobbyPreview } = {}) {
+  const ver = version || lobbyVersion(store.get());
+  const clean = list == null ? null : (normalizeLobbySelection(list) || []);
+  const reqBody = clean == null
+    ? (ver ? { version: ver } : {})
+    : { ...(ver ? { version: ver } : {}), plugins: clean };
+  const res = await net.request('plugins.preview', reqBody);
+  const key = `${ver || ''}|${clean == null ? '0' : '1'}|${JSON.stringify(clean || [])}`;
+  if (lp === lobbyPlugins && preview === lobbyPreview) lobbySyncApplied?.(key);
+  setLobbyPlugins(clean, lp);
+  preview.set({ status: 'ready', version: ver, content: res?.content || null, policy: res?.policy || preview.get().policy || null, error: null });
+  return res;
+}
+
+/** Retry a failed `lobbyPreview` request. */
+export const retryLobbyPreview = () => lobbyRetryHook?.();
+
+/**
+ * The initial `plugins` selection to include on `room.create` for `version`, or `undefined` when the browser uses server
+ * policy defaults or the server does not allow host plugin selection.
+ */
+export function activeLobbyPlugins(version = lobbyVersion(appStore.get()), { store = appStore, cat = catalog, lp = lobbyPlugins, preview = lobbyPreview } = {}) {
+  if (!installedCount(store.get())) return undefined;
+  const prev = preview.get();
+  if (prev?.policy && prev.policy.rooms !== 'host') return undefined;
+  const chosen = lp.get();
+  if (!chosen.custom) return undefined;
+  if (prev.status === 'ready' && (!prev.version || prev.version === version) && Array.isArray(prev.content?.plugins)) {
+    return prev.content.plugins.filter((p) => !p.auto).map((p) => ({
+      id: p.id,
+      ...(p.settings && typeof p.settings === 'object' ? { settings: { ...p.settings } } : {}),
+    }));
+  }
+  const c = cat.get();
+  return filterLobbySelection(chosen.plugins, c.status === 'ready' ? c.plugins : null, version);
+}
+
+/**
+ * Keep `lobbyPreview` in sync with the server (`plugins.preview`) while the player is outside a room on a server with
+ * plugins: loads initial server defaults or re-resolves the player's saved selection whenever version or selection changes.
+ */
+export function installLobbyPlugins({ store = appStore, net = appNet, fetch: doFetch = defaultFetch, toast = null, cat = catalog, lp = lobbyPlugins, preview = lobbyPreview } = {}) {
+  let req = 0;
+  let lastKey = '';
+  let online = store.get()?.connection?.status === 'online';
+  if (lp === lobbyPlugins && preview === lobbyPreview) {
+    lobbySyncApplied = (k) => { lastKey = k; };
+    lobbyRetryHook = () => { lastKey = ''; void sync(true); };
+  }
+  const idle = () => {
+    req++;
+    lastKey = '';
+    const cur = preview.get();
+    if (cur.status !== 'idle' || cur.content || cur.policy) preview.set({ status: 'idle', version: null, content: null, policy: null, error: null });
+  };
+  const sync = async (force = false) => {
+    const s = store.get();
+    if (!installedCount(s)) { idle(); return; }
+    if (s.connection?.status !== 'online' || s.room) return;
+    const ver = lobbyVersion(s);
+    const chosen = lp.get();
+    const catPlugins = cat.get().status === 'ready' ? cat.get().plugins : null;
+    const filtered = chosen.custom ? filterLobbySelection(chosen.plugins, catPlugins, ver) : null;
+    const key = `${ver || ''}|${chosen.custom ? '1' : '0'}|${JSON.stringify(filtered || [])}`;
+    if (!force && key === lastKey) return;
+    lastKey = key;
+    const mine = ++req;
+    preview.set({ status: 'loading', version: ver, error: null });
+    try {
+      const res = await net.request('plugins.preview', filtered == null ? (ver ? { version: ver } : {}) : { ...(ver ? { version: ver } : {}), plugins: filtered });
+      if (mine !== req) return;
+      preview.set({ status: 'ready', version: ver, content: res?.content || null, policy: res?.policy || preview.get().policy || null, error: null });
+    } catch (err) {
+      if (mine !== req) return;
+      let reported = err;
+      if (filtered != null && /^PLUGIN_|^VERSION_UNSUPPORTED$/.test(String(err?.code || ''))) {
+        try {
+          const loaded = await loadCatalog({ force: true, fetch: doFetch });
+          if (mine !== req) return;
+          const narrowed = filterLobbySelection(chosen.plugins, loaded, ver);
+          const attempt = JSON.stringify(narrowed) !== JSON.stringify(filtered)
+            ? await net.request('plugins.preview', { ...(ver ? { version: ver } : {}), plugins: narrowed })
+              .catch(() => net.request('plugins.preview', ver ? { version: ver } : {}))
+            : await net.request('plugins.preview', ver ? { version: ver } : {});
+          if (mine !== req) return;
+          if (attempt?.policy?.rooms && attempt.policy.rooms !== 'host') setLobbyPlugins(null, lp);
+          preview.set({ status: 'ready', version: ver, content: attempt?.content || null, policy: attempt?.policy || preview.get().policy || null, error: null });
+          return;
+        } catch (fallbackErr) {
+          if (mine !== req) return;
+          reported = fallbackErr;
+        }
+      }
+      if (reported?.code === 'RATE') lastKey = '';
+      preview.set({ status: 'failed', version: ver, error: reported?.message || String(reported?.code || 'preview failed') });
+      if (toast && reported?.code !== 'OFFLINE' && reported?.code !== 'DISCONNECTED') console.warn('[content] lobby plugins preview failed', reported?.code || reported?.message || reported);
+    }
+  };
+  const offStore = store.subscribe((s) => {
+    const nowOnline = s?.connection?.status === 'online';
+    if (nowOnline !== online) { online = nowOnline; if (online) lastKey = ''; }
+    void sync();
+  });
+  const offLp = lp.subscribe(() => { void sync(); });
+  void sync();
+  return () => {
+    req++;
+    offStore(); offLp();
+    if (lp === lobbyPlugins && preview === lobbyPreview) { lobbySyncApplied = null; lobbyRetryHook = null; }
+  };
+}
 
 /**
  * The plugin catalogue (GET /plugins/index.json): `status` 'idle' | 'loading' | 'ready' | 'failed', `plugins` its
@@ -305,11 +492,16 @@ export function installContent({ store = appStore, data = dataStore, layers = co
   const onImgError = (e) => { const el = e?.target; if (el && el.tagName === 'IMG') layers.fail?.(el.currentSrc || el.src); };
   doc?.addEventListener?.('error', onImgError, true);
 
-  // the room's visual set
+  // the room's (or lobby preview's) visual set
   let roomVs = null;
   let roomReq = 0;
+  const desiredVs = (s) => {
+    if (s?.room) return isVisualHash(s.room.content?.vs) ? s.room.content.vs : null;
+    const lp = lobbyPreview.get();
+    return lp.status === 'ready' && isVisualHash(lp.content?.vs) ? lp.content.vs : null;
+  };
   const syncRoom = (s) => {
-    const vs = isVisualHash(s?.room?.content?.vs) ? s.room.content.vs : null;
+    const vs = desiredVs(s);
     if (vs === roomVs) return;
     roomVs = vs;
     const req = ++roomReq;
@@ -368,6 +560,7 @@ export function installContent({ store = appStore, data = dataStore, layers = co
     const n = installedCount(s);
     if (n !== installed) { installed = n; if (personal.get().ids.length) syncPersonal(); }
   });
+  const offPreview = lobbyPreview.subscribe(() => { syncRoom(store.get()); });
   syncRoom(store.get());
   const offPersonal = personal.subscribe(() => { syncPersonal(); });
   // a catalogue fetched again may name a plugin's new `vs` (its files changed): the switched-on ones follow
@@ -376,7 +569,7 @@ export function installContent({ store = appStore, data = dataStore, layers = co
   if (personal.get().ids.length) syncPersonal();
   return () => {
     ++personalReq; ++roomReq; // Drop in-flight answers before removing this install's properties and layers.
-    offStore(); offPersonal(); offCatalog(); offLayers(); offFailed(); layers.onDrop(null);
+    offStore(); offPreview(); offPersonal(); offCatalog(); offLayers(); offFailed(); layers.onDrop(null);
     doc?.removeEventListener?.('error', onImgError, true);
     data.setView('assets', null); layers.setRoom(null); layers.setPersonal([]);
     themeApplied = applyThemeProperties(globalThis.document?.documentElement, [], themeApplied);
@@ -426,10 +619,10 @@ const waiting = new Map();
  * and parsed. Transient failures (network, a timeout, HTTP 5xx / 408 / 429) are tried again.
  * @param {string} url @param {{ sha256?: string, bytes?: number } | null} want null: the manifest itself (checked later)
  * @param {{ fetch: typeof fetch, retryDelays?: readonly number[], wait?: (ms: number) => Promise<void>, timeoutMs?: number,
- *   onBytes?: (n: number) => void }} opts
+ *   onBytes?: (n: number) => void, cache?: RequestCache }} opts
  * @returns {Promise<any>} the parsed JSON (rejects with the reason)
  */
-export async function fetchChecked(url, want, { fetch: doFetch, retryDelays = CONTENT_RETRY_MS, wait = sleep, timeoutMs = CONTENT_TIMEOUT_MS, onBytes = null }) {
+export async function fetchChecked(url, want, { fetch: doFetch, retryDelays = CONTENT_RETRY_MS, wait = sleep, timeoutMs = CONTENT_TIMEOUT_MS, onBytes = null, cache = 'default' }) {
   for (let attempt = 0; ; attempt++) {
     const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
     let timer = null;
@@ -437,7 +630,7 @@ export async function fetchChecked(url, want, { fetch: doFetch, retryDelays = CO
     let res;
     let buf = null;
     try {
-      res = await Promise.race([doFetch(url, { cache: 'default', signal: ctrl?.signal }), timedOut]);
+      res = await Promise.race([doFetch(url, { cache, signal: ctrl?.signal }), timedOut]);
       if (res && res.ok) buf = await Promise.race([res.arrayBuffer(), timedOut]);
     } catch { res = null; }
     clearTimeout(timer);
@@ -530,12 +723,39 @@ export async function loadContentSet(cs, { fetch: doFetch = defaultFetch, retryD
  * @returns {Promise<{ cs: string, index: any, values: Map<string, any>, bounds: any, version: string, scripts: [],
  *   canSim: true, nativeVerified: false }>} (rejects with the reason)
  */
+/**
+ * Well-formed per-version i18n entries under the version's data prefix (presentation only; not part of cs).
+ * @param {any} index @param {string} prefix `/data/versions/<slug>/`
+ * @returns {Record<string, { url: string, sha256: string, bytes: number }>}
+ */
+function versionI18nOf(index, prefix) {
+  /** @type {Record<string, { url: string, sha256: string, bytes: number }>} */
+  const out = {};
+  if (!isObj(index?.i18n)) return out;
+  for (const [lang, f] of Object.entries(index.i18n)) {
+    if (!isObj(f) || typeof f.url !== 'string' || !isContentHash(f.sha256) || !Number.isInteger(f.bytes)) continue;
+    if (!f.url.startsWith(`${prefix}i18n/`) || f.url.includes('..')) throw new Error(`i18n/${lang}: an address outside the version's i18n`);
+    out[lang] = { url: f.url, sha256: f.sha256, bytes: f.bytes };
+  }
+  return out;
+}
+
+/** Stable fingerprint of a version index's i18n map (url / sha / bytes per lang). */
+function i18nFingerprint(i18n) {
+  if (!isObj(i18n)) return '';
+  return JSON.stringify(Object.keys(i18n).sort().map((lang) => {
+    const f = i18n[lang];
+    return [lang, f?.url, f?.sha256, f?.bytes];
+  }));
+}
+
 export async function loadVersionSet(cs, id, { fetch: doFetch = defaultFetch, retryDelays = CONTENT_RETRY_MS, wait = sleep, timeoutMs = CONTENT_TIMEOUT_MS, onProgress = null } = {}) {
   if (!isContentHash(cs)) throw new Error('no content hash');
   const entry = versionById(id);
   if (!entry || entry.id === DEFAULT_VERSION) throw new Error(`not another official version: ${String(id)}`);
   const own = `/cs/${csUrlPart(cs)}/`;
-  const index = await fetchChecked(`${own}index.json`, null, { fetch: doFetch, retryDelays, wait, timeoutMs });
+  // i18n is outside cs: bypass a stale immutable HTTP cache from before the overlay existed
+  const index = await fetchChecked(`${own}index.json`, null, { fetch: doFetch, retryDelays, wait, timeoutMs, cache: 'reload' });
   if (!isObj(index) || index.cs !== cs || index.vanilla !== true || index.version !== id || !isObj(index.data)) throw new Error('the manifest is not that version\'s set');
   if (!Array.isArray(index.plugins) || index.plugins.length || !isObj(index.settings) || Object.keys(index.settings).length) throw new Error('a version set names plugins or settings');
   const entries = Object.entries(index.data);
@@ -561,7 +781,12 @@ export async function loadVersionSet(cs, id, { fetch: doFetch = defaultFetch, re
   await Promise.all(Array.from({ length: Math.min(CONTENT_PARALLEL, entries.length) }, worker));
   const bounds = await fetchChecked(official.url, official, { fetch: doFetch, retryDelays, wait, timeoutMs });
   if (!isObj(bounds) || bounds.v !== 1) throw new Error('bounds: not an official-bounds snapshot');
-  return { cs, index, values, bounds, version: id, scripts: [], canSim: true, nativeVerified: false };
+  // optional per-version game-text overlays (M3): not part of cs; only validated entries reach showVersion
+  const i18n = versionI18nOf(index, prefix);
+  const indexOut = { ...index };
+  if (Object.keys(i18n).length) indexOut.i18n = i18n;
+  else delete indexOut.i18n;
+  return { cs, index: indexOut, values, bounds, version: id, scripts: [], canSim: true, nativeVerified: false };
 }
 
 /**
@@ -571,7 +796,7 @@ export async function loadVersionSet(cs, id, { fetch: doFetch = defaultFetch, re
 export const pageVersion = () => (held && typeof held.version === 'string' ? held.version : DEFAULT_VERSION);
 
 /** Load the failed set on screen again (the lobby version switch's 重试). */
-export const retryContentSet = () => { retryHook?.(); };
+export const retryContentSet = () => { if (lobbyPreview.get().status === 'failed') retryLobbyPreview(); retryHook?.(); };
 
 /**
  * The content set the battle runner simulates on now (public/js/battle/runner.js): `{ cs, data, bounds }` of the checked
@@ -617,7 +842,14 @@ export function installContentSet({ store = appStore, data = dataStore, net = ap
   const toldVersion = new Set();
   /** room.contentReady on its way (one at a time) and the cs it named */
   let telling = null;
-  const roomCs = (s) => (s?.room?.content && s.room.content.vanilla === false && isContentHash(s.room.content.cs) ? s.room.content.cs : null);
+  const roomPluginContent = (s) => (s?.room?.content && s.room.content.vanilla === false && isContentHash(s.room.content.cs) ? s.room.content : null);
+  const previewPluginContent = (s) => {
+    if (s?.room) return null;
+    const lp = lobbyPreview.get();
+    if (lp.status !== 'ready' || !lp.content || lp.content.vanilla !== false || !isContentHash(lp.content.cs)) return null;
+    const v = shownVersion(s);
+    return !lp.version || lp.version === v ? lp.content : null;
+  };
   /**
    * The version set the page should show (header "Official versions"): `{ version, cs }` — cs null while a room's
    * content does not name the room's version yet (keep what is there) — or null: the server's files.
@@ -644,7 +876,7 @@ export function installContentSet({ store = appStore, data = dataStore, net = ap
   const tell = (cs, ok) => {
     if (!net || telling === cs || store.get()?.room?.content?.cs !== cs) return;
     telling = cs;
-    Promise.resolve().then(() => net.request('room.contentReady', ok ? { cs } : { cs, ok: false }))
+    Promise.resolve(net.request('room.contentReady', ok ? { cs } : { cs, ok: false }))
       .catch((err) => console.warn('[content] room.contentReady', err?.code || err))
       .finally(() => { if (telling === cs) telling = null; });
   };
@@ -662,18 +894,48 @@ export function installContentSet({ store = appStore, data = dataStore, net = ap
     versionCache.delete(set.cs);
     versionCache.set(set.cs, set);
     while (versionCache.size > VERSION_CACHE) versionCache.delete(versionCache.keys().next().value);
-    // (a version's index carries no translations: its files take only the Chinese texts until M3 — data.js versionFiles)
-    data.setContent({ id: set.cs, values: set.values, overlay: null, langs: [] });
+    // version game texts: index.i18n/<lang> under /data/versions/<slug>/i18n/ (M3); absent → Chinese only (versionFiles)
+    const i18n = isObj(set.index?.i18n) ? set.index.i18n : {};
+    const overlay = (lang) => (isObj(i18n[lang])
+      ? fetchChecked(i18n[lang].url, i18n[lang], { fetch: doFetch, retryDelays, wait })
+      : Promise.resolve(null));
+    data.setContent({ id: set.cs, values: set.values, overlay, langs: Object.keys(i18n) });
     contentSet.set({ cs: set.cs, kind: 'version', version: set.version, status: 'ready', error: null, kitted: null });
     settleWaiting(set.cs);
     tell(set.cs, true);
+  };
+  /**
+   * Re-read a cached version's index (i18n is outside cs). Returns an updated set when the i18n map changed, else null.
+   * Data files and bounds stay as checked; only the presentation overlay entry can move.
+   */
+  const refreshVersionIndex = async (set) => {
+    const entry = versionById(set.version);
+    if (!entry || entry.id === DEFAULT_VERSION) return null;
+    const own = `/cs/${csUrlPart(set.cs)}/`;
+    const index = await fetchChecked(`${own}index.json`, null, { fetch: doFetch, retryDelays, wait, cache: 'reload' });
+    if (!isObj(index) || index.cs !== set.cs || index.vanilla !== true || index.version !== set.version) return null;
+    const prefix = `/data/versions/${versionSlug(entry)}/`;
+    let i18n;
+    try { i18n = versionI18nOf(index, prefix); } catch { return null; }
+    if (i18nFingerprint(i18n) === i18nFingerprint(set.index?.i18n)) return null;
+    const indexOut = { ...set.index };
+    if (Object.keys(i18n).length) indexOut.i18n = i18n;
+    else delete indexOut.i18n;
+    return { ...set, index: indexOut };
   };
   const loadVersion = (cs, version) => {
     const mine = ++req;
     // the set on screen stays until this one is checked (header "Official versions")
     settleWaiting(null);
     const cached = versionCache.get(cs);
-    if (cached && cached.version === version) { showVersion(cached); return; }
+    if (cached && cached.version === version) {
+      // sync lobby⇄room: data/bounds stay; index revalidated in the background (i18n outside cs)
+      showVersion(cached);
+      refreshVersionIndex(cached)
+        .then((next) => { if (mine === req && next) showVersion(next); })
+        .catch((err) => console.warn(`[content] version index refresh ${version}: ${err?.message || err}`));
+      return;
+    }
     contentSet.set({ cs, kind: 'version', version, status: 'loading', loaded: 0, total: 0, error: null, kitted: null });
     loadVersionSet(cs, version, { fetch: doFetch, retryDelays, wait, onProgress: (loaded, total) => { if (mine === req) contentSet.set({ loaded, total }); } })
       .then((set) => { if (mine === req) showVersion(set); })
@@ -689,7 +951,7 @@ export function installContentSet({ store = appStore, data = dataStore, net = ap
         tell(cs, false);
       });
   };
-  const load = (cs, consent = false) => {
+  const load = (cs, consent = false, contentMeta = null) => {
     const mine = ++req;
     if (held) { held = null; data.setContent(null); }
     settleWaiting(null);
@@ -715,7 +977,12 @@ export function installContentSet({ store = appStore, data = dataStore, net = ap
         // the set's own game texts per language (a plugin's operators named in it): checked like the data files
         const overlay = (lang) => (isObj(i18n[lang]) ? fetchChecked(i18n[lang].url, i18n[lang], { fetch: doFetch, retryDelays, wait }) : Promise.resolve(null));
         data.setContent({ id: cs, values: set.values, overlay, langs: Object.keys(i18n) });
-        const extra = store.get()?.room?.content?.kittedExtra;
+        const curRoomContent = store.get()?.room?.content;
+        const curPreview = lobbyPreview.get()?.content;
+        const meta = curRoomContent?.cs === cs ? curRoomContent
+          : contentMeta?.cs === cs ? contentMeta
+          : curPreview?.cs === cs ? curPreview : null;
+        const extra = meta?.kittedExtra;
         contentSet.set({ status: 'ready', version: set.version || null, error: null, kitted: Array.isArray(extra) ? extra.filter((x) => typeof x === 'string').slice(0, 200) : null });
         settleWaiting(cs);
         if (set.canSim || !store.get()?.room?.seats?.some(s => s?.playerId === store.get()?.me?.playerId)) tell(cs, true);
@@ -737,13 +1004,16 @@ export function installContentSet({ store = appStore, data = dataStore, net = ap
     else if (cur.status === 'failed' && seat.content !== 'failed') tell(cs, false);
   };
   const sync = (s) => {
-    const cs = roomCs(s);
+    const rc = roomPluginContent(s);
+    const pc = rc ? null : previewPluginContent(s);
+    const active = rc || pc;
+    const cs = active ? active.cs : null;
     const cur = contentSet.get();
     if (cs) {
-      // a room with gameplay plugins: its content set (unchanged since 0.3.0)
-      const consent = !!s.room.content.trusted && hasScriptConsent(cs);
-      if (cur.cs !== cs || cur.kind !== 'plugins' || (held?.cs === cs && held.canSim === false && consent)) { load(cs,consent); return; }
-      retell(s, cs, !s.room.content.trusted || consent || !s.room.seats?.includes(mySeat(s)));
+      // a room (or lobby preview) with gameplay plugins: its content set (unchanged since 0.3.0)
+      const consent = !!active.trusted && hasScriptConsent(cs);
+      if (cur.cs !== cs || cur.kind !== 'plugins' || (held?.cs === cs && held.canSim === false && consent)) { load(cs, consent, active); return; }
+      retell(s, cs, !active.trusted || consent || !s?.room?.seats?.includes(mySeat(s)));
       return;
     }
     const want = versionWanted(s);
@@ -759,9 +1029,10 @@ export function installContentSet({ store = appStore, data = dataStore, net = ap
     if (cur.kind === 'version') { toldVersion.delete(cur.cs); loadVersion(cur.cs, cur.version); } else load(cur.cs, hasScriptConsent(cur.cs));
   };
   const off = store.subscribe((s) => sync(s));
+  const offPreview = lobbyPreview.subscribe(() => sync(store.get()));
   sync(store.get());
   if (typeof window !== 'undefined') globalThis.__SP_CONTENT__ = contentHooks();
-  return () => { off(); drop(); retryHook = null; };
+  return () => { off(); offPreview(); drop(); retryHook = null; };
 }
 
 /**

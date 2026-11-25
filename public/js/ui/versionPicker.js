@@ -18,8 +18,8 @@
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Icon, Modal, Spinner } from './components.js';
 import { useStore } from '../store.js';
-import { contentSet, retryContentSet } from '../content.js';
-import { DEFAULT_VERSION, VERSION_PERIODS, lobbyVersion, periodLine, serverDefaultVersion, setLobbyVersion, versionLabel } from '../versions.js';
+import { contentSet, lobbyPreview, retryContentSet } from '../content.js';
+import { DEFAULT_VERSION, VERSION_PERIODS, lobbyVersion, periodLine, serverDefaultVersion, setLobbyVersion, versionContentStatus, versionLabel } from '../versions.js';
 import { getLang, t } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -48,8 +48,11 @@ export function scrollCurrentCard(root) {
 }
 
 /** The load state of a version on this page, as the chip shows it ('' when its data is on screen or not needed). */
-export function versionLoadText(c, id) {
-  if (!c || c.kind !== 'version' || c.version !== id) return '';
+export function versionLoadText(c, id, previewCs = null) {
+  if (!c) return '';
+  const matched = (c.kind === 'version' && c.version === id)
+    || (c.kind === 'plugins' && previewCs && c.cs === previewCs);
+  if (!matched) return '';
   if (c.status === 'loading') return t('载入中 {pct}%', { pct: c.total > 0 ? Math.min(100, Math.floor((c.loaded / c.total) * 100)) : 0 });
   if (c.status === 'failed') return t('校验失败');
   return '';
@@ -62,7 +65,9 @@ export function versionLoadText(c, id) {
  */
 export function VersionPicker({ mode, versions, current, serverDefault, roomMode = null, editable = true, busy = false, onPick, onClose, note = null }) {
   const list = Array.isArray(versions) ? versions : [];
-  const chineseTexts = getLang() !== 'zh';
+  // Only warn about Chinese game text when this UI language is not Chinese and the version has no i18n pack for it yet.
+  const lang = getLang();
+  const chineseTexts = lang !== 'zh';
   const listRef = useRef(null);
   useEffect(() => { scrollCurrentCard(listRef.current); }, [current, list.length]);
   return html`<${Modal} open=${true} onClose=${onClose} class="verpick" micro="OFFICIAL VERSION" title=${t('游戏版本')} width="min(12.6rem, 96vw)"
@@ -74,6 +79,10 @@ export function VersionPicker({ mode, versions, current, serverDefault, roomMode
         const usable = !roomMode || !Array.isArray(v.roomModes) || v.roomModes.includes(roomMode);
         const preview = v.id !== DEFAULT_VERSION;
         const season = versionSeason(v);
+        // welcome.versions[].i18n lists the version's game-text packs; en also covers ja / ko (their chain falls back to it)
+        const packs = Array.isArray(v.i18n) ? v.i18n : [];
+        const covered = packs.includes(lang) || (packs.includes('en') && (lang === 'ja' || lang === 'ko'));
+        const showZhOnlyNote = chineseTexts && !covered;
         // Colour is the season: red 规程, teal 盟约. (No registry id on the card: it means nothing to a player.)
         return html`<li key=${v.id} role="option" aria-selected=${on ? 'true' : 'false'} data-season=${season}
             class=${cx('verpick__row', season === 'regulation' ? 'is-reg' : 'is-covenant', on && 'is-on', preview && 'is-preview')}>
@@ -86,7 +95,7 @@ export function VersionPicker({ mode, versions, current, serverDefault, roomMode
               ${preview ? html`<span class="verpick__badge is-preview">${t('预览')}</span>` : null}
             </span>
             <span class="verpick__period t-lo">${periodLine(v.id)}</span>
-            ${preview ? html`<span class="verpick__note t-dim">${t('核心规则已按该版本。悬赏抽取、部分数值和六名敌人的攻击前摇仍是推算')}${chineseTexts ? html`<br />${t('该版本的游戏文本暂时只有中文')}` : null}</span>` : null}
+            ${preview ? html`<span class="verpick__note t-dim">${t('核心规则已按该版本。悬赏抽取、部分数值和六名敌人的攻击前摇仍是推算')}${showZhOnlyNote ? html`<br />${t('该版本的游戏文本暂时只有中文')}` : null}</span>` : null}
             ${usable ? null : html`<span class="verpick__note is-warn">${t('该版本不支持当前的模拟方式')}</span>`}
           </button>
         </li>`;
@@ -103,11 +112,17 @@ export function VersionSwitch() {
   const current = useStore(lobbyVersion);
   const serverDefault = useStore(serverDefaultVersion);
   const c = useStore((s) => s, Object.is, contentSet);
+  const preview = useStore((s) => s, Object.is, lobbyPreview);
   const [open, setOpen] = useState(false);
   if (!Array.isArray(versions) || !versions.length) return null;
-  const load = versionLoadText(c, current);
-  const failed = c.kind === 'version' && c.version === current && c.status === 'failed';
-  const loading = c.kind === 'version' && c.version === current && c.status === 'loading';
+  const previewCs = (!preview.version || preview.version === current) && preview.content?.vanilla === false ? preview.content.cs : null;
+  const load = versionLoadText(c, current, previewCs);
+  const activeState = current !== DEFAULT_VERSION
+    ? versionContentStatus(c, current, previewCs)
+    : (previewCs ? (c.kind === 'plugins' && c.cs === previewCs ? c.status : 'loading') : 'ready');
+  const previewFailed = preview.status === 'failed' && (!preview.version || preview.version === current);
+  const failed = activeState === 'failed' || (previewFailed && !previewCs);
+  const loading = !failed && activeState === 'loading';
   // one version only (not 第二期下半): what the server plays, nothing to choose
   if (versions.length === 1) {
     return html`<span class="verchip verchip--ro" data-testid="version-switch" data-version=${current} title=${t('本服务器的游戏版本')}>

@@ -37,10 +37,11 @@
 import { progressLabel } from '../itemProgress.js';
 import { itemText, garrisonText } from './showTags.js';
 import { BondTimers } from './bondTimers.js';
+import { bondDisplay } from './bondStrip.js';
 import { useEffect, useMemo } from '../../vendor/hooks.module.js';
 import { html, Icon, TierChip, MicroLabel, Button, confirmDialog, useTicker } from './components.js';
 import { OperatorImage, Img, RichText, UnitThumb, BondGlyph, GIcon, diyToken, TokenAvatar } from './gameComponents.js';
-import { attackInterval, rangeGridBox, fmtNum, tileKey, chessLoadout, nextThreshold, bondTier, briefingBondTip, pieceBondIds, grantedBonds, morphPairings, ownStandIn, standInOf, standInLoadout, standInLabel, standInTip, standInForText, ownDiyRecord, ownDiyPick, diyRecordFor, pickGetter, unitPick, unitCultivation } from './gameLogic.js';
+import { attackInterval, rangeGridBox, fmtNum, tileKey, chessLoadout, nextThreshold, bondCountCap, bondTier, bondPhased, briefingBondTip, pieceBondIds, grantedBonds, morphPairings, ownStandIn, standInOf, standInLoadout, standInLabel, standInTip, standInForText, ownDiyRecord, ownDiyPick, diyRecordFor, pickGetter, unitPick, unitCultivation } from './gameLogic.js';
 import { skillIconUrl, skillRecordIconUrl, profIconUrl, subProfIconUrl, itemIconUrl, enemyIconUrl, tokenAvatarUrl, factionIconUrl, uiUrl, moduleTypeIconUrl } from './assetUrls.js';
 import { abilityRows } from './abilityLines.js';
 import { data } from '../data.js';
@@ -51,6 +52,9 @@ import { moduleBadge, fullTraitText } from './loadoutModel.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 import { morphSlotPolicy } from '../../../shared/plugins/rules.js';
 import { audio } from '../audio.js';
+import { store } from '../store.js';
+import { skinsStore, ownerSkin } from './skins.js';
+import { settingsStore } from './settingsStore.js';
 import { IngameCustomization } from './ingameCustomization.js';
 import { tokenVariantFor } from './gameLogic/loadout.js';
 import { useSettings } from './settings.js';
@@ -287,13 +291,19 @@ export function BondChips({ bondIds, bonds = [], onBond = null, off = null, gran
       const count = Number.isFinite(e?.count) ? e.count : 0;
       const tier = isOff ? 0 : Number.isFinite(e?.tier) ? e.tier : bondTier(count, th, rec?.maxCount ?? null);
       const active = !isOff && (e ? !!e.active : tier > 0);
+      // the 阶 the label names is the strip's numeral (bondStrip bondDisplay: 规程's official phase level, which can count
+      // layers, §37.341); the pips stay the member thresholds. 盟约: no numeral, so just 「已激活」 (§37.342)
+      const phased = bondPhased(data.get('config'));
+      const stage = active ? (e ? bondDisplay(id, e).stage : phased ? tier : 0) : 0;
+      // 在场 n/cap: the popup's denominator (gameLogic bondCountCap: the first threshold, §37.342); is-max still marks the
+      // top member threshold
       const next = nextThreshold(count, th);
-      const cap = next ?? th[th.length - 1] ?? null;
+      const cap = bondCountCap(th);
       const isoTag = iso.has(id) ? t('（变形同构体）') : '';
       // the count holds 调和's +1 (the server's bond entry says so, DESIGN §21.26)
       const harmonyTag = !isOff && Number.isInteger(e?.harmony) && e.harmony > 0 ? t('（含调和 +{harmony}）', { harmony: e.harmony }) : '';
       const label = isOff ? briefingBondTip(rec?.name || id, 'off')
-        : `${rec?.name || id}${isoTag}${cap != null ? t('：在场 {count}/{cap}', { count, cap }) : t('：在场 {count}', { count })}${harmonyTag}${active ? t('，已激活 {tier} 阶', { tier }) : t('，未激活')}`;
+        : `${rec?.name || id}${isoTag}${cap != null ? t('：在场 {count}/{cap}', { count, cap }) : t('：在场 {count}', { count })}${harmonyTag}${!active ? t('，未激活') : stage > 0 ? t('，已激活 {tier} 阶', { tier: stage }) : t('，已激活')}`;
       const body = isOff
         ? html`
         <${BondGlyph} bondId=${id} class="dbond__icon" />
@@ -422,7 +432,7 @@ function ItemProgress({ progress }) {
   return label ? html`<p class="ditem__progress">${t('出售干员')} <strong>${label}</strong></p>` : null;
 }
 
-export function ChessDetail({ chess, piece, unit, snapHp, editable, canLoadout = false, canSkin = false, onSell, bonds, offBonds = null, loadout, onBond, live = null, hint = null, unitItems = null, unitItemProgress = null, standIn = null, diy = null, cultOpts = null, morphMode = 'official', onUnequip = null, ownerId, skin = null }) {
+export function ChessDetail({ chess, piece, unit, snapHp, editable, canLoadout = false, canSkin = false, onSell, bonds, offBonds = null, loadout, onBond, live = null, hint = null, unitItems = null, unitItemProgress = null, unitGarrisonTags = null, standIn = null, diy = null, cultOpts = null, morphMode = 'official', onUnequip = null, ownerId, skin = null }) {
   const m = data.get('assets');
   const hp = hpOf(live, snapHp);
   // 0.2.0 自选编队: `chess` is then the composed 自选 record (the operator, the slot's tier / price); its skill and module are
@@ -487,8 +497,8 @@ export function ChessDetail({ chess, piece, unit, snapHp, editable, canLoadout =
       </div>
     </div>`;
   blocks.garrison = garrisons.length > 1
-    ? garrisons.map(garrison => html`<${GarrisonBlock} key=${garrison.garrisonId} garrison=${garrison} m=${m} piece=${piece} />`)
-    : garrisons[0] ? html`<${GarrisonBlock} key="garrison" garrison=${garrisons[0]} m=${m} piece=${piece} />` : null;
+    ? garrisons.map(garrison => html`<${GarrisonBlock} key=${garrison.garrisonId} garrison=${garrison} m=${m} piece=${unitGarrisonTags ? { garrisonTags: unitGarrisonTags } : piece} />`)
+    : garrisons[0] ? html`<${GarrisonBlock} key="garrison" garrison=${garrisons[0]} m=${m} piece=${unitGarrisonTags ? { garrisonTags: unitGarrisonTags } : piece} />` : null;
   blocks.trait = body.trait?.desc ? html`<p key="trait" class="dtrait"><${Icon} name="info" /><${RichText} text=${traitText(body, golden, lo)} /></p>` : null;
   // (`fr` is the body the unit fights with — a stand-in's record for a 补位 chess; `chess` is only the range's fallback)
   blocks.stats = chessStatsBlock({ rec: fr, chess: c, live });
@@ -845,7 +855,7 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     const own = Number.isInteger(u.uid) ? pieces?.get(u.uid) : null;
     if (u.side === 'enemy') { const en = data.lookup('enemies', u.defId); return en ? { type: 'enemy', enemy: en, unitId: u.id } : null; }
     // a hand item on a scouted prep board (m.field units, kind 'item'): the item's own card
-    if (u.kind === 'item') { const it = data.lookup('items', u.defId); return it ? { type: 'item', item: it, progress: u.progress } : null; }
+    if (u.kind === 'item') { const it = data.lookup('items', u.defId); return it ? { type: 'item', item: it, piece: { showTag: u.showTag }, progress: u.progress } : null; }
     const c = data.lookup('chess', u.defId);
     // a unit says itself whether it is a stand-in (UnitInfo standInFor: the sim's, prep scouting's); an own piece's unit
     // follows m.private.standIns like the piece
@@ -858,7 +868,7 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
     const dr = pick ? diyRecordFor(c, pick, dd) : null;
     // 0.2.2: another player's unit says its 潜能 / 练度 itself (UnitInfo potential / cultivate); an own piece's unit follows
     // m.private.ops (the panel's `cultOpts`)
-    const cv = { ...(own?.piece ? {} : { cultOpts: { cultivation: unitCultivation(u) } }), unitItemProgress: u.itemProgress };
+    const cv = { ...(own?.piece ? {} : { cultOpts: { cultivation: unitCultivation(u) } }), unitItemProgress: u.itemProgress, unitGarrisonTags: u.garrisonTags };
     if (dr) return { type: 'chess', ...appearance, chess: dr, piece: own?.piece || null, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: null, diy: pick, ...cv };
     if (c) return { type: 'chess', ...appearance, chess: c, piece: own?.piece || null, unitId: u.id, unitItems: Array.isArray(u.items) ? u.items : null, standIn: si, ...cv };
     const t = data.lookup('tokens', u.defId) || diyToken(u.defId);
@@ -879,6 +889,24 @@ export function resolveDetail(target, pieces, { priv = null, backups = data.get(
  */
 export function selectVoiceKey(detail) {
   return detail?.type === 'chess' ? `${detail.chess?.chessId || ''}:${detail.unitId ?? detail.piece?.uid ?? ''}:${detail.tap ?? ''}` : null;
+}
+
+/**
+ * The outfit the 选中干员 line of a resolved detail is said in (#733, DESIGN §37.330): the one its card draws —
+ * ChessDetail's body (a 补位 piece's stand-in, a 自选 record's pick, else the chess) under OperatorImage's rule
+ * (`ownerSkin`: the seat that owns the unit / piece — a teammate's unit its owner's public choice, or the skin it arrived
+ * with; a card of the own seat this seat's; the 显示其他玩家的皮肤 switch), never the viewer's choice for another seat.
+ * `{ skinKey, skinCharId }` for audio.voice, or {} for none.
+ * @param {any} detail resolveDetail's result
+ * @param {{ myId?: string|null, players?: any[], localSkins?: Record<string, string>, otherSkins?: boolean }} [view]
+ * @returns {{ skinKey?: string, skinCharId?: string }}
+ */
+export function selectVoiceOutfit(detail, { myId = null, players = [], localSkins = {}, otherSkins = true } = {}) {
+  if (detail?.type !== 'chess') return {};
+  const body = detail.standIn && detail.standIn.standInFor ? detail.standIn : detail.chess;
+  const charId = typeof body?.charId === 'string' && body.charId ? body.charId : null;
+  const skinKey = charId ? ownerSkin(charId, { ownerId: detail.ownerId, skin: detail.skin ?? null, myId, players: Array.isArray(players) ? players : [], localSkins, otherSkins }) : null;
+  return skinKey ? { skinKey, skinCharId: charId } : {};
 }
 
 /**
@@ -908,7 +936,11 @@ export function DetailPanel({ detail, editable, canLoadout = false, canSkin = fa
   // and battle lines the card and audio.js show), never by the operator it replaces; a 自选 record is already the pick's
   const selectChar = voice && detail?.type === 'chess' ? detail.standIn?.assets?.voice || detail.standIn?.charId || detail.chess?.assets?.voice || detail.chess?.charId || null : null;
   useEffect(() => {
-    if (selectKey && selectChar) audio.voice(selectChar, 'select');
+    if (!selectKey || !selectChar) return;
+    // in the outfit the card shows (#733): the unit's own seat, read when the line starts (selectVoiceOutfit)
+    const s = store.get();
+    audio.voice(selectChar, 'select', selectVoiceOutfit(detail, { myId: s?.me?.playerId ?? null, players: s?.match?.public?.players || [],
+      localSkins: skinsStore.get()?.skins || {}, otherSkins: settingsStore.get()?.otherSkins !== false }));
   }, [selectKey, selectChar]);
   if (!detail) return null;
   let liveNow = null;
@@ -932,7 +964,7 @@ export function DetailPanel({ detail, editable, canLoadout = false, canSkin = fa
     <div class="dpanel__scroll">
       ${bondTimers ? html`<${BondTimers} rows=${bondTimers()} />` : null}
       ${detail.type === 'chess' ? html`<${ChessDetail} chess=${detail.chess} ownerId=${detail.ownerId} skin=${detail.skin} piece=${detail.piece} snapHp=${snapHp} editable=${editable} canLoadout=${canLoadout} canSkin=${canSkin} onSell=${sellIt}
-        bonds=${bonds} offBonds=${offBonds} loadout=${loadout} onBond=${onBond} live=${liveNow} hint=${detail.hint || null} unitItems=${detail.unitItems || null} unitItemProgress=${detail.unitItemProgress || null}
+        bonds=${bonds} offBonds=${offBonds} loadout=${loadout} onBond=${onBond} live=${liveNow} hint=${detail.hint || null} unitItems=${detail.unitItems || null} unitItemProgress=${detail.unitItemProgress || null} unitGarrisonTags=${detail.unitGarrisonTags || null}
         standIn=${detail.standIn || null} diy=${detail.diy || null} cultOpts=${detail.cultOpts || { ops }} morphMode=${morphMode} onUnequip=${onUnequip} />` : null}
       ${detail.type === 'item' ? html`<${ItemDetail} item=${detail.item} progress=${detail.progress || detail.piece?.progress} piece=${detail.piece} editable=${editable} onDestroy=${destroyIt} offBonds=${offBonds} morphMode=${morphMode} unequipAllowed=${unequipAllowed} />` : null}
       ${detail.type === 'enemy' ? html`<${EnemyDetail} enemy=${detail.enemy} snapHp=${snapHp} count=${detail.count} live=${liveNow} />` : null}

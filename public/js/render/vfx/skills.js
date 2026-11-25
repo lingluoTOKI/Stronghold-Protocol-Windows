@@ -1347,6 +1347,12 @@ export function chargeKeys(plan) {
  * or, instead of a projectile (history §32.14.43):
  *   attack      the node of the plan attack the fx stands for: its cast / range rows play on the owner at the fx, its hit
  *               groups and aims on the damage the fx's frame deals after it (SkillFx kit hits)
+ * or a shell the kit fires and moves itself (history §37.242):
+ *   launch      the last node name of a to-tile ability of the owner's current mode (its facing variant): the fx fires
+ *               it now — its cast rows on the owner for its facing, `projectile`'s flying effect straight from the
+ *               muzzle to the fx's point over the kit's flight time `extra.t` (SkillFx._launch)
+ *   ends        the fx kind of a launch binding this fx ends: the owner's oldest shell in the air stops where it is
+ *               (the kit's explosion, which may come before the end point), then this binding plays
  * The R11 entries (0.3.0 official-effects audit, history §32.14.44) bind a kit area or strike to the official prefab
  * the client plays there: the areas are the skill projectiles' reached effects (the projectile stays where it lands —
  * AuraHitBehaviour — for the area's life), the strikes their hit effects.
@@ -1424,6 +1430,17 @@ export const FX_BINDINGS = Object.freeze({
     lock: binding({ owner: 'src', keys: ['lemuen_skill_03_crosshair_range', 'lemuen_skill_03_crosshair_02'], hold: 'lock', during: true }),
     bombard: binding({ owner: 'id', projectile: 'projectile_chr_lemuen_s3_attack', at: 'point', holdS: 2, during: true }),
   }),
+  // 涤火杰西卡 S3 (kits/ops/op-jesca2.js fireBomb / explode): a 'bombardShell' (id = her, the farthest tile ahead, `t` its
+  // flight time) is her mode S3's ExtraBomb (ProjectileToTileAbility: cast jesca2_skill_03_start_02 / _down for her
+  // facing, projectile_chr_jesca2_s3_bomb flying straight at speed 5 with its main jesca2_skill_03_trail_02); its
+  // 'bombard' (id = her, where it went off) is that projectile's EffectBehaviour _effectsWhenStop jesca2_skill_03_hit_02
+  // (index.json lists it under `effects`, not onHit / onReached). Until round 83 both were 蕾缪安's procedural mortar
+  // shell and blast (GitHub report: her S3's attack effects looked wrong). No `during` on the explosion: a shell fired
+  // at the skill's last moment still lands after it
+  skchr_jesca2_3: Object.freeze({
+    bombardShell: binding({ owner: 'id', launch: 'ExtraBomb', projectile: 'projectile_chr_jesca2_s3_bomb', during: true }),
+    bombard: binding({ owner: 'id', keys: ['jesca2_skill_03_hit_02'], at: 'point', oneshot: true, ends: 'bombardShell' }),
+  }),
   // 泡泡 S2 (chess_char_2_08-bubble.js): she makes no attack; every damage instance she takes strikes back at its source
   // ('counter': id = her, target = the attacker). The client's bubble_s_2 does it at ON_TAKE_DAMAGE — DamageViaAttr and
   // CreateEffect on MODIFIER_SOURCE with the blackboard's `effect` bubble_skill_02_hit (index.json's use 'hit' by name,
@@ -1473,7 +1490,9 @@ export function bindingEffects(idx, bind) {
   if (Array.isArray(bind?.keys)) return bind.keys.map(lc).filter(Boolean);
   const p = bind?.projectile ? idx?.projectiles?.[lc(bind.projectile)] : null;
   if (!p) return [];
-  const list = bind.part ? (Array.isArray(p[bind.part]) ? p[bind.part] : [])
+  // a field of the projectile: a list of keys, or one key (`main`, its own flying effect)
+  const field = (f) => (Array.isArray(p[f]) ? p[f] : typeof p[f] === 'string' ? [p[f]] : []);
+  const list = Array.isArray(bind.parts) ? bind.parts.flatMap(field) : bind.part ? field(bind.part)
     : Array.isArray(p.onReached) && p.onReached.length ? p.onReached : Array.isArray(p.onHit) ? p.onHit : [];
   return list.map(lc).filter(Boolean);
 }
@@ -1582,7 +1601,7 @@ export function bindingKeys(idx, skillId) {
     for (const k of bindingEffects(idx, bind)) out.add(k);
     // the tick oneshots and, when the binding flies the shot itself, the trail (preloading; neither is a reached effect)
     for (const k of bind.hits || []) if (lc(k)) out.add(lc(k));
-    if (bind.fly && bind.projectile) {
+    if ((bind.fly || bind.launch) && bind.projectile) {
       const main = lc(idx?.projectiles?.[lc(bind.projectile)]?.main);
       if (main) out.add(main);
     }
@@ -1608,12 +1627,18 @@ export const OWNER_NEAR = 1;
  *              — an enemy of this key whose skill `skill` (its data record's prefabKey) was cast in the fx's frame (the
  *              sim's castSlot comes in the same tick); 'near' — a standing enemy of this key within OWNER_NEAR tiles of the
  *              point (an fx at its feet that names no one); 'any' — the kind is this enemy's alone (假想敌：蚀裂's cloud lands
- *              on its killer after its death: no id, no frame of its own). A zone whose `extra.id` is that unit (【污染秽蚀】
- *              carries `pollution`'s src) matches as 'id' even when the field says 'cast'. SkillFx tries a 'died' owner
- *              within OWNER_NEAR before a cast the zone does not name, and a binding that draws nothing does not claim it.
- *   projectile / part / keys    the prefabs (bindingEffects; `part`: the projectile field to read)
- *   hold / holdS               how long the looping ones stay at the fx's point: 'fx' — the fx's `dur` (the zone's time) —,
- *              else `holdS`; `once`: the prefabs play once there, for their own life (a one-shot)
+ *              on its killer after its death: no id, no frame of its own); 'shell' — a shell a `shell` binding took at the
+ *              fx's point (its landing: the kit's 'bombard' comes where its 'bombardShell' went). A zone whose `extra.id`
+ *              is that unit (【污染秽蚀】 carries `pollution`'s src) matches as 'id' even when the field says 'cast'. SkillFx
+ *              tries a 'died' owner within OWNER_NEAR before a cast the zone does not name, and a binding that draws
+ *              nothing does not claim it.
+ *   projectile / part / parts / keys    the prefabs (bindingEffects; `part` / `parts`: the projectile field(s) to read)
+ *   hold / holdS               how long the looping ones stay at the fx's point: 'fx' — the fx's `dur` (the zone's time;
+ *              `holdKey`: that field of the fx instead) —, else `holdS`; `once`: the prefabs play once there, for their own
+ *              life (a one-shot)
+ *   shell      the fx is a shell in flight: its prefabs stay until its landing ('shell' owner), at most SHELL_GRACE_S past
+ *              the hold; `coverHits` (a landing): the first HP hit of that frame on each unit inside the fx's `r` is its
+ *              own (FxWiring.blasts)
  *   talent     instead of prefabs: the talent (prefab key) whose aura the fx is a tick of — while the unit's talent loops
  *              (render/vfx/talentfx.js) are drawn they stand for it, and one unclaimed HP hit in that frame on a unit
  *              inside the sim radius plays the aura's buff effects on it, offered to each aura (auraTargets)
@@ -1621,7 +1646,7 @@ export const OWNER_NEAR = 1;
  *              (a buff it creates at its tick: a condition talents.js cannot read, here the mode's own) — for its record's
  *              blackboard value `bbKey` (talents.bb), else `holdS` s; `endMode`: the fx ends it early
  */
-const ebind = (o) => Object.freeze({ ...o, ...(o.keys ? { keys: Object.freeze(o.keys) } : {}) });
+const ebind = (o) => Object.freeze({ ...o, ...(o.keys ? { keys: Object.freeze(o.keys) } : {}), ...(o.parts ? { parts: Object.freeze(o.parts) } : {}) });
 const POLLUTED_DIE = Object.freeze({
   // the client's PollutedDie talent (Talent/BslimeTalent_1) fires projectile_enemy_nhpbr_polluted where the unit falls: an
   // EffectBehaviour that plays enemy_nhpbr_attack_range on its target as it starts (_effectsToTargetWhenStart, looping)
@@ -1638,6 +1663,27 @@ const NEST_AURA = Object.freeze({
   // the AOE talent (AppearSyncedTalent / AuraAbility): its `_effects` loop while the unit stands (talentfx.js), and the
   // aura's buff enemy_dsubrl_aoe[aura] plays enemy_dsubrl_attack_hit on every unit in it at each tick (ON_BUFF_TRIGGER)
   pulse: ebind({ owner: 'id', talent: 'AOE' }),
+});
+/**
+ * 帝国炮火先兆者 / 中枢先兆者 (content/enemies/fly.js kitShell; GitHub #143 「炮火的火圈也没特效」): every normal attack is
+ * an 'atk' of kind 'mortar' with no damage (FxWiring.attack plays its cast row enemy_emppnt_attack_01_start_02 and flies
+ * nothing), a 'bombardShell' at the target's spot (id = the enemy, t = SHELL_FLIGHT 3 s) and, t s later, its 'bombard'
+ * of kind 'emppnt' there with the damage. The client's attack projectile projectile_enemy_emppnt does not fly either: its
+ * movement is AttachToTarget with `_delayToStart` 3 (index.json projectiles, its behaviours). As it starts it puts
+ * enemy_emppnt_attack_01_start on its target (_effectsToTargetWhenStart, spawn GROUND: the red crosshair zhunxing, 2.6 s,
+ * and the light pillar guangzhu, 2.4 s); its own effect enemy_emppnt_attack_01_trail waits its root's FxDelay 2.75 s,
+ * then its clip drops the missile (daodan with its flame huoyan) from 5.27 tiles up and 3.73 tiles back onto the spot
+ * in 0.27 s; reaching it at 3 s plays enemy_emppnt_attack_01_hit (_effectsWhenReached) and the projectile, which has no
+ * hit effect of its own, stops. So the 'bombardShell' plays the start effect and the trail at the spot until the shell's
+ * 'bombard', which plays the hit where that shell was taken and stands for the shell's hits on the units in its `r`.
+ * Before #143 the attack flew the projectile as an ordinary shot: the explosion came ~2.8 s before the damage, and the
+ * remake's own shell, closing ring and blast followed. [ASSUMED] the trail sits on the ground at the sim's spot with its
+ * root unturned (the client attaches the projectile to its target, `_followTarget` 0; the sim's spot is where the
+ * target stood); both prefabs are timed for the sim's 3 s.
+ */
+const EMPPNT_SHELL = Object.freeze({
+  bombardShell: ebind({ owner: 'id', projectile: 'projectile_enemy_emppnt', parts: ['toTargetOnStart', 'main'], hold: 'fx', holdKey: 't', holdS: 3, shell: true }),
+  bombard: ebind({ xkind: 'emppnt', owner: 'shell', projectile: 'projectile_enemy_emppnt', part: 'onReached', once: true, coverHits: true }),
 });
 export const ENEMY_FX_BINDINGS = Object.freeze({
   // 萨卡兹枯朽战士 / 组长 (content/enemies/archetypes.js kitPolluted: the 'zone' of kind 'pollution' where it fell — r =
@@ -1667,6 +1713,9 @@ export const ENEMY_FX_BINDINGS = Object.freeze({
   // (AppearSyncedTalent / AuraAbility) — its `_effects` loop while it stands, and the units in it carry enemy_cjhot_debuff
   // (its buff enemy_cjhot_t[aoe], INFINITY, tick 1)
   enemy_10054_cjhot: Object.freeze({ explode: ebind({ xkind: 'boil', owner: 'near', talent: 'aoe' }) }),
+  // 帝国炮火先兆者 / 中枢先兆者 (fly.js kitShell: 'bombardShell' id = it, t; its 'bombard' of kind 'emppnt' t s later)
+  enemy_1112_emppnt: EMPPNT_SHELL,
+  enemy_1112_emppnt_2: EMPPNT_SHELL,
   // 水遁忍者 (special.js: its 漩涡形态 — a 'telegraph' of kind 'spin' as it starts, id = it; then damage every
   // RotateDamage.interval s around it for EndRotate.rotate_duration s, ended early by 失衡's 'phase' of kind 'spinStop'):
   // the client's SwitchModeTrigger puts it in its mode M1 (RotateAttack), whose RotateEffect talent's buff
@@ -1682,7 +1731,7 @@ export const ENEMY_FX_BINDINGS = Object.freeze({
  * a death, a unit at the point, the kind alone; the fx itself is ranked again — the unit `extra.id` names, then a death
  * within OWNER_NEAR, then a cast the zone does not name (skillfx.js _fxRank).
  */
-const OWNER_ORDER = Object.freeze({ id: 0, cast: 1, died: 2, near: 3, any: 4 });
+const OWNER_ORDER = Object.freeze({ id: 0, shell: 0, cast: 1, died: 2, near: 3, any: 4 });
 export const ENEMY_FX_KINDS = Object.freeze((() => {
   const out = {};
   for (const [key, kinds] of Object.entries(ENEMY_FX_BINDINGS)) for (const kind of Object.keys(kinds)) (out[kind] ||= []).push(key);

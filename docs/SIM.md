@@ -92,10 +92,11 @@ the summons the same way, and the summons rank after the operators of all player
 field — units deploy one after another with a fixed delay from the battle start — and "两处阵地将前后拼接为一处阵地").
 
 外勤医疗's prepared slot is a preparation view record, not a combat `Unit`. The `battleStart` handler creates either
-预备干员-医疗 or Touch after counting deployed elites. [ASSUMED] Its effective targeting order precedes ordinary
-initial deployments (`preBattleAggroSeq`); its actual `deploySeq` still identifies the later runtime spawn. Prepared
-slots on a shared field follow player order [ASSUMED]. A later `spawnMapChar` without this option keeps its ordinary
-summon order (§30.22).
+预备干员-医疗 or Touch after counting deployed elites, on every player whose match bands include the grant — a teammate
+whose own 规程 command is a different effect, and a field kept after the holder has left. [ASSUMED] Its effective
+targeting order precedes ordinary initial deployments (`preBattleAggroSeq`); its actual `deploySeq` still identifies
+the later runtime spawn. Prepared slots on a shared field follow player order [ASSUMED]. A later `spawnMapChar`
+without this option keeps its ordinary summon order (§30.22).
 
 Register hooks before the first step (e.g. `opts.setup(battle)` or right after `new Battle`).
 
@@ -606,7 +607,7 @@ on the match/client side; `morphSlotPolicy` permits a third carried item only wh
 
 ## 2. Units
 
-**莱塔尼亚's enemy-shaped summons** (`content/bonds/lethania.js`; assumptions: DESIGN §5.5 and history §37.222): the bond creates one summon at each enemy knock-out—normally NOTE, or CHORUS in place of NOTE according to the six-operator probability—and, at six operators, triggers an additional summon at a qualifying owned operator's knock-out, using the same NOTE-or-CHORUS probability; its version blackboard supplies the chance and living-summon cap. Each summon belongs to the bond player and appears at the center of the death tile. [ASSUMED] In a shared field every installed player's bond sees any enemy knock-out, regardless of killer or field owner. The explicit token adapter preserves arts damage, movement speed, blocking capacity and the enemy record's MELEE / RANGED shape. Marked pursuers can overlap allies, other summons, downed bodies and non-deployable road tiles; they never own an `_occ` slot. The blocker scans their actual coordinates separately. A NOTE born with attackable enemies on its birth tile enters a local mode. Candidates must occupy that tile and be within the selector's 0.5 raw radius plus the target collider; a target blocked by another ally remains attackable and is never stolen. If an unblocked local target is in contact and NOTE has capacity, it takes the nearest eligible one through the normal block-capacity check [ASSUMED nearest tie]; without capacity it still attacks. Attack selection and pre-move commits stay local while any candidate remains. Once empty, NOTE returns permanently to global selection and does not re-enter if a later enemy comes onto that tile. A NOTE with no local birth candidate uses global selection immediately. CHORUS remains global. CHORUS uses strict 2.4 raw radius plus the target collider for selection and attack, and pauses once in range. Only these tokens pursue: a four-neighbour ground route avoids impassable terrain / obstacles but ignores friendly occupancy and downed bodies; movement spends real speed and synchronizes x/y, tile and range state, without changing `_occ`. Both pause for control, `noMove`, an attack clip, or while they hold an enemy. [ASSUMED] They choose a shortest ground route to a selectable target, with fixed direction tie order. With no living deployed enemy, each summon captures its own current tile center on its first empty-field tick, or when the field transitions from enemies present to none, then returns to that point. A new enemy clears the per-unit idle target. Capture occurs before movement-state gates, but movement still respects those gates; both types spawn at the death tile center before any empty-field tick. A living but unselectable enemy makes them hold. A spawn on a non-ground death tile stays at its center; no off-platform movement rule is inferred. CHORUS anti-air selection is [ASSUMED] because its enemy record has no selector field. Its reported multi-hit cadence and the bond-described +20 ASPD aura for Leithania operators remain separate discrepancies; see §37.140.
+**莱塔尼亚's enemy-shaped summons** (`content/bonds/lethania.js`; assumptions: DESIGN §5.5 and history §37.222): the bond creates one summon at each enemy knock-out—normally NOTE, or CHORUS in place of NOTE according to the six-operator probability—and, at six operators, triggers an additional summon at a qualifying owned operator's knock-out, using the same NOTE-or-CHORUS probability; its version blackboard supplies the chance and living-summon cap. Each summon belongs to the bond player and appears at the center of the death tile. [ASSUMED] In a shared field every installed player's bond sees any enemy knock-out, regardless of killer or field owner. The explicit token adapter preserves arts damage, movement speed, blocking capacity and the enemy record's MELEE / RANGED shape. Marked pursuers can overlap allies, other summons, downed bodies and non-deployable road tiles; they never own an `_occ` slot. The blocker scans their actual coordinates separately. A NOTE born with attackable enemies on its birth tile enters a local mode. Candidates must occupy that tile and be within the selector's 0.5 raw radius plus the target collider; a target blocked by another ally remains attackable and is never stolen. If an unblocked local target is in contact and NOTE has capacity, it takes the nearest eligible one through the normal block-capacity check [ASSUMED nearest tie]; without capacity it still attacks. Attack selection and pre-move commits stay local while any candidate remains. Once empty, NOTE returns permanently to global selection and does not re-enter if a later enemy comes onto that tile. A NOTE with no local birth candidate uses global selection immediately. CHORUS remains global. CHORUS uses strict 2.4 raw radius plus the target collider for selection and attack, and pauses once in range. Only these tokens pursue: a four-neighbour ground route avoids impassable terrain / obstacles but ignores friendly occupancy and downed bodies; movement spends real speed and synchronizes x/y, tile and range state, without changing `_occ`. Both pause for control, `noMove`, an attack clip, or while they hold an enemy. [ASSUMED] They choose a shortest ground route to a selectable target, with fixed direction tie order. With no living deployed enemy, each summon captures its own current tile center on its first empty-field tick, or when the field transitions from enemies present to none, then returns to that point. A new enemy clears the per-unit idle target. Capture occurs before movement-state gates, but movement still respects those gates; both types spawn at the death tile center before any empty-field tick. A living but unselectable enemy makes them hold. A spawn on a non-ground death tile stays at its center; no off-platform movement rule is inferred. CHORUS anti-air selection is [ASSUMED] because its enemy record has no selector field. Its reported multi-hit cadence and the bond-described +20 ASPD aura for Leithania operators remain separate discrepancies; see §37.140. Both NOTE and CHORUS hold 禁疗 (`abnormal: ['healFree']`, permanent `noHeal` + `healFree` flags per PRTS): healing abilities cannot target or directly heal them, while HP regeneration (`hpRegen`) still applies.
 
 `Unit` fields: `id, side ('ally'|'enemy'), kind ('op'|'token'|'enemy'|'device'), defId, def (normalised), name, ownerId
 (playerId), uid (board piece), ownerUnit (tokens), skin (the owner's skinId, display only — stored and published, never read by a rule; absent from `Battle.result()`, docs/SKINS.md), x, y (floats; x = col, y = row), tileR, tileC (allies), homeR, homeC
@@ -969,7 +970,16 @@ describes as raising the target's 生命回复速度 are hpRegen buffs, never `h
 收割者 / 不屈者 / 武者) do not stop them: the 吟游者 trait (professions.js `bardRegen`, 分支特性信息 吟游者; 魔王's 微尘 ×1.5
 through its `bardRegen` hook; 浊心斯卡蒂 and her 海嗣), 调香师's 熏衣草, 瑕光 S2, 铃兰 S3 (none in its first second, refreshed
 every second), 锡人's 炼金单元 (GitHub #96 / #137) and 引星棘刺's S1 / S2 炼金单元 (the same wording and blackboard key as
-锡人 S2; a community report, 0.2.2); `overheal`
+锡人 S2; a community report, 0.2.2), and 规程【聚合】(`content/bonds/regulation.js` `installDoc`, effect
+`act3autochess_bond_eff_doc`, GitHub #983): each on-field member refreshes an `hpRegen` buff
+(`bond:doc:regen:<member id>`, current ATK × (heal_base + heal_per_stack × layers)) on this player's operators and
+summons standing in its current attack range, skill-widened grids included, and on itself only when its own tile is
+in that range. Overlapping members add. The refresh reuses the bard rhythm, 0.25 s / 0.5 s [ASSUMED] (the ability
+prefab `act3autochess_bond_doc_ability` is not in the tables). It is not `bardRegen`, so 魔王 does not scale it.
+[ASSUMED] devices and a unit that is not this player's ally are outside 「我方单位」. Element recovery stays a 1 s
+`healElement` of ep_heal_base + ep_heal_per_stack × layers: the engine has no `EP_RECOVERY_PER_SEC` stat. 庇护 stays
+the separate 1 s `bond:doc:res` check (operators only, strongest member, dropped when nobody covers the operator);
+`overheal`
 turns the excess into an `overheal` shield. `battle.loseHp(target, amount, { source, from, tags, silent, sourceless })` = HP
 loss ignoring DEF/RES/shields/dodge (流失); `sourceless: true` makes it 无来源 ("受到等量的无来源生命流失": hooks see no source,
 `source` keeps the credit — stats and the per-player shared-pool tally), as does a 无来源 `from`. A 流失 skips the damage
@@ -986,9 +996,18 @@ and 扎罗's 溶血骇惧; "受到N真实伤害" over time is damage (PRTS 伤�
 `'dot'` / `'periodic'` (player report D1). Terrain ticks (`content/devices.js`): 深水区's 【水蚀】 is the same kind (PRTS 涨潮控制
 深水 "无来源真实持续伤害（不属于环境伤害，不会触发受击回复）": `noSp`, tags `'dot'` / `'periodic'` / `'deepsea'`); 活性源石's is
 无来源 true damage tagged `'terrain'` — 环境伤害 (PRTS 自然环境), what "受到来自自然环境的伤害" content (纠缠藤蔓) reads — and
-not `'dot'` [ASSUMED] (DESIGN §22.4). 规程 `tile_speedup` (glyph `z`) is not a tick: a ground unit standing on it gains
-ASPD +`attack_speed` and move ×`move_speed` (`stage.special.speedup`, official 25 / 1.5), both sides, cleared on leaving;
-flyers skip it. Glyph `w` (`tile_duel_grassland`) grants both sides' ground units Stealth through the independent
+not `'dot'` [ASSUMED] (DESIGN §22.4). 规程 `tile_speedup` (glyph `z`) is not a tick. The buff template's
+success branch gives a ground ally whose profession is one of PIONEER / WARRIOR / TANK / SNIPER / CASTER / MEDIC /
+SUPPORT / SPECIAL / TOKEN flat ASPD +`attack_speed` (official 25, from `stage.special.speedup`); the fail branch gives
+a ground enemy move ×`move_speed` (official 1.5) and no ASPD. Both children are infinite and are not removed when the
+parent tile buff ends, so they stay after the unit leaves the tile, until a 重生 clears them or the unit leaves the
+field. Standing on the tile again does not stack (maxStack 1). Flyers skip it (`terrainFor`). Devices are not allies of
+those professions. 规程 盐坨子炮 (`trap_196_cnnon`, role `cannon`) stands on the separator just above the field
+(row = rect.r1 + 1, facing DOWN; `spawnDevice` `allowOutside`) and does not block the road. Every 6 s (`sktok_cnnon`
+SP; the stage runes `char_skill_cd_mul` / `char_attribute_add` are not applied [ASSUMED]) it deals its ATK as physical
+damage to allies on the far tile of range 4-1 and moves one adjacent ground enemy of 重量 ≤ 3 onto that tile.
+Operators can attack it. 寻险水手 (`enemy_10043_sailor`) gains a short move-speed buff from that teleport only.
+Glyph `w` (`tile_duel_grassland`) grants both sides' ground units Stealth through the independent
 `terrain:duelGrass` buff. Leaving clears only that source; blocked enemies are visible and regain it after
 `stage.special.duelGrass.enemyStealthRestoreSec` seconds (`stealthRestore`, fallback 0). The official value is 0, so
 release is immediate. Flyers skip it. Source: official tile/buff prefabs, [field receipt](research/regulation-map09-20261112.json). The 源石溶剂 drain also ticks on every 敌人类我方单位 of the field (炎佑, a
@@ -1049,6 +1068,7 @@ registration order. `battle.off(handle)` / `battle.off(name, fn)` / `battle.offO
 | `dodge` | `{ source, target, dmg }` | an attack was dodged |
 | `boomerangCaught` | `{ unit, attackId, isSkill, x, y }` | a 回环射手 boomerang came back to its thrower (`ai.js throwBoomerang`; `isSkill` = thrown by a skill attack): 娜仁图亚 LPS-Y "每回收5次回旋投射物", S3 "投射物全部回收时" |
 | `layerGain` | `{ playerId, bondId, n, reason, source, tile }` | mutable `n` before recording (魔王 +1 …), then clamped to the room left under `BOND_LAYER_CAP` (999); not emitted for a bond already at the cap; `tile` = `[r, c]` where `source` stands — or was knocked out this very instant ("被击倒时" gains) — else null (`addLayers` opts.tile overrides) |
+| `bondLayersChanged` | `{ playerId, bondId, n }` | After a permanent or temporary layer write. `n` is the actual signed change. Standing effects can read the updated count via `effectiveBondLayers`. A zero change emits nothing. |
 | `merchantPay` | `{ unit, cost, cancel }` | a merchant (行商) is about to pay its periodic DP; change `cost` or set `cancel` |
 | `battleEnd` | `{ result }` | may still add layer gains / coins |
 
@@ -1089,7 +1109,7 @@ logged error names the open frames (`chain: hit(enemy_x→chess_y) > damaged(che
 | `enemiesInKeys(keys, attacker, profile)`, `enemiesOnTiles(keys, attacker, profile)`, `blockedTargets(unit, profile)` | targetable enemies in the range of the tiles — a regular one by its 0.1 collider, each listed once (a `rangeTiles` attacker: by tile) —, or standing on them (`enemiesOnTiles`, the tile rule: the tile of the position; a huge one on its rectangle's tiles); the enemies a unit blocks — always selectable by it, a ranged operator on a melee tile included (§1.2 Blocking) |
 | `setAllyTarget(unit, on)`, `allyTargetsInKeys(keys, attacker)`, `isAllyTarget(unit)` | an **ally target**: an ally unit our attacks select like an enemy — 白铁's 铁钳号·原型机, a summon of the enemy camp ("可被我方干员攻击但不受伤害", PRTS; kits/ops/op-ironmn.js). The attack loop (ai.js `acquireTargets`) appends the registered ones standing on the attacker's range after every enemy (their 嘲讽等级 −2 puts them last: one target ⇒ an enemy first; all in range / more targets ⇒ them too) and ranged attacks fly to them; heals, skills that pick their own victims and enemies never select them (the kit gives it `untargetable` against enemies and cancels the damage it takes in its `hit` hook). A skill that acts on them counts the registered ones like enemies for its automatic start (skills.js `_allyTargetIn` / `allyTargetsOk`, every enemy condition of the trigger rules — the owner's rule of 2026-10-08): one that acts through the unit's own attacks, or whose kit flags `allyTargets: true` because its selectors take them too (`allyTargetsInKeys` / `allyTargetsInRadius`: 蕾缪安 S3's locks, 艾丽妮 S3, 陈 S2, 引星棘刺 S2); [ASSUMED] a skill that picks its victims among enemies only (or whose kit says `allyTargets: false`) is not opened by them and waits for an enemy. None registered ⇒ the loop is unchanged |
 | `allies(ownerId?)`, `aliveEnemies()`, `unitAt(r, c)`, `unitById(id)`, `tileInfo(r, c)`, `lowestHpAllyInRange(unit)` | |
-| `addLayers(playerId, bondId, n, reason, {source})`, `addTempLayers(playerId, bondId, n)`, `addCoins(playerId, n)` | layers are a no-op when `flags.layerGainsEnabled` is false (unite/boss); a gain adds at most the room left under `BOND_LAYER_CAP` (999, shared/constants.js `layerGainRoom`: the client's `AddBondCount` min(L + n, 999)) on the live copy — or, without one, on the battle's own gains — and returns what it added (0 at the cap: no hook, no event). `addTempLayers` writes `perPlayer.tempLayerGains` only (规程; the field is omitted when empty; no `layerGain` hook) |
+| `addLayers(playerId, bondId, n, reason, {source})`, `addTempLayers(playerId, bondId, n)`, `removeTempLayers(playerId, bondId, n)`, `tempLayers(playerId, bondId)`, `effectiveBondLayers(playerId, bondId)`, `tempLayersSnapshot()`, `addCoins(playerId, n)` | `addLayers` is a no-op when `flags.layerGainsEnabled` is false (联防 always; boss and hidden follow `config.finalAssault.layerGainsEnabled`, true only for 规程). It returns the actual permanent gain under `BOND_LAYER_CAP` (999), after the pre-write `layerGain` modifiers. Temporary layers use a separate battle-local ledger capped at 10000 per player/bond; add/remove return actual positive amounts and never invoke `layerGain`. `tempLayerGain` is a post-write positive receipt; `tempLayerChange` is a post-write signed receipt `{ playerId, bondId, n, total }` on both gain/removal. `tempLayers` reads the temporary count; `effectiveBondLayers` and content support `bondLayers` read permanent + temporary. `tempLayersSnapshot()` returns a detached snapshot for hosts/Workers. Normal/boss/hidden battles report the temporary balance in optional `perPlayer.tempLayerGains`. Unite restores `PlayerBattleInput.tempLayers` before content installation, freezes that ledger (no add/remove), and omits fresh temporary receipts. The match retains the own balance through combat end and SETTLE, converts only at the next `enterPrep`/`onPrepStart`, then clears it. Finished Battles reject further changes; only unite restores a carried ledger. |
 | `getPlayer(playerId)` | `{ playerId, seat, side, colOffset, mirror, dir (default unit direction: RIGHT, mirrored side LEFT), facing (its sign), bonds (live copy, layers updated by addLayers), bandId, playerEffects, lpForBoss, dp, units }` |
 | `mapTile(ps, row, col, abs?)` / `mapDir(ps, dir, abs?)` | board → field tile / direction of a player (the FA right-side mirror) |
 | `onOwnBoard(ps, r, c)` | whether a field tile lies on the player's own board — GEO.FIELD (rows 9–12, cols 2–10) mapped onto this field: the 联防 right-hand helper's +8 columns, the boss field's rows 2–5 (never its hand / 临时整备区 rows 0–1), the mirrored right half; 乌尔比安's S3 【移动】 takes only such tiles (DESIGN §25.17.2) |
@@ -1307,9 +1327,10 @@ silently inert until M2 (DESIGN §35.22.5): in 上半, the traits of 煌 (`SERVE
 spells the field `give_garrion_id`; `garrisons/battle.js` reads `give_garrison_id`); the 标准模拟 band clause
 `act1autochess_band31_buff` on four bandIds 下半 also has; 灵巧's 20-layer award `bond_layer_refresh_shop_award_equip`
 and 远见's 100-layer discount; and six 上半 equipment keys (商业包装方案, 信标, 寻呼模块, `act1autochess_equip_acarm055` /
-`078` / `102_global_buff`); in V2_1, 远见's two discount keys, which the code does not read: `bond_layer_char_goods_price_bond_discount` (V2_1 only)
+`078` / `102_global_buff`); in V2_1, 远见's two discount keys, which the code did not read before M2: `bond_layer_char_goods_price_bond_discount` (V2_1 only)
 and `bond_layer_char_goods_price_discount` (also 上半's 100-layer key), not V2_2's
-`bond_multi_layer_char_goods_price_bond_discount`. No class sees a changed text under the same keys: V2_1's 陈 以己之长
+`bond_multi_layer_char_goods_price_bond_discount` (`bonds/addon/meta.js` reads both since 0.3.2's M2 port; they stack,
+80 layers 远见 −1 and 150 layers every operator a further −1, §37.343). No class sees a changed text under the same keys: V2_1's 陈 以己之长
 reaches 高台 operators only, `bands/battle.js` every operator as in V2_2 (DESIGN §35.22.5). Nor does any class report 上半's 森蚺 (`band_zumama`): it carries Touch's key `auto_chess_change_map`, which the default data has (same key, different meaning: the M2 audit), with device aliases
 (`trap_1104_aclasert#1`…`#4`, one 双眼皮 on every field). `bands/battle.js isMapCharBuff` accepts only Touch's
 map-character shape, so 森蚺 has no battle part (nor the AI's team-support class) until M2 builds its device switch. The
@@ -1718,7 +1739,8 @@ Unknown subprofessions fall back to the profession default (test `professions.te
   client plays the deploy and its interpolation snaps instead of sliding), `['atk', src, tgt, projKind]`
   (`none|arrow|bolt|bomb|lob|orb|drone|enemy|boomerang|droneBomb|chain|chainHeal`; a boomerang's way back has no event —
   the renderer flies it back to the thrower at `BOOMERANG_RETURN_SPEED`; an enemy's `profile.shot` may name another
-  kind, e.g. `mortar` for 帝国炮火先兆者, which the renderer does not draw — its fx `bombardShell` is the shell), `['dmg', tgt,
+  kind, e.g. `mortar` for 帝国炮火先兆者, for which the renderer flies no projectile (官方特效: its cast row only) — its fx
+  `bombardShell` is the shell, its `bombard` the landing), `['dmg', tgt,
   amount, type]` (`phys|arts|true|burn|neural|necrosis|apoptosis`), `['heal', tgt, amount]`, `['skill', id, 1|0]`,
   `['engage', id]` (an ally's first attack that hits an enemy — the client's 行动开始 voice, DESIGN §21.30), `['die', id,
   reason]`, `['leak', id]`, `['status', id, key, 1|0]`, `['fx', kind, x, y, extra]` (`hitCap` `{ id, n }`: a leader's
@@ -1742,6 +1764,10 @@ Unknown subprofessions fall back to the profession default (test `professions.te
 ---
 
 ## 10. Testing content (test/helpers/battleHarness.js)
+
+The enemy-status garrison event maps `check_ab_flag` 16 to `freeze` and 33 to `fear`. Regulation Nymph's fear
+trigger is tested with the real version records and S2 in `test/garrisons/regulation.test.js`, including range,
+active Swift, new entries versus refreshes, the 4/8-layer grant and the 20/40-layer per-battle cap.
 
 ```js
 import { test } from 'node:test';
@@ -1987,3 +2013,12 @@ field. The flag lasts only until that one-shot callback fires (or is cancelled);
 open normally. Ordinary cosmetic callbacks do not receive this flag. Regulation's `replaceLater` snapshots the
 remaining route and position at death, uses this flag for positive delays and spawns zero-delay replacements
 immediately. See [the source record](research/sarkaz-death-spawns-20261113.md).
+
+### Salt cannon passenger projectiles
+
+`content/saltCannon.js` uses the existing Projectiles manager. On impact, the shot deals Physical splash damage
+to selectable allies in the landing tile's 3×3 grid, then releases the original passenger onto its landing route.
+Only a cancelled final (`*_death`) shot kills its passenger. [ASSUMED] Cancelling an ordinary shot leaves Eat's
+passenger hidden in the cannon until a later shot releases it. Fixed enemy-side devices do not move, count as
+wave enemies or prevent a clear. The fatal hook preserves the initial 1 HP floor; subsequent destruction uses
+a source-less kill, so operators receive no kill credit for the cannon's own InstantKill.
